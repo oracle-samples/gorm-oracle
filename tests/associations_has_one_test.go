@@ -1,0 +1,307 @@
+/*
+** Copyright (c) 2025 Oracle and/or its affiliates.
+**
+** The Universal Permissive License (UPL), Version 1.0
+**
+** Subject to the condition set forth below, permission is hereby granted to any
+** person obtaining a copy of this software, associated documentation and/or data
+** (collectively the "Software"), free of charge and under any and all copyright
+** rights in the Software, and any and all patent rights owned or freely
+** licensable by each licensor hereunder covering either (i) the unmodified
+** Software as contributed to or provided by such licensor, or (ii) the Larger
+** Works (as defined below), to deal in both
+**
+** (a) the Software, and
+** (b) any piece of software and/or hardware listed in the lrgrwrks.txt file if
+** one is included with the Software (each a "Larger Work" to which the Software
+** is contributed by such licensors),
+**
+** without restriction, including without limitation the rights to copy, create
+** derivative works of, display, perform, and distribute the Software and make,
+** use, sell, offer for sale, import, export, have made, and have sold the
+** Software and the Larger Work(s), and to sublicense the foregoing rights on
+** either these or other terms.
+**
+** This license is subject to the following condition:
+** The above copyright notice and either this complete permission notice or at
+** a minimum a reference to the UPL must be included in all copies or
+** substantial portions of the Software.
+**
+** THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+** IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+** FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+** AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+** LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+** OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+** SOFTWARE.
+ */
+
+package tests
+
+import (
+	"testing"
+
+	. "github.com/oracle/gorm-oracle/tests/utils"
+)
+
+func TestHasOneAssociation(t *testing.T) {
+	user := *GetUser("hasone", Config{Account: true})
+
+	if err := DB.Create(&user).Error; err != nil {
+		t.Fatalf("errors happened when create: %v", err)
+	}
+
+	CheckUser(t, user, user)
+
+	// Find
+	var user2 User
+	DB.Find(&user2, "\"id\" = ?", user.ID)
+	DB.Model(&user2).Association("Account").Find(&user2.Account)
+	CheckUser(t, user2, user)
+
+	// Count
+	AssertAssociationCount(t, user, "Account", 1, "")
+
+	// Append
+	account := Account{AccountNumber: "account-has-one-append"}
+
+	if err := DB.Model(&user2).Association("Account").Append(&account); err != nil {
+		t.Fatalf("Error happened when append account, got %v", err)
+	}
+
+	if account.ID == 0 {
+		t.Fatalf("Account's ID should be created")
+	}
+
+	user.Account = account
+	CheckUserSkipUpdatedAt(t, user2, user)
+
+	AssertAssociationCount(t, user, "Account", 1, "AfterAppend")
+
+	// Replace
+	account2 := Account{AccountNumber: "account-has-one-replace"}
+
+	if err := DB.Model(&user2).Association("Account").Replace(&account2); err != nil {
+		t.Fatalf("Error happened when append Account, got %v", err)
+	}
+
+	if account2.ID == 0 {
+		t.Fatalf("account2's ID should be created")
+	}
+
+	user.Account = account2
+	CheckUserSkipUpdatedAt(t, user2, user)
+
+	AssertAssociationCount(t, user2, "Account", 1, "AfterReplace")
+
+	// Delete
+	if err := DB.Model(&user2).Association("Account").Delete(&Account{}); err != nil {
+		t.Fatalf("Error happened when delete account, got %v", err)
+	}
+	AssertAssociationCount(t, user2, "Account", 1, "after delete non-existing data")
+
+	if err := DB.Model(&user2).Association("Account").Delete(&account2); err != nil {
+		t.Fatalf("Error happened when delete Account, got %v", err)
+	}
+	AssertAssociationCount(t, user2, "Account", 0, "after delete")
+
+	// Prepare Data for Clear
+	account = Account{AccountNumber: "account-has-one-append"}
+	if err := DB.Model(&user2).Association("Account").Append(&account); err != nil {
+		t.Fatalf("Error happened when append Account, got %v", err)
+	}
+
+	AssertAssociationCount(t, user2, "Account", 1, "after prepare data")
+
+	// Clear
+	if err := DB.Model(&user2).Association("Account").Clear(); err != nil {
+		t.Errorf("Error happened when clear Account, got %v", err)
+	}
+
+	AssertAssociationCount(t, user2, "Account", 0, "after clear")
+}
+
+func TestHasOneAssociationWithSelect(t *testing.T) {
+	user := *GetUser("hasone", Config{Account: true})
+
+	DB.Omit("Account.AccountNumber").Create(&user)
+
+	AssertAssociationCount(t, user, "Account", 1, "")
+
+	var account Account
+	DB.Model(&user).Association("Account").Find(&account)
+	if account.AccountNumber != "" {
+		t.Errorf("account's number should not be saved")
+	}
+}
+
+func TestHasOneAssociationForSlice(t *testing.T) {
+	users := []User{
+		*GetUser("slice-hasone-1", Config{Account: true}),
+		*GetUser("slice-hasone-2", Config{Account: false}),
+		*GetUser("slice-hasone-3", Config{Account: true}),
+	}
+
+	DB.Create(&users)
+
+	// Count
+	AssertAssociationCount(t, users, "Account", 2, "")
+
+	// Find
+	var accounts []Account
+	if DB.Model(&users).Association("Account").Find(&accounts); len(accounts) != 2 {
+		t.Errorf("accounts count should be %v, but got %v", 3, len(accounts))
+	}
+
+	// Append
+	DB.Model(&users).Association("Account").Append(
+		&Account{AccountNumber: "account-slice-append-1"},
+		&Account{AccountNumber: "account-slice-append-2"},
+		&Account{AccountNumber: "account-slice-append-3"},
+	)
+
+	AssertAssociationCount(t, users, "Account", 3, "After Append")
+
+	// Replace -> same as append
+
+	// Delete
+	if err := DB.Model(&users).Association("Account").Delete(&users[0].Account); err != nil {
+		t.Errorf("no error should happened when deleting account, but got %v", err)
+	}
+
+	AssertAssociationCount(t, users, "Account", 2, "after delete")
+
+	// Clear
+	DB.Model(&users).Association("Account").Clear()
+	AssertAssociationCount(t, users, "Account", 0, "After Clear")
+}
+
+func TestPolymorphicHasOneAssociation(t *testing.T) {
+	pet := Pet{Name: "hasone", Toy: Toy{Name: "toy-has-one"}}
+
+	if err := DB.Create(&pet).Error; err != nil {
+		t.Fatalf("errors happened when create: %v", err)
+	}
+
+	CheckPet(t, pet, pet)
+
+	// Find
+	var pet2 Pet
+	DB.Find(&pet2, "\"id\" = ?", pet.ID)
+	DB.Model(&pet2).Association("Toy").Find(&pet2.Toy)
+	CheckPet(t, pet2, pet)
+
+	// Count
+	AssertAssociationCount(t, pet, "Toy", 1, "")
+
+	// Append
+	toy := Toy{Name: "toy-has-one-append"}
+
+	if err := DB.Model(&pet2).Association("Toy").Append(&toy); err != nil {
+		t.Fatalf("Error happened when append toy, got %v", err)
+	}
+
+	if toy.ID == 0 {
+		t.Fatalf("Toy's ID should be created")
+	}
+
+	pet.Toy = toy
+	CheckPetSkipUpdatedAt(t, pet2, pet)
+
+	AssertAssociationCount(t, pet, "Toy", 1, "AfterAppend")
+
+	// Replace
+	toy2 := Toy{Name: "toy-has-one-replace"}
+
+	if err := DB.Model(&pet2).Association("Toy").Replace(&toy2); err != nil {
+		t.Fatalf("Error happened when append Toy, got %v", err)
+	}
+
+	if toy2.ID == 0 {
+		t.Fatalf("toy2's ID should be created")
+	}
+
+	pet.Toy = toy2
+	CheckPetSkipUpdatedAt(t, pet2, pet)
+
+	AssertAssociationCount(t, pet2, "Toy", 1, "AfterReplace")
+
+	// Delete
+	if err := DB.Model(&pet2).Association("Toy").Delete(&Toy{}); err != nil {
+		t.Fatalf("Error happened when delete toy, got %v", err)
+	}
+	AssertAssociationCount(t, pet2, "Toy", 1, "after delete non-existing data")
+
+	if err := DB.Model(&pet2).Association("Toy").Delete(&toy2); err != nil {
+		t.Fatalf("Error happened when delete Toy, got %v", err)
+	}
+	AssertAssociationCount(t, pet2, "Toy", 0, "after delete")
+
+	// Prepare Data for Clear
+	toy = Toy{Name: "toy-has-one-append"}
+	if err := DB.Model(&pet2).Association("Toy").Append(&toy); err != nil {
+		t.Fatalf("Error happened when append Toy, got %v", err)
+	}
+
+	AssertAssociationCount(t, pet2, "Toy", 1, "after prepare data")
+
+	// Clear
+	if err := DB.Model(&pet2).Association("Toy").Clear(); err != nil {
+		t.Errorf("Error happened when clear Toy, got %v", err)
+	}
+
+	AssertAssociationCount(t, pet2, "Toy", 0, "after clear")
+}
+
+func TestPolymorphicHasOneAssociationForSlice(t *testing.T) {
+	pets := []Pet{
+		{Name: "hasone-1", Toy: Toy{Name: "toy-has-one"}},
+		{Name: "hasone-2", Toy: Toy{}},
+		{Name: "hasone-3", Toy: Toy{Name: "toy-has-one"}},
+	}
+
+	DB.Create(&pets)
+
+	// Count
+	AssertAssociationCount(t, pets, "Toy", 2, "")
+
+	// Find
+	var toys []Toy
+	if DB.Model(&pets).Association("Toy").Find(&toys); len(toys) != 2 {
+		t.Errorf("toys count should be %v, but got %v", 3, len(toys))
+	}
+
+	// Append
+	DB.Model(&pets).Association("Toy").Append(
+		&Toy{Name: "toy-slice-append-1"},
+		&Toy{Name: "toy-slice-append-2"},
+		&Toy{Name: "toy-slice-append-3"},
+	)
+
+	AssertAssociationCount(t, pets, "Toy", 3, "After Append")
+
+	// Replace -> same as append
+
+	// Delete
+	if err := DB.Model(&pets).Association("Toy").Delete(&pets[0].Toy); err != nil {
+		t.Errorf("no error should happened when deleting toy, but got %v", err)
+	}
+
+	AssertAssociationCount(t, pets, "Toy", 2, "after delete")
+
+	// Clear
+	DB.Model(&pets).Association("Toy").Clear()
+	AssertAssociationCount(t, pets, "Toy", 0, "After Clear")
+}
+
+func TestHasOneAssociationReplaceWithNonValidValue(t *testing.T) {
+	user := User{Name: "jinzhu", Account: Account{AccountNumber: "1"}}
+
+	if err := DB.Create(&user).Error; err != nil {
+		t.Fatalf("errors happened when create: %v", err)
+	}
+
+	if err := DB.Model(&user).Association("Languages").Replace(Account{AccountNumber: "2"}); err == nil {
+		t.Error("expected association error to be not nil")
+	}
+}

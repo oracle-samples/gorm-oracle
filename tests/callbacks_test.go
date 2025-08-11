@@ -1,0 +1,292 @@
+/*
+** Copyright (c) 2025 Oracle and/or its affiliates.
+**
+** The Universal Permissive License (UPL), Version 1.0
+**
+** Subject to the condition set forth below, permission is hereby granted to any
+** person obtaining a copy of this software, associated documentation and/or data
+** (collectively the "Software"), free of charge and under any and all copyright
+** rights in the Software, and any and all patent rights owned or freely
+** licensable by each licensor hereunder covering either (i) the unmodified
+** Software as contributed to or provided by such licensor, or (ii) the Larger
+** Works (as defined below), to deal in both
+**
+** (a) the Software, and
+** (b) any piece of software and/or hardware listed in the lrgrwrks.txt file if
+** one is included with the Software (each a "Larger Work" to which the Software
+** is contributed by such licensors),
+**
+** without restriction, including without limitation the rights to copy, create
+** derivative works of, display, perform, and distribute the Software and make,
+** use, sell, offer for sale, import, export, have made, and have sold the
+** Software and the Larger Work(s), and to sublicense the foregoing rights on
+** either these or other terms.
+**
+** This license is subject to the following condition:
+** The above copyright notice and either this complete permission notice or at
+** a minimum a reference to the UPL must be included in all copies or
+** substantial portions of the Software.
+**
+** THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+** IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+** FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+** AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+** LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+** OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+** SOFTWARE.
+ */
+
+package tests
+
+import (
+	"fmt"
+	"reflect"
+	"runtime"
+	"strings"
+	"testing"
+
+	"gorm.io/gorm"
+)
+
+func assertCallbacks(v interface{}, fnames []string) (result bool, msg string) {
+	var (
+		got   []string
+		funcs = reflect.ValueOf(v).Elem().FieldByName("fns")
+	)
+
+	for i := 0; i < funcs.Len(); i++ {
+		got = append(got, getFuncName(funcs.Index(i)))
+	}
+
+	return fmt.Sprint(got) == fmt.Sprint(fnames), fmt.Sprintf("expects %v, got %v", fnames, got)
+}
+
+func getFuncName(fc interface{}) string {
+	reflectValue, ok := fc.(reflect.Value)
+	if !ok {
+		reflectValue = reflect.ValueOf(fc)
+	}
+
+	fnames := strings.Split(runtime.FuncForPC(reflectValue.Pointer()).Name(), ".")
+	return fnames[len(fnames)-1]
+}
+
+func c1(*gorm.DB) {}
+func c2(*gorm.DB) {}
+func c3(*gorm.DB) {}
+func c4(*gorm.DB) {}
+func c5(*gorm.DB) {}
+func c6(*gorm.DB) {}
+
+func TestCallbacks(t *testing.T) {
+	type callback struct {
+		name    string
+		before  string
+		after   string
+		remove  bool
+		replace bool
+		err     string
+		match   func(*gorm.DB) bool
+		h       func(*gorm.DB)
+	}
+
+	datas := []struct {
+		callbacks []callback
+		err       string
+		results   []string
+	}{
+		{
+			callbacks: []callback{{h: c1}, {h: c2}, {h: c3}, {h: c4}, {h: c5}},
+			results:   []string{"c1", "c2", "c3", "c4", "c5"},
+		},
+		{
+			callbacks: []callback{{h: c1}, {h: c2}, {h: c3}, {h: c4}, {h: c5, before: "c4"}},
+			results:   []string{"c1", "c2", "c3", "c5", "c4"},
+		},
+		{
+			callbacks: []callback{{h: c1}, {h: c2}, {h: c3}, {h: c4, after: "c5"}, {h: c5}},
+			results:   []string{"c1", "c2", "c3", "c5", "c4"},
+		},
+		{
+			callbacks: []callback{{h: c1}, {h: c2}, {h: c3}, {h: c4, after: "c5"}, {h: c5, before: "c4"}},
+			results:   []string{"c1", "c2", "c3", "c5", "c4"},
+		},
+		{
+			callbacks: []callback{{h: c1}, {h: c2, before: "c4", after: "c5"}, {h: c3}, {h: c4}, {h: c5}},
+			results:   []string{"c1", "c5", "c2", "c3", "c4"},
+		},
+		{
+			callbacks: []callback{{h: c1, after: "c3"}, {h: c2, before: "c4", after: "c5"}, {h: c3, before: "c5"}, {h: c4}, {h: c5}},
+			results:   []string{"c3", "c1", "c5", "c2", "c4"},
+		},
+		{
+			callbacks: []callback{{h: c1, before: "c4", after: "c3"}, {h: c2, before: "c4", after: "c5"}, {h: c3, before: "c5"}, {h: c4}, {h: c5}},
+			results:   []string{"c3", "c1", "c5", "c2", "c4"},
+		},
+		{
+			callbacks: []callback{{h: c1, before: "c3", after: "c4"}, {h: c2, before: "c4", after: "c5"}, {h: c3, before: "c5"}, {h: c4}, {h: c5}},
+			err:       "conflicting",
+		},
+		{
+			callbacks: []callback{{h: c1}, {h: c2, before: "c4", after: "c5"}, {h: c3}, {h: c4}, {h: c5}, {h: c2, remove: true}},
+			results:   []string{"c1", "c3", "c4", "c5"},
+		},
+		{
+			callbacks: []callback{{h: c1}, {name: "c", h: c2}, {h: c3}, {name: "c", h: c4, replace: true}},
+			results:   []string{"c1", "c4", "c3"},
+		},
+		{
+			callbacks: []callback{{h: c1}, {h: c2, before: "c4", after: "c5"}, {h: c3}, {h: c4}, {h: c5, before: "*"}},
+			results:   []string{"c5", "c1", "c2", "c3", "c4"},
+		},
+		{
+			callbacks: []callback{{h: c1}, {h: c2, before: "c4", after: "c5"}, {h: c3, before: "*"}, {h: c4}, {h: c5, before: "*"}},
+			results:   []string{"c3", "c5", "c1", "c2", "c4"},
+		},
+		{
+			callbacks: []callback{{h: c1}, {h: c2, before: "c4", after: "c5"}, {h: c3, before: "c4", after: "*"}, {h: c4, after: "*"}, {h: c5, before: "*"}},
+			results:   []string{"c5", "c1", "c2", "c3", "c4"},
+		},
+	}
+
+	for idx, data := range datas {
+		db, err := gorm.Open(nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		callbacks := db.Callback()
+
+		for _, c := range data.callbacks {
+			var v interface{} = callbacks.Create()
+			callMethod := func(s interface{}, name string, args ...interface{}) {
+				var argValues []reflect.Value
+				for _, arg := range args {
+					argValues = append(argValues, reflect.ValueOf(arg))
+				}
+
+				results := reflect.ValueOf(s).MethodByName(name).Call(argValues)
+				if len(results) > 0 {
+					v = results[0].Interface()
+				}
+			}
+
+			if c.name == "" {
+				c.name = getFuncName(c.h)
+			}
+
+			if c.before != "" {
+				callMethod(v, "Before", c.before)
+			}
+
+			if c.after != "" {
+				callMethod(v, "After", c.after)
+			}
+
+			if c.match != nil {
+				callMethod(v, "Match", c.match)
+			}
+
+			if c.remove {
+				callMethod(v, "Remove", c.name)
+			} else if c.replace {
+				callMethod(v, "Replace", c.name, c.h)
+			} else {
+				callMethod(v, "Register", c.name, c.h)
+			}
+
+			if e, ok := v.(error); !ok || e != nil {
+				err = e
+			}
+		}
+
+		if len(data.err) > 0 && err == nil {
+			t.Errorf("callbacks tests #%v should got error %v, but not", idx+1, data.err)
+		} else if len(data.err) == 0 && err != nil {
+			t.Errorf("callbacks tests #%v should not got error, but got %v", idx+1, err)
+		}
+
+		if ok, msg := assertCallbacks(callbacks.Create(), data.results); !ok {
+			t.Errorf("callbacks tests #%v failed, got %v", idx+1, msg)
+		}
+	}
+}
+
+func TestPluginCallbacks(t *testing.T) {
+	db, _ := gorm.Open(nil, nil)
+	createCallback := db.Callback().Create()
+
+	createCallback.Before("*").Register("plugin_1_fn1", c1)
+	createCallback.After("*").Register("plugin_1_fn2", c2)
+
+	if ok, msg := assertCallbacks(createCallback, []string{"c1", "c2"}); !ok {
+		t.Errorf("callbacks tests failed, got %v", msg)
+	}
+
+	// plugin 2
+	createCallback.Before("*").Register("plugin_2_fn1", c3)
+	if ok, msg := assertCallbacks(createCallback, []string{"c3", "c1", "c2"}); !ok {
+		t.Errorf("callbacks tests failed, got %v", msg)
+	}
+
+	createCallback.After("*").Register("plugin_2_fn2", c4)
+	if ok, msg := assertCallbacks(createCallback, []string{"c3", "c1", "c2", "c4"}); !ok {
+		t.Errorf("callbacks tests failed, got %v", msg)
+	}
+
+	// plugin 3
+	createCallback.Before("*").Register("plugin_3_fn1", c5)
+	if ok, msg := assertCallbacks(createCallback, []string{"c5", "c3", "c1", "c2", "c4"}); !ok {
+		t.Errorf("callbacks tests failed, got %v", msg)
+	}
+
+	createCallback.After("*").Register("plugin_3_fn2", c6)
+	if ok, msg := assertCallbacks(createCallback, []string{"c5", "c3", "c1", "c2", "c4", "c6"}); !ok {
+		t.Errorf("callbacks tests failed, got %v", msg)
+	}
+}
+
+func TestCallbacksGet(t *testing.T) {
+	db, _ := gorm.Open(nil, nil)
+	createCallback := db.Callback().Create()
+
+	createCallback.Before("*").Register("c1", c1)
+	if cb := createCallback.Get("c1"); reflect.DeepEqual(cb, c1) {
+		t.Errorf("callbacks tests failed, got: %p, want: %p", cb, c1)
+	}
+
+	createCallback.Remove("c1")
+	if cb := createCallback.Get("c2"); cb != nil {
+		t.Errorf("callbacks test failed. got: %p, want: nil", cb)
+	}
+}
+
+func TestCallbacksRemove(t *testing.T) {
+	db, _ := gorm.Open(nil, nil)
+	createCallback := db.Callback().Create()
+
+	createCallback.Before("*").Register("c1", c1)
+	createCallback.After("*").Register("c2", c2)
+	createCallback.Before("c4").Register("c3", c3)
+	createCallback.After("c2").Register("c4", c4)
+
+	// callbacks: []string{"c1", "c3", "c4", "c2"}
+	createCallback.Remove("c1")
+	if ok, msg := assertCallbacks(createCallback, []string{"c3", "c4", "c2"}); !ok {
+		t.Errorf("callbacks tests failed, got %v", msg)
+	}
+
+	createCallback.Remove("c4")
+	if ok, msg := assertCallbacks(createCallback, []string{"c3", "c2"}); !ok {
+		t.Errorf("callbacks tests failed, got %v", msg)
+	}
+
+	createCallback.Remove("c2")
+	if ok, msg := assertCallbacks(createCallback, []string{"c3"}); !ok {
+		t.Errorf("callbacks tests failed, got %v", msg)
+	}
+
+	createCallback.Remove("c3")
+	if ok, msg := assertCallbacks(createCallback, []string{}); !ok {
+		t.Errorf("callbacks tests failed, got %v", msg)
+	}
+}

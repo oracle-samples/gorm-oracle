@@ -1,28 +1,42 @@
-*This repository acts as a template for all of Oracle’s GitHub repositories. It contains information about the guidelines for those repositories. All files and sections contained in this template are mandatory, and a GitHub app ensures alignment with these guidelines. To get started with a new repository, replace the italic paragraphs with the respective text for your project.*
+# GORM Driver for Oracle
 
-# Project name
+The GORM Driver for Oracle provides support for Oracle databases, enabling full compatibility with GORM's ORM capabilities. It is built on top of the [Go DRiver for ORacle (Godror)](https://github.com/godror/godror) and supports key features such as auto migrations, associations, transactions, and advanced querying.
 
-*Describe your project's features, functionality and target audience*
+## Prerequisite
 
-## Installation
+### Install Instant Client
 
-*Provide detailed step-by-step installation instructions. You can name this section **How to Run** or **Getting Started** instead of **Installation** if that's more acceptable for your project*
+To use ODPI-C with Godror, you’ll need to install the Oracle Instant Client on your system.
 
-## Documentation
+Follow the steps on [this page](https://odpi-c.readthedocs.io/en/latest/user_guide/installation.html) complete the installation.
 
-*Developer-oriented documentation can be published on GitHub, but all product documentation must be published on <https://docs.oracle.com>*
+After that, use a logfmt-encoded parameter list to specify the instanct client directory in the `dataSourceName` when you connect to the database. For example:
 
-## Examples
+```go
+dsn := `user="scott" password="tiger" 
+        connectString="[host]:[port]/cdb1_pdb1.regress.rdbms.dev.us.oracle.com"
+        libDir="/Path/to/your/instantclient_23_8"`
+```
 
-*Describe any included examples or provide a link to a demo/tutorial*
+## Quick start
 
-## Help
+```go main.go
+package main
 
-*Inform users on where to get help or how to receive official support from Oracle (if applicable)*
+import (
+        "github.com/oracle/gorm-oracle/oracle"
+        "gorm.io/gorm"
+)
+
+func main() {
+        dsn := `user="scott" password="tiger"
+                connectString="[host]:[port]/cdb1_pdb1.regress.rdbms.dev.us.oracle.com"
+                libDir="/Path/to/your/instantclient_23_8"`
+        db, err := gorm.Open(oracle.Open(dsn), &gorm.Config{})
+}
+```
 
 ## Contributing
-
-*If your project has specific contribution requirements, update the CONTRIBUTING.md file to ensure those requirements are clearly explained*
 
 This project welcomes contributions from the community. Before submitting a pull request, please [review our contribution guide](./CONTRIBUTING.md)
 
@@ -32,13 +46,4 @@ Please consult the [security guide](./SECURITY.md) for our responsible security 
 
 ## License
 
-*The correct copyright notice format for both documentation and software is*
-    "Copyright (c) [year,] year Oracle and/or its affiliates."
-*You must include the year the content was first released (on any platform) and the most recent year in which it was revised*
-
-Copyright (c) 2023 Oracle and/or its affiliates.
-
-*Replace this statement if your project is not licensed under the UPL*
-
-Released under the Universal Permissive License v1.0 as shown at
-<https://oss.oracle.com/licenses/upl/>.
+Copyright (c) 2025 Oracle and/or its affiliates. Released under the Universal Permissive License v1.0 as shown at <https://oss.oracle.com/licenses/upl/>.
