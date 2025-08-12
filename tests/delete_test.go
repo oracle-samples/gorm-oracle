@@ -419,6 +419,7 @@ func TestHardDeleteAfterSoftDelete(t *testing.T) {
 }
 
 func TestDeleteWithLimitAndOrder(t *testing.T) {
+	DB.Exec(`DROP TABLE "users"`).Commit()
 	users := []User{
 		*GetUser("del-limited-1", Config{}),
 		*GetUser("del-limited-2", Config{}),
@@ -438,7 +439,7 @@ func TestDeleteWithLimitAndOrder(t *testing.T) {
 }
 
 func TestRawSQLDeleteWithLimit(t *testing.T) {
-	DB.Exec(`DROP TABLE "users"`)
+	RunMigrations()
 	users := []User{
 		*GetUser("del-limited-1", Config{}),
 		*GetUser("del-limited-2", Config{}),

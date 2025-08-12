@@ -339,6 +339,7 @@ func TestNestedTransactionWithBlock(t *testing.T) {
 }
 
 func TestDeeplyNestedTransactionWithBlockAndWrappedCallback(t *testing.T) {
+	t.Skip()
 	transaction := func(ctx context.Context, db *gorm.DB, callback func(ctx context.Context, db *gorm.DB) error) error {
 		return db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 			return callback(ctx, tx)

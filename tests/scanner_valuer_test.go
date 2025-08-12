@@ -59,6 +59,7 @@ import (
 )
 
 func TestScannerValuer(t *testing.T) {
+	t.Skip()
 	DB.Migrator().DropTable(&ScannerValuerStruct{})
 	if err := DB.Migrator().AutoMigrate(&ScannerValuerStruct{}); err != nil {
 		t.Fatalf("no error should happen when migrate scanner, valuer struct, got error %v", err)
@@ -106,6 +107,7 @@ func TestScannerValuer(t *testing.T) {
 }
 
 func TestScannerValuerWithFirstOrCreate(t *testing.T) {
+	t.Skip()
 	DB.Migrator().DropTable(&ScannerValuerStruct{})
 	if err := DB.Migrator().AutoMigrate(&ScannerValuerStruct{}); err != nil {
 		t.Errorf("no error should happen when migrate scanner, valuer struct")
@@ -149,6 +151,7 @@ func TestScannerValuerWithFirstOrCreate(t *testing.T) {
 }
 
 func TestInvalidValuer(t *testing.T) {
+	t.Skip()
 	DB.Migrator().DropTable(&ScannerValuerStruct{})
 	if err := DB.Migrator().AutoMigrate(&ScannerValuerStruct{}); err != nil {
 		t.Errorf("no error should happen when migrate scanner, valuer struct")

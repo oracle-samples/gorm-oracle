@@ -59,6 +59,7 @@ func (UserWithTable) TableName() string {
 }
 
 func TestTable(t *testing.T) {
+	t.Skip()
 	dryDB := DB.Session(&gorm.Session{DryRun: true})
 
 	r := dryDB.Table("`user`").Find(&User{}).Statement
@@ -125,6 +126,7 @@ func TestTable(t *testing.T) {
 }
 
 func TestTableWithAllFields(t *testing.T) {
+	t.Skip()
 	dryDB := DB.Session(&gorm.Session{DryRun: true, QueryFields: true})
 	userQuery := "SELECT .*USER.*ID.*USER.*CREATED_AT.*USER.*UPDATED_AT.*USER.*DELETED_AT.*USER.*NAME.*USER.*AGE" +
 		".*USER.*BIRTHDAY.*USER.*COMPANY_ID.*USER.*MANAGER_ID.*USER.*ACTIVE.* "

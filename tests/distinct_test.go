@@ -114,7 +114,7 @@ func TestDistinct(t *testing.T) {
 }
 
 func TestDistinctWithVaryingCase(t *testing.T) {
-	DB.Exec(`DROP TABLE "users"`)
+	RunMigrations()
 	users := []User{
 		{Name: "Alpha"},
 		{Name: "alpha"},

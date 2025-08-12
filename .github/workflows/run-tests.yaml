@@ -50,4 +50,5 @@ jobs:
     - name: Run all tests under tests directory
       run: |
         cd tests
+        go get .
         go test -v 
