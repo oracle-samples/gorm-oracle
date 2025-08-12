@@ -50,4 +50,4 @@ jobs:
         cd tests
         go get -t github.com/oracle-samples/gorm-oracle/tests
         go get .
-        go test -v 
+        go test -failfast
