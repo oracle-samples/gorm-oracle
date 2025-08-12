@@ -1,4 +1,4 @@
-module github.com/oracle/gorm-oracle
+module github.com/oracle-samples/gorm-oracle
 
 go 1.24.4
 
