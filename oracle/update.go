@@ -50,7 +50,29 @@ import (
 	"gorm.io/gorm/schema"
 )
 
-// Update callback function for Oracle
+// Update overrides GORM's update callback for Oracle.
+//
+// It builds Oracle-compatible UPDATE statements and supports:
+//
+//   - Standard updates without RETURNING using GORM’s default SQL build, with
+//     bind variable conversion for Oracle types.
+//   - Updates with RETURNING, emitting a PL/SQL block that performs
+//     UPDATE … RETURNING BULK COLLECT INTO for multi-row updates,
+//     wiring sql.Out binds for each returned column and row.
+//   - UPDATE safety: checks for missing WHERE conditions and refuses to run
+//     unless AllowGlobalUpdate is set or the WHERE clause has meaningful
+//     conditions (beyond soft-delete filters).
+//   - Primary key WHERE injection when the destination object or slice has
+//     identifiable PK values, to avoid unintended mass updates.
+//   - Soft-delete compatibility: conditions on deleted_at are ignored for the
+//     safety check, but preserved in the WHERE for the actual SQL.
+//
+// For updates with RETURNING, OUT bind results are mapped back into the
+// destination struct or slice using getUpdateReturningValues.
+//
+// Register with:
+//
+//	db.Callback().Update().Replace("gorm:update", oracle.Update)
 func Update(db *gorm.DB) {
 	if db.Error != nil || db.Statement == nil {
 		return
