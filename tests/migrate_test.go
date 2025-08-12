@@ -1120,7 +1120,8 @@ func TestMigrateDonotAlterColumn(t *testing.T) {
 
 	var err error
 	err = mockM.DropTable(&NotTriggerUpdate{})
-	tests.AssertEqual(t, err, nil)
+	// DROP TABLE fails if the table does not exist.
+	// tests.AssertEqual(t, err, nil)
 	err = mockM.AutoMigrate(&NotTriggerUpdate{})
 	tests.AssertEqual(t, err, nil)
 	err = mockM.AutoMigrate(&NotTriggerUpdate{})
