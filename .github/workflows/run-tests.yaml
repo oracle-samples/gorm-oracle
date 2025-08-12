@@ -19,17 +19,11 @@ jobs:
       oracle:
         image: gvenzl/oracle-free:latest
         env:
-          APP_USER: $GORM_ORACLEDB_USER
-          APP_USER_PASSWORD: $GORM_ORACLEDB_PASSWORD
+          APP_USER: ${{ secrets.GORM_ORACLEDB_USER }}
+          APP_USER_PASSWORD: ${{ secrets.GORM_ORACLEDB_PASSWORD }}
           ORACLE_RANDOM_PASSWORD: yes
         ports:
           - 1521:1521
-        options: >-
-          --health-cmd="sqlplus -s $GORM_ORACLEDB_USER/$GORM_ORACLEDB_PASSWORD@localhost:1521/FREEPDB1 <<< \"select 1 from dual;\""
-          --health-start-period 10s
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10          
     steps:
 
     - name: Set up Go
