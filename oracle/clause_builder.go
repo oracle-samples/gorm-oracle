@@ -161,7 +161,7 @@ func ReturningClauseBuilder(c clause.Clause, builder clause.Builder) {
 					var dest interface{}
 					if stmt.Schema != nil {
 						if field := findFieldByDBName(stmt.Schema, column.Name); field != nil {
-							dest = createTypedDestination(field.FieldType)
+							dest = createTypedDestination(field)
 						} else {
 							dest = new(string) // Default to string for unknown fields
 						}
