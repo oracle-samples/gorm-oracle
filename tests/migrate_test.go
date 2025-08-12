@@ -50,7 +50,7 @@ import (
 
 	"time"
 
-	. "github.com/oracle/gorm-oracle/tests/utils"
+	. "github.com/oracle-samples/gorm-oracle/tests/utils"
 
 	"github.com/stretchr/testify/assert"
 

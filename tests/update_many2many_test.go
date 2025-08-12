@@ -41,7 +41,7 @@ package tests
 import (
 	"testing"
 
-	. "github.com/oracle/gorm-oracle/tests/utils"
+	. "github.com/oracle-samples/gorm-oracle/tests/utils"
 
 	"gorm.io/gorm"
 )
