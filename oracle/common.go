@@ -450,6 +450,8 @@ func isNullValue(value interface{}) bool {
 
 	// Check for different NULL types
 	switch v := value.(type) {
+	case sql.NullString:
+		return !v.Valid
 	case sql.NullInt64:
 		return !v.Valid
 	case sql.NullInt32:
