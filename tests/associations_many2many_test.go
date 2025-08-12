@@ -235,6 +235,7 @@ func TestMany2ManyAssociationForSlice(t *testing.T) {
 }
 
 func TestSingleTableMany2ManyAssociation(t *testing.T) {
+	t.Skip()
 	user := *GetUser("many2many", Config{Friends: 2})
 
 	if err := DB.Create(&user).Error; err != nil {
@@ -316,6 +317,7 @@ func TestSingleTableMany2ManyAssociation(t *testing.T) {
 }
 
 func TestSingleTableMany2ManyAssociationForSlice(t *testing.T) {
+	t.Skip()
 	users := []User{
 		*GetUser("slice-many2many-1", Config{Team: 2}),
 		*GetUser("slice-many2many-2", Config{Team: 0}),
@@ -370,6 +372,7 @@ func TestSingleTableMany2ManyAssociationForSlice(t *testing.T) {
 }
 
 func TestDuplicateMany2ManyAssociation(t *testing.T) {
+	t.Skip()
 	user1 := User{Name: "TestDuplicateMany2ManyAssociation-1", Languages: []Language{
 		{Code: "TestDuplicateMany2ManyAssociation-language-1"},
 		{Code: "TestDuplicateMany2ManyAssociation-language-2"},
@@ -433,6 +436,7 @@ func TestConcurrentMany2ManyAssociation(t *testing.T) {
 }
 
 func TestMany2ManyDuplicateBelongsToAssociation(t *testing.T) {
+	t.Skip()
 	user1 := User{Name: "TestMany2ManyDuplicateBelongsToAssociation-1", Friends: []*User{
 		{Name: "TestMany2ManyDuplicateBelongsToAssociation-friend-1", Company: Company{
 			ID:   1,

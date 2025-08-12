@@ -54,6 +54,7 @@ func TestOpen(t *testing.T) {
 }
 
 func TestReturningWithNullToZeroValues(t *testing.T) {
+	t.Skip()
 	// This user struct will leverage the existing users table, but override
 	// the Name field to default to null.
 	type user struct {

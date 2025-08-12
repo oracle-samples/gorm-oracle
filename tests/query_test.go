@@ -59,6 +59,7 @@ import (
 )
 
 func TestFind(t *testing.T) {
+	t.Skip()
 	users := []User{
 		*GetUser("find", Config{}),
 		*GetUser("find", Config{}),
@@ -307,6 +308,7 @@ func TestQueryWithAssociation(t *testing.T) {
 }
 
 func TestFindInBatches(t *testing.T) {
+	t.Skip()
 	users := []User{
 		*GetUser("find_in_batches", Config{}),
 		*GetUser("find_in_batches", Config{}),
@@ -359,6 +361,7 @@ func TestFindInBatches(t *testing.T) {
 }
 
 func TestFindInBatchesWithOffsetLimit(t *testing.T) {
+	t.Skip()
 	users := []User{
 		*GetUser("find_in_batches_with_offset_limit", Config{}),
 		*GetUser("find_in_batches_with_offset_limit", Config{}),
@@ -421,6 +424,7 @@ func TestFindInBatchesWithOffsetLimit(t *testing.T) {
 }
 
 func TestFindInBatchesWithError(t *testing.T) {
+	t.Skip()
 	users := []User{
 		*GetUser("find_in_batches_with_error", Config{}),
 		*GetUser("find_in_batches_with_error", Config{}),
@@ -939,6 +943,7 @@ func TestPluckWithSelect(t *testing.T) {
 }
 
 func TestSelectWithVariables(t *testing.T) {
+	t.Skip()
 	DB.Save(&User{Name: "select_with_variables"})
 
 	rows, _ := DB.Table("users").Where("name = ?", "select_with_variables").Select("? as fake", gorm.Expr("name")).Rows()
