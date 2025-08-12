@@ -19,8 +19,8 @@ jobs:
       oracle:
         image: gvenzl/oracle-free:latest
         env:
-          APP_USER: ${{ secrets.GORM_ORACLEDB_USER }}
-          APP_USER_PASSWORD: ${{ secrets.GORM_ORACLEDB_PASSWORD }}
+          APP_USER: ${{ env.GORM_ORACLEDB_USER }}
+          APP_USER_PASSWORD: ${{ env.GORM_ORACLEDB_PASSWORD }}
           ORACLE_RANDOM_PASSWORD: yes
         ports:
           - 1521:1521
