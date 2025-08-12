@@ -100,18 +100,30 @@ func findFieldByDBName(schema *schema.Schema, dbName string) *schema.Field {
 }
 
 // Create typed destination for OUT parameters
-func createTypedDestination(fieldType reflect.Type) interface{} {
-	// Handle pointer types
-	if fieldType.Kind() == reflect.Ptr {
-		fieldType = fieldType.Elem()
+func createTypedDestination(f *schema.Field) interface{} {
+	if f == nil {
+		var s string
+		return &s
 	}
 
-	// Type-safe handling for known GORM types and SQL null types
-	switch fieldType {
-	case reflect.TypeOf(gorm.DeletedAt{}):
+	ft := f.FieldType
+	for ft.Kind() == reflect.Ptr {
+		ft = ft.Elem()
+	}
+
+	if ft == reflect.TypeOf(gorm.DeletedAt{}) {
 		return new(sql.NullTime)
-	case reflect.TypeOf(time.Time{}):
+	}
+	if ft == reflect.TypeOf(time.Time{}) {
+		if !f.NotNull { // nullable column => keep NULLs
+			return new(sql.NullTime)
+		}
 		return new(time.Time)
+	}
+
+	switch ft {
+	case reflect.TypeOf(sql.NullTime{}):
+		return new(sql.NullTime)
 	case reflect.TypeOf(sql.NullInt64{}):
 		return new(sql.NullInt64)
 	case reflect.TypeOf(sql.NullInt32{}):
@@ -120,33 +132,28 @@ func createTypedDestination(fieldType reflect.Type) interface{} {
 		return new(sql.NullFloat64)
 	case reflect.TypeOf(sql.NullBool{}):
 		return new(sql.NullBool)
-	case reflect.TypeOf(sql.NullTime{}):
-		return new(sql.NullTime)
 	}
 
-	// Handle primitive types by Kind
-	switch fieldType.Kind() {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return new(int64) // Oracle returns NUMBER as int64
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return new(uint64)
-	case reflect.Float32, reflect.Float64:
-		return new(float64) // Oracle returns FLOAT as float64
-	case reflect.Bool:
-		return new(int64) // Oracle NUMBER(1) for boolean
+	switch ft.Kind() {
 	case reflect.String:
 		return new(string)
-	case reflect.Struct:
-		// For time.Time specifically
-		if fieldType == reflect.TypeOf(time.Time{}) {
-			return new(time.Time)
-		}
-		// For other structs, use string as safe fallback
-		return new(string)
-	default:
-		// For unknown types, use string as safe fallback
-		return new(string)
+
+	case reflect.Bool:
+		return new(int64)
+
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return new(int64)
+
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		return new(uint64)
+
+	case reflect.Float32, reflect.Float64:
+		return new(float64)
 	}
+
+	// Fallback
+	var s string
+	return &s
 }
 
 // Convert values for Oracle-specific types
@@ -182,7 +189,7 @@ func convertValue(val interface{}) interface{} {
 
 // Convert Oracle values back to Go types
 func convertFromOracleToField(value interface{}, field *schema.Field) interface{} {
-	if value == nil {
+	if value == nil || field == nil {
 		return nil
 	}
 
@@ -194,7 +201,6 @@ func convertFromOracleToField(value interface{}, field *schema.Field) interface{
 
 	var converted interface{}
 
-	// Handle special types first using type-safe comparisons
 	switch targetType {
 	case reflect.TypeOf(gorm.DeletedAt{}):
 		if nullTime, ok := value.(sql.NullTime); ok {
@@ -203,7 +209,31 @@ func convertFromOracleToField(value interface{}, field *schema.Field) interface{
 			converted = gorm.DeletedAt{}
 		}
 	case reflect.TypeOf(time.Time{}):
-		converted = value
+		switch vv := value.(type) {
+		case time.Time:
+			converted = vv
+		case sql.NullTime:
+			if vv.Valid {
+				converted = vv.Time
+			} else {
+				// DB returned NULL
+				if isPtr {
+					return nil // -> *time.Time(nil)
+				}
+				// non-pointer time.Time: represent NULL as zero time
+				return time.Time{}
+			}
+		default:
+			converted = value
+		}
+
+	case reflect.TypeOf(sql.NullTime{}):
+		if nullTime, ok := value.(sql.NullTime); ok {
+			converted = nullTime
+		} else {
+			converted = sql.NullTime{}
+		}
+
 	case reflect.TypeOf(sql.NullInt64{}):
 		if nullInt, ok := value.(sql.NullInt64); ok {
 			converted = nullInt
@@ -228,25 +258,19 @@ func convertFromOracleToField(value interface{}, field *schema.Field) interface{
 		} else {
 			converted = sql.NullBool{}
 		}
-	case reflect.TypeOf(sql.NullTime{}):
-		if nullTime, ok := value.(sql.NullTime); ok {
-			converted = nullTime
-		} else {
-			converted = sql.NullTime{}
-		}
 	default:
-		// Handle primitive types
+		// primitives and everything else
 		converted = convertPrimitiveType(value, targetType)
 	}
 
-	// Handle pointer types
-	if isPtr && converted != nil {
-		if isZeroValueForPointer(converted, targetType) {
+	// Pointer targets: nil for "zero-ish", else allocate and set.
+	if isPtr {
+		if isZeroFor(targetType, converted) {
 			return nil
 		}
 		ptr := reflect.New(targetType)
 		ptr.Elem().Set(reflect.ValueOf(converted))
-		converted = ptr.Interface()
+		return ptr.Interface()
 	}
 
 	return converted
@@ -426,8 +450,6 @@ func isNullValue(value interface{}) bool {
 
 	// Check for different NULL types
 	switch v := value.(type) {
-	case sql.NullString:
-		return !v.Valid
 	case sql.NullInt64:
 		return !v.Valid
 	case sql.NullInt32:
@@ -441,4 +463,29 @@ func isNullValue(value interface{}) bool {
 	default:
 		return false
 	}
+}
+
+func isZeroFor(t reflect.Type, v interface{}) bool {
+	if v == nil {
+		return true
+	}
+	rv := reflect.ValueOf(v)
+	if !rv.IsValid() {
+		return true
+	}
+	// exact type match?
+	if rv.Type() == t {
+		// special-case time.Time
+		if t == reflect.TypeOf(time.Time{}) {
+			return rv.Interface().(time.Time).IsZero()
+		}
+		// generic zero check
+		z := reflect.Zero(t)
+		return reflect.DeepEqual(rv.Interface(), z.Interface())
+	}
+	// If types differ (e.g., sql.NullTime), treat invalid as zero
+	if nt, ok := v.(sql.NullTime); ok {
+		return !nt.Valid
+	}
+	return false
 }

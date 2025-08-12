@@ -254,7 +254,7 @@ func buildBulkDeletePLSQL(db *gorm.DB) {
 		for _, column := range allColumns {
 			field := findFieldByDBName(schema, column)
 			if field != nil {
-				dest := createTypedDestination(field.FieldType)
+				dest := createTypedDestination(field)
 				stmt.Vars = append(stmt.Vars, sql.Out{Dest: dest})
 
 				plsqlBuilder.WriteString(fmt.Sprintf("  IF l_deleted_records.COUNT > %d THEN\n", rowIdx))
