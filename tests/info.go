@@ -45,7 +45,7 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/oracle/gorm-oracle/oracle"
+	"github.com/oracle-samples/gorm-oracle/oracle"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )

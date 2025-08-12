@@ -50,6 +50,22 @@ import (
 	"gorm.io/gorm/schema"
 )
 
+// Create overrides GORM's create callback for Oracle.
+//
+// Behavior:
+//   - If the schema has fields with default DB values and only one row is
+//     being inserted, it builds an INSERT ... RETURNING statement.
+//   - If no RETURNING is needed, it emits a standard INSERT.
+//   - If multiple rows require RETURNING, it builds a PL/SQL block using
+//     FORALL and BULK COLLECT; if an ON CONFLICT clause is present and
+//     resolvable, it emits a MERGE.
+//   - For that last case, it validates Dest (non-nil, non-empty slice with
+//     no nil elements), normalizes bind variables for Oracle, and populates
+//     destinations from OUT parameters.
+//
+// Register with:
+//
+//	db.Callback().Create().Replace("gorm:create", oracle.Create)
 func Create(db *gorm.DB) {
 	if db.Error != nil || db.Statement == nil {
 		return

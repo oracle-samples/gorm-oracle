@@ -72,15 +72,17 @@ type Dialector struct {
 	*Config
 }
 
-// Returns the name of the database dialect
+// Name returns the name of the database dialect
 func (d Dialector) Name() string {
 	return "oracle"
 }
 
+// Open creates a new godror Dialector with the given DSN
 func Open(dsn string) gorm.Dialector {
 	return &Dialector{Config: &Config{DriverName: "godror", DataSourceName: dsn}}
 }
 
+// New creates a new Dialector with the given config
 func New(config Config) gorm.Dialector {
 	return &Dialector{Config: &config}
 }
@@ -116,7 +118,7 @@ func (d Dialector) Initialize(db *gorm.DB) (err error) {
 	return nil
 }
 
-// Registers the migrator
+// Migrator returns the migrator instance associated with the given gorm.DB
 func (d Dialector) Migrator(db *gorm.DB) gorm.Migrator {
 	return Migrator{
 		Migrator: migrator.Migrator{

@@ -58,6 +58,7 @@ const (
 	ClauseReturning  = "RETURNING"
 )
 
+// Returns the clause builders that are used to generate clauses for Oracle DB
 func OracleClauseBuilders() map[string]clause.ClauseBuilder {
 	return map[string]clause.ClauseBuilder{
 		ClauseInsert:     InsertClauseBuilder,
@@ -70,6 +71,7 @@ func OracleClauseBuilders() map[string]clause.ClauseBuilder {
 	}
 }
 
+// InsertClauseBuilder builds the INSERT INTO cluase
 func InsertClauseBuilder(c clause.Clause, builder clause.Builder) {
 
 	if insert, ok := c.Expression.(clause.Insert); ok {
@@ -87,6 +89,7 @@ func InsertClauseBuilder(c clause.Clause, builder clause.Builder) {
 	// Modifier field is intentionally ignored for Oracle
 }
 
+// UpdateClauseBuilder builds the UPDATE clause
 func UpdateClauseBuilder(c clause.Clause, builder clause.Builder) {
 	if update, ok := c.Expression.(clause.Update); ok {
 		builder.WriteString("UPDATE ")
@@ -103,6 +106,7 @@ func UpdateClauseBuilder(c clause.Clause, builder clause.Builder) {
 	// Modifier field is intentionally ignored for Oracle
 }
 
+// DeleteClauseBuilder builds the DELETE clause
 func DeleteClauseBuilder(c clause.Clause, builder clause.Builder) {
 	if _, ok := c.Expression.(clause.Delete); ok {
 		builder.WriteString("DELETE")
@@ -176,8 +180,8 @@ func ReturningClauseBuilder(c clause.Clause, builder clause.Builder) {
 	}
 }
 
-// getDefaultValues remains the same - it extracts values from sql.Out parameters
-
+// LimitClauseBuilder builds the Oracle FETCH clause instead of using the default LIMIT syntax
+// The FETCH syntax is supported in Oracle 12c and later
 func LimitClauseBuilder(c clause.Clause, builder clause.Builder) {
 	if limit, ok := c.Expression.(clause.Limit); ok {
 		// Convert LIMIT to Oracle FETCH syntax
@@ -187,6 +191,7 @@ func LimitClauseBuilder(c clause.Clause, builder clause.Builder) {
 	}
 }
 
+// ValuesClauseBuilder builds the VALUES clause of an INSERT statement
 func ValuesClauseBuilder(c clause.Clause, builder clause.Builder) {
 	if values, ok := c.Expression.(clause.Values); ok {
 		if len(values.Columns) > 0 {
@@ -273,7 +278,7 @@ func buildOracleFetchLimit(limit clause.Limit, builder clause.Builder, stmt *gor
 	}
 }
 
-// Updated OnConflictClauseBuilder - builds MERGE statement directly
+// OnConflictClauseBuilder builds MERGE statement directly
 func OnConflictClauseBuilder(c clause.Clause, builder clause.Builder) {
 	if onConflict, ok := c.Expression.(clause.OnConflict); ok {
 		if stmt, ok := builder.(*gorm.Statement); ok {

@@ -1,11 +1,11 @@
-module github.com/oracle/gorm-oracle/tests
+module github.com/oracle-samples/gorm-oracle/tests
 
 go 1.24.4
 
 require gorm.io/gorm v1.30.0
 
 require (
-	github.com/oracle/gorm-oracle v0.0.0-00010101000000-000000000000
+	github.com/oracle-samples/gorm-oracle v0.0.1
 	github.com/stretchr/testify v1.10.0
 )
 
@@ -27,4 +27,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/oracle/gorm-oracle => ../
+replace github.com/oracle-samples/gorm-oracle => ../
