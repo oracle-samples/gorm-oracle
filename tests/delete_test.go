@@ -420,7 +420,7 @@ func TestHardDeleteAfterSoftDelete(t *testing.T) {
 }
 
 func TestDeleteWithLimitAndOrder(t *testing.T) {
-	if err := DB.Exec(`DROP TABLE "users"`).Commit().Error; err != nil {
+	if err := DB.Exec(`DROP TABLE "users" CASCADE CONSTRAINTS`).Commit().Error; err != nil {
 		if !strings.Contains(err.Error(), "ORA-00942") {
 			t.Fatalf("Failed to migrate, got error: %s", err)
 		}
