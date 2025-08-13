@@ -65,7 +65,7 @@ func TestCustomizeColumn(t *testing.T) {
 	}
 
 	var cc1 CustomizeColumn
-	DB.First(&cc1, "mapped_name = ?", "foo")
+	DB.First(&cc1, "\"mapped_name\" = ?", "foo")
 
 	if cc1.Name != expected {
 		t.Errorf("Failed to query CustomizeColumn")
@@ -75,7 +75,7 @@ func TestCustomizeColumn(t *testing.T) {
 	DB.Save(&cc)
 
 	var cc2 CustomizeColumn
-	DB.First(&cc2, "mapped_id = ?", 666)
+	DB.First(&cc2, "\"mapped_id\" = ?", 666)
 	if cc2.Name != "bar" {
 		t.Errorf("Failed to query CustomizeColumn")
 	}
