@@ -1,11 +1,6 @@
 name: Run Tests
 
-on: 
-  - push
-  - pull_request
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+on: push
 
 jobs:
   build:
