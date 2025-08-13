@@ -251,7 +251,7 @@ func TestJoinWithSoftDeleted(t *testing.T) {
 
 	var user1 User
 	DB.Model(&User{}).Joins("NamedPet").Joins("Account").First(&user1, user.ID)
-	if user1.NamedPet == nil || user1.Account.ID == 0 {
+	if user1.NamedPet.ID == 0 || user1.Account.ID == 0 {
 		t.Fatalf("joins NamedPet and Account should not empty:%v", user1)
 	}
 
@@ -260,8 +260,8 @@ func TestJoinWithSoftDeleted(t *testing.T) {
 
 	var user2 User
 	DB.Model(&User{}).Joins("NamedPet").Joins("Account").First(&user2, user.ID)
-	if user2.NamedPet == nil || user2.Account.ID != 0 {
-		t.Fatalf("joins Account should not empty:%v", user2)
+	if user2.NamedPet.ID == 0 || user2.Account.ID != 0 {
+		t.Fatalf("joins Account should be empty:%v", user2)
 	}
 
 	// NamedPet should empty
@@ -269,8 +269,8 @@ func TestJoinWithSoftDeleted(t *testing.T) {
 
 	var user3 User
 	DB.Model(&User{}).Joins("NamedPet").Joins("Account").First(&user3, user.ID)
-	if user3.NamedPet != nil || user2.Account.ID != 0 {
-		t.Fatalf("joins NamedPet and Account should not empty:%v", user2)
+	if user3.NamedPet.ID != 0 || user3.Account.ID != 0 {
+		t.Fatalf("joins NamedPet and Account should be empty:%v", user3)
 	}
 }
 
