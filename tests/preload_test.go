@@ -75,7 +75,7 @@ func TestPreloadWithAssociations(t *testing.T) {
 	CheckUser(t, user, user)
 
 	var user2 User
-	DB.Preload(clause.Associations).Find(&user2, "id = ?", user.ID)
+	DB.Preload(clause.Associations).Find(&user2, "\"id\" = ?", user.ID)
 	CheckUser(t, user2, user)
 
 	user3 := *GetUser("preload_with_associations_new", Config{
@@ -89,7 +89,7 @@ func TestPreloadWithAssociations(t *testing.T) {
 		Friends:   1,
 	})
 
-	DB.Preload(clause.Associations).Find(&user3, "id = ?", user.ID)
+	DB.Preload(clause.Associations).Find(&user3, "\"id\" = ?", user.ID)
 	CheckUser(t, user3, user)
 }
 
@@ -105,15 +105,15 @@ func TestNestedPreload(t *testing.T) {
 	}
 
 	var user2 User
-	DB.Preload("Pets.Toy").Find(&user2, "id = ?", user.ID)
+	DB.Preload("Pets.Toy").Find(&user2, "\"id\" = ?", user.ID)
 	CheckUser(t, user2, user)
 
 	var user3 User
-	DB.Preload(clause.Associations+"."+clause.Associations).Find(&user3, "id = ?", user.ID)
+	DB.Preload(clause.Associations+"."+clause.Associations).Find(&user3, "\"id\" = ?", user.ID)
 	CheckUser(t, user3, user)
 
 	var user4 *User
-	DB.Preload("Pets.Toy").Find(&user4, "id = ?", user.ID)
+	DB.Preload("Pets.Toy").Find(&user4, "\"id\" = ?", user.ID)
 	CheckUser(t, *user4, user)
 }
 
@@ -164,7 +164,7 @@ func TestPreloadWithConds(t *testing.T) {
 	}
 
 	var users2 []User
-	DB.Preload("Account", clause.Eq{Column: "number", Value: users[0].Account.AccountNumber}).Find(&users2, "id IN ?", userIDs)
+	DB.Preload("Account", clause.Eq{Column: "account_number", Value: users[0].Account.AccountNumber}).Find(&users2, "id IN ?", userIDs)
 	sort.Slice(users2, func(i, j int) bool {
 		return users2[i].ID < users2[j].ID
 	})
@@ -228,7 +228,7 @@ func TestNestedPreloadWithConds(t *testing.T) {
 	}
 
 	var users2 []User
-	DB.Preload("Pets.Toy", "name like ?", `%preload_3`).Find(&users2, "id IN ?", userIDs)
+	DB.Preload("Pets.Toy", "\"name\" like ?", `%preload_3`).Find(&users2, "\"id\" IN ?", userIDs)
 
 	for idx, user := range users2[0:2] {
 		for _, pet := range user.Pets {
@@ -307,8 +307,8 @@ func TestPreloadWithDiffModel(t *testing.T) {
 		User
 	}
 
-	DB.Model(User{}).Preload("Account", clause.Eq{Column: "number", Value: user.Account.AccountNumber}).Select(
-		"users.*, 'yo' as something").First(&result, "name = ?", user.Name)
+	DB.Model(User{}).Preload("Account", clause.Eq{Column: "\"account_number\"", Value: user.Account.AccountNumber}).Select(
+		"\"users\".*, 'yo' as something").First(&result, "\"name\" = ?", user.Name)
 
 	CheckUser(t, user, result.User)
 }
@@ -324,29 +324,29 @@ func TestNestedPreloadWithUnscoped(t *testing.T) {
 	}
 
 	var user2 User
-	DB.Preload("Pets.Toy").Find(&user2, "id = ?", user.ID)
+	DB.Preload("Pets.Toy").Find(&user2, "\"id\" = ?", user.ID)
 	CheckUser(t, user2, user)
 
 	DB.Delete(&pet)
 
 	var user3 User
-	DB.Preload(clause.Associations+"."+clause.Associations).Find(&user3, "id = ?", user.ID)
+	DB.Preload(clause.Associations+"."+clause.Associations).Find(&user3, "\"id\" = ?", user.ID)
 	if len(user3.Pets) != 0 {
 		t.Fatalf("User.Pet[0] was deleted and should not exist.")
 	}
 
 	var user4 *User
-	DB.Preload("Pets.Toy").Find(&user4, "id = ?", user.ID)
+	DB.Preload("Pets.Toy").Find(&user4, "\"id\" = ?", user.ID)
 	if len(user4.Pets) != 0 {
 		t.Fatalf("User.Pet[0] was deleted and should not exist.")
 	}
 
 	var user5 User
-	DB.Unscoped().Preload(clause.Associations+"."+clause.Associations).Find(&user5, "id = ?", user.ID)
+	DB.Unscoped().Preload(clause.Associations+"."+clause.Associations).Find(&user5, "\"id\" = ?", user.ID)
 	CheckUserUnscoped(t, user5, user)
 
 	var user6 *User
-	DB.Unscoped().Preload("Pets.Toy").Find(&user6, "id = ?", user.ID)
+	DB.Unscoped().Preload("Pets.Toy").Find(&user6, "\"id\" = ?", user.ID)
 	CheckUserUnscoped(t, *user6, user)
 }
 
