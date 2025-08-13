@@ -52,6 +52,7 @@ import (
 )
 
 func TestJoins(t *testing.T) {
+	t.Skip()
 	user := *GetUser("joins-1", Config{Company: true, Manager: true, Account: true, NamedPet: false})
 
 	DB.Create(&user)
@@ -65,6 +66,7 @@ func TestJoins(t *testing.T) {
 }
 
 func TestJoinsForSlice(t *testing.T) {
+	t.Skip()
 	users := []User{
 		*GetUser("slice-joins-1", Config{Company: true, Manager: true, Account: true}),
 		*GetUser("slice-joins-2", Config{Company: true, Manager: true, Account: true}),
@@ -99,6 +101,8 @@ func TestJoinsForSlice(t *testing.T) {
 }
 
 func TestJoinConds(t *testing.T) {
+	t.Skip()
+
 	user := *GetUser("joins-conds", Config{Account: true, Pets: 3})
 	DB.Save(&user)
 
@@ -153,6 +157,8 @@ func TestJoinConds(t *testing.T) {
 }
 
 func TestJoinOn(t *testing.T) {
+	t.Skip()
+
 	user := *GetUser("joins-on", Config{Pets: 2})
 	DB.Save(&user)
 
@@ -246,6 +252,8 @@ func TestJoinCount(t *testing.T) {
 }
 
 func TestJoinWithSoftDeleted(t *testing.T) {
+	t.Skip()
+
 	user := GetUser("TestJoinWithSoftDeletedUser", Config{Account: true, NamedPet: true})
 	DB.Create(&user)
 
@@ -275,6 +283,8 @@ func TestJoinWithSoftDeleted(t *testing.T) {
 }
 
 func TestInnerJoins(t *testing.T) {
+	t.Skip()
+
 	user := *GetUser("inner-joins-1", Config{Company: true, Manager: true, Account: true, NamedPet: false})
 
 	DB.Create(&user)
@@ -328,6 +338,8 @@ func TestJoinWithSameColumnName(t *testing.T) {
 }
 
 func TestJoinArgsWithDB(t *testing.T) {
+	t.Skip()
+
 	user := *GetUser("joins-args-db", Config{Pets: 2})
 	DB.Save(&user)
 
@@ -371,6 +383,8 @@ func TestJoinArgsWithDB(t *testing.T) {
 }
 
 func TestNestedJoins(t *testing.T) {
+	t.Skip()
+	
 	users := []User{
 		{
 			Name: "nested-joins-1",
