@@ -45,8 +45,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/oracle/gorm-oracle/oracle"
-	. "github.com/oracle/gorm-oracle/tests/utils"
+	"github.com/oracle-samples/gorm-oracle/oracle"
+	. "github.com/oracle-samples/gorm-oracle/tests/utils"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"

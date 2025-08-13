@@ -57,7 +57,7 @@ type Migrator struct {
 	migrator.Migrator
 }
 
-// RunWithValue run migration with statement value
+// RunWithValue runs migration for the given `value`
 func (m Migrator) RunWithValue(value interface{}, fc func(*gorm.Statement) error) error {
 	if table, ok := value.(string); ok {
 		return m.Migrator.RunWithValue(table, fc)
@@ -65,14 +65,14 @@ func (m Migrator) RunWithValue(value interface{}, fc func(*gorm.Statement) error
 	return m.Migrator.RunWithValue(value, fc)
 }
 
-// Database
+// CurrentDatabase returns the the name of the current Oracle database
 func (m Migrator) CurrentDatabase() string {
 	var name string
 	m.DB.Raw("SELECT ora_database_name FROM dual").Scan(&name)
 	return name
 }
 
-// CreateTable create table in database for values
+// CreateTable creates table in database for the given `values`
 func (m Migrator) CreateTable(values ...interface{}) error {
 
 	for _, value := range m.ReorderModels(values, false) {
@@ -201,7 +201,9 @@ func (m Migrator) CreateTable(values ...interface{}) error {
 	return nil
 }
 
-// Drops the table starting from the bottom of the dependency chain
+// DropTable drops the table starting from the bottom of the dependency chain.
+// The function returns an error when Oracle databases report a missing table.
+// If multiple errors occur, it returns a combined (joint) error.
 func (m Migrator) DropTable(values ...interface{}) error {
 	var errorList []error
 	values = m.ReorderModels(values, false)
@@ -234,7 +236,7 @@ func (m Migrator) HasTable(value interface{}) bool {
 	return count > 0
 }
 
-// RenameTable rename table from oldName to newName
+// RenameTable renames table from oldName to newName
 func (m Migrator) RenameTable(oldName, newName interface{}) error {
 	var oldTable, newTable interface{}
 	if v, ok := oldName.(string); ok {
@@ -259,10 +261,6 @@ func (m Migrator) RenameTable(oldName, newName interface{}) error {
 		}
 	}
 
-	// TODO: Cannot rename a table that is referenced by a foreign key
-	// Disable the constraints for each referencing table before renaming,
-	// and recreate them after renaming
-
 	return m.DB.Exec("RENAME ? TO ?", oldTable, newTable).Error
 }
 
@@ -273,8 +271,7 @@ func (m Migrator) GetTables() (tableList []string, err error) {
 	return
 }
 
-// Columns
-// AddColumn create `name` column for value
+// AddColumn creates `name` column for the given `value`
 func (m Migrator) AddColumn(value interface{}, name string) error {
 	return m.RunWithValue(value, func(stmt *gorm.Statement) error {
 		// Check if the column name is already used
@@ -290,7 +287,7 @@ func (m Migrator) AddColumn(value interface{}, name string) error {
 	})
 }
 
-// DropColumn drop value's `name` column
+// DropColumn drops value's `name` column
 func (m Migrator) DropColumn(value interface{}, name string) error {
 	return m.RunWithValue(value, func(stmt *gorm.Statement) error {
 		if stmt.Schema != nil {
@@ -307,7 +304,7 @@ func (m Migrator) DropColumn(value interface{}, name string) error {
 	})
 }
 
-// AlterColumn alter value's `field` column's type based on schema definition
+// AlterColumn alters value's `field` column's type based on schema definition
 func (m Migrator) AlterColumn(value interface{}, field string) error {
 	return m.RunWithValue(value, func(stmt *gorm.Statement) error {
 		if stmt.Schema != nil {
@@ -326,7 +323,7 @@ func (m Migrator) AlterColumn(value interface{}, field string) error {
 	})
 }
 
-// HasColumn check has column `field` for value or not
+// HasColumn checks whether the table for the given value contains the specified column `field`
 func (m Migrator) HasColumn(value interface{}, field string) bool {
 	var count int64
 
@@ -340,7 +337,7 @@ func (m Migrator) HasColumn(value interface{}, field string) bool {
 	return count > 0
 }
 
-// ColumnTypes return columnTypes []gorm.ColumnType and execErr error
+// ColumnTypes returns the column types for the given value’s table and any error encountered during execution
 func (m Migrator) ColumnTypes(value interface{}) ([]gorm.ColumnType, error) {
 	columnTypes := make([]gorm.ColumnType, 0)
 	execErr := m.RunWithValue(value, func(stmt *gorm.Statement) (err error) {
@@ -370,7 +367,7 @@ func (m Migrator) ColumnTypes(value interface{}) ([]gorm.ColumnType, error) {
 	return columnTypes, execErr
 }
 
-// HasConstraint check has constraint or not
+// HasConstraint checks whether the table for the given `value` contains the specified constraint `name`
 func (m Migrator) HasConstraint(value interface{}, name string) bool {
 	var count int64
 
@@ -389,8 +386,7 @@ func (m Migrator) HasConstraint(value interface{}, name string) bool {
 	return count > 0
 }
 
-// Indexes
-// DropIndex drop index `name`
+// DropIndex drops the index with the specified `name` from the table associated with `value`
 func (m Migrator) DropIndex(value interface{}, name string) error {
 	return m.RunWithValue(value, func(stmt *gorm.Statement) error {
 		if stmt.Schema != nil {
@@ -403,7 +399,7 @@ func (m Migrator) DropIndex(value interface{}, name string) error {
 	})
 }
 
-// HasIndex check has index `name` or not
+// HasIndex checks whether the table for the given `value` contains an index with the specified `name`
 func (m Migrator) HasIndex(value interface{}, name string) bool {
 	var count int64
 	m.RunWithValue(value, func(stmt *gorm.Statement) error {
@@ -423,7 +419,7 @@ func (m Migrator) HasIndex(value interface{}, name string) bool {
 	return count > 0
 }
 
-// RenameIndex rename index from oldName to newName
+// RenameIndex renames index from oldName to newName on the table for the given `value`
 func (m Migrator) RenameIndex(value interface{}, oldName, newName string) error {
 	return m.RunWithValue(value, func(stmt *gorm.Statement) error {
 		return m.DB.Exec(
@@ -460,7 +456,7 @@ func (m Migrator) FullDataTypeOf(field *schema.Field) (expr clause.Expr) {
 	return expr
 }
 
-// Build Oracle-compatible default values from string
+// Builds Oracle-compatible default values from string
 func (m Migrator) buildOracleDefault(defaultValue string) string {
 	defaultValue = strings.TrimSpace(defaultValue)
 

@@ -49,7 +49,31 @@ import (
 	"gorm.io/gorm/schema"
 )
 
-// Delete callback function for Oracle
+// Delete overrides GORM's delete callback for Oracle.
+//
+// Delete builds a safe, Oracle-compatible DELETE that supports soft deletes,
+// hard deletes, and optional RETURNING of deleted rows.
+//
+// Behavior:
+//   - DELETE safety: checks for missing WHERE conditions and refuses to run
+//     unless AllowGlobalUpdate is set or the WHERE clause has meaningful
+//     conditions.
+//   - Soft delete: if the model has a soft-delete field and Unscoped is false,
+//     it lets GORM emit the UPDATE that marks rows as deleted. If a RETURNING
+//     clause is present with soft delete, it executes via QueryContext so the
+//     returned columns can be scanned.
+//   - Hard delete + RETURNING: it emits a PL/SQL block that performs DELETE …
+//     RETURNING BULK COLLECT INTO, wiring per-row sql.Out destinations so the
+//     deleted rows (or selected columns) can be populated back into the
+//     destination slice.
+//   - Hard delete (no RETURNING): it emits a standard DELETE and executes it
+//     via ExecContext.
+//   - Expressions: it expands WHERE expressions, including IN with slices, and
+//     normalizes bind variables for Oracle.
+//
+// Register with:
+//
+//	db.Callback().Delete().Replace("gorm:delete", oracle.Delete)
 func Delete(db *gorm.DB) {
 	if db.Error != nil || db.Statement == nil {
 		return

@@ -18,13 +18,13 @@ dsn := `user="scott" password="tiger"
         libDir="/Path/to/your/instantclient_23_8"`
 ```
 
-## Quick start
+## Getting Started
 
 ```go main.go
 package main
 
 import (
-        "github.com/oracle/gorm-oracle/oracle"
+        "github.com/oracle-samples/gorm-oracle/oracle"
         "gorm.io/gorm"
 )
 
