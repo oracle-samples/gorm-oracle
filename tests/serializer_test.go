@@ -66,27 +66,7 @@ type SerializerStruct struct {
 	EncryptedString        EncryptedString
 }
 
-type SerializerPostgresStruct struct {
-	gorm.Model
-	Name                   []byte                 `gorm:"json"`
-	Roles                  Roles                  `gorm:"serializer:json"`
-	Roles2                 *Roles                 `gorm:"serializer:json"`
-	Roles3                 *Roles                 `gorm:"serializer:json;not null"`
-	Contracts              map[string]interface{} `gorm:"serializer:json"`
-	JobInfo                Job                    `gorm:"type:bytes;serializer:gob"`
-	CreatedTime            int64                  `gorm:"serializer:unixtime;type:timestamptz"` // store time in db, use int as field type
-	UpdatedTime            *int64                 `gorm:"serializer:unixtime;type:timestamptz"` // store time in db, use int as field type
-	CustomSerializerString string                 `gorm:"serializer:custom"`
-	EncryptedString        EncryptedString
-}
-
-func (*SerializerPostgresStruct) TableName() string { return "serializer_structs" }
-
 func adaptorSerializerModel(s *SerializerStruct) interface{} {
-	if DB.Dialector.Name() == "postgres" {
-		sps := SerializerPostgresStruct(*s)
-		return &sps
-	}
 	return s
 }
 
@@ -154,6 +134,7 @@ func TestSerializer(t *testing.T) {
 	data := SerializerStruct{
 		Name:            []byte("jinzhu"),
 		Roles:           []string{"r1", "r2"},
+		Roles3:          &Roles{},
 		Contracts:       map[string]interface{}{"name": "jinzhu", "age": 10},
 		EncryptedString: EncryptedString("pass"),
 		CreatedTime:     createdAt.Unix(),
@@ -166,19 +147,21 @@ func TestSerializer(t *testing.T) {
 		},
 		CustomSerializerString: "world",
 	}
+	// empty := Roles{}
+	// data.Roles3 = &empty
 
 	if err := DB.Create(&data).Error; err != nil {
 		t.Fatalf("failed to create data, got error %v", err)
 	}
 
 	var result SerializerStruct
-	if err := DB.Where("roles2 IS NULL AND roles3 = ?", "").First(&result, data.ID).Error; err != nil {
+	if err := DB.Where("\"roles2\" IS NULL AND \"roles3\" = ?", "[]").First(&result, data.ID).Error; err != nil {
 		t.Fatalf("failed to query data, got error %v", err)
 	}
 
 	tests.AssertEqual(t, result, data)
 
-	if err := DB.Model(&result).Update("roles", "").Error; err != nil {
+	if err := DB.Model(&result).Update("roles", []string{}).Error; err != nil {
 		t.Fatalf("failed to update data's roles, got error %v", err)
 	}
 
@@ -195,6 +178,8 @@ func TestSerializerZeroValue(t *testing.T) {
 	}
 
 	data := SerializerStruct{}
+	// If left as is Roles3 value will be "" which will be translated by OracleDB to NULL which is not allowed for Role3 column
+	data.Roles3 = &Roles{}
 
 	if err := DB.Create(&data).Error; err != nil {
 		t.Fatalf("failed to create data, got error %v", err)
@@ -207,7 +192,7 @@ func TestSerializerZeroValue(t *testing.T) {
 
 	tests.AssertEqual(t, result, data)
 
-	if err := DB.Model(&result).Update("roles", "").Error; err != nil {
+	if err := DB.Model(&result).Update("roles", []string{}).Error; err != nil {
 		t.Fatalf("failed to update data's roles, got error %v", err)
 	}
 
@@ -228,6 +213,7 @@ func TestSerializerAssignFirstOrCreate(t *testing.T) {
 	data := SerializerStruct{
 		Name:            []byte("ag9920"),
 		Roles:           []string{"r1", "r2"},
+		Roles3:          &Roles{},
 		Contracts:       map[string]interface{}{"name": "jing1", "age": 11},
 		EncryptedString: EncryptedString("pass"),
 		CreatedTime:     createdAt.Unix(),

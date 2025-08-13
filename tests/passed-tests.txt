@@ -287,9 +287,9 @@ TestScanToEmbedded
 TestGORMValuer
 TestScopes
 TestComplexScopes
-#TestSerializer
-#TestSerializerZeroValue
-#TestSerializerAssignFirstOrCreate
+TestSerializer
+TestSerializerZeroValue
+TestSerializerAssignFirstOrCreate
 TestSoftDelete
 TestDeletedAtUnMarshal
 TestDeletedAtOneOr
