@@ -3,7 +3,7 @@ name: Run Tests
 on: push
 
 jobs:
-  build:
+  run-tests:
     runs-on: ubuntu-latest
     env:
       GORM_ORACLEDB_USER: ${{ secrets.GORM_ORACLEDB_USER }}
