@@ -40,7 +40,6 @@ package tests
 
 import (
 	"errors"
-	"strings"
 	"testing"
 
 	. "github.com/oracle-samples/gorm-oracle/tests/utils"
@@ -420,11 +419,7 @@ func TestHardDeleteAfterSoftDelete(t *testing.T) {
 }
 
 func TestDeleteWithLimitAndOrder(t *testing.T) {
-	if err := DB.Exec(`DROP TABLE "users" CASCADE CONSTRAINTS`).Error; err != nil {
-		if !strings.Contains(err.Error(), "ORA-00942") {
-			t.Fatalf("Failed to migrate, got error: %s", err)
-		}
-	}
+	RunMigrations()
 	users := []User{
 		*GetUser("del-limited-1", Config{}),
 		*GetUser("del-limited-2", Config{}),
