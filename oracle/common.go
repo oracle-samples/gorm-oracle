@@ -276,24 +276,6 @@ func convertFromOracleToField(value interface{}, field *schema.Field) interface{
 	return converted
 }
 
-// Helper function to check if a value should be treated as nil for pointer fields
-func isZeroValueForPointer(value interface{}, targetType reflect.Type) bool {
-	v := reflect.ValueOf(value)
-	if !v.IsValid() || v.Kind() != targetType.Kind() {
-		return false
-	}
-
-	switch targetType.Kind() {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return v.Int() == 0
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return v.Uint() == 0
-	case reflect.Float32, reflect.Float64:
-		return v.Float() == 0.0
-	}
-	return false
-}
-
 // Helper function to handle primitive type conversions
 func convertPrimitiveType(value interface{}, targetType reflect.Type) interface{} {
 	switch targetType.Kind() {
