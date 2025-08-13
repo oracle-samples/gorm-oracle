@@ -57,7 +57,7 @@ func TestJoins(t *testing.T) {
 	DB.Create(&user)
 
 	var user2 User
-	if err := DB.Joins("NamedPet").Joins("Company").Joins("Manager").Joins("Account").First(&user2, "users.name = ?", user.Name).Error; err != nil {
+	if err := DB.Joins("NamedPet").Joins("Company").Joins("Manager").Joins("Account").First(&user2, "\"users\".\"name\" = ?", user.Name).Error; err != nil {
 		t.Fatalf("Failed to load with joins, got error: %v", err)
 	}
 
@@ -79,7 +79,7 @@ func TestJoinsForSlice(t *testing.T) {
 	}
 
 	var users2 []User
-	if err := DB.Joins("Company").Joins("Manager").Joins("Account").Find(&users2, "users.id IN ?", userIDs).Error; err != nil {
+	if err := DB.Joins("Company").Joins("Manager").Joins("Account").Find(&users2, "\"users\".\"id\" IN ?", userIDs).Error; err != nil {
 		t.Fatalf("Failed to load with joins, got error: %v", err)
 	} else if len(users2) != len(users) {
 		t.Fatalf("Failed to load join users, got: %v, expect: %v", len(users2), len(users))
@@ -103,51 +103,51 @@ func TestJoinConds(t *testing.T) {
 	DB.Save(&user)
 
 	var users1 []User
-	DB.Joins("inner join pets on pets.user_id = users.id").Where("users.name = ?", user.Name).Find(&users1)
+	DB.Joins(`inner join "pets" on "pets"."user_id" = "users"."id"`).Where(`"users"."name" = ?`, user.Name).Find(&users1)
 	if len(users1) != 3 {
 		t.Errorf("should find two users using left join, but got %v", len(users1))
 	}
 
 	var users2 []User
-	DB.Joins("inner join pets on pets.user_id = users.id AND pets.name = ?", user.Pets[0].Name).Where("users.name = ?", user.Name).First(&users2)
+	DB.Joins(`inner join "pets" on "pets"."user_id" = "users"."id" AND "pets"."name" = ?`, user.Pets[0].Name).Where(`"users"."name" = ?`, user.Name).First(&users2)
 	if len(users2) != 1 {
 		t.Errorf("should find one users using left join with conditions, but got %v", len(users2))
 	}
 
 	var users3 []User
-	DB.Joins("inner join pets on pets.user_id = users.id AND pets.name = ?", user.Pets[0].Name).Joins("join accounts on accounts.user_id = users.id AND accounts.number = ?", user.Account.AccountNumber).Where("users.name = ?", user.Name).First(&users3)
+	DB.Joins(`inner join "pets" on "pets"."user_id" = "users"."id" AND "pets"."name" = ?`, user.Pets[0].Name).Joins(`join "accounts" on "accounts"."user_id" = "users"."id" AND "accounts"."account_number" = ?`, user.Account.AccountNumber).Where(`"users"."name" = ?`, user.Name).First(&users3)
 	if len(users3) != 1 {
 		t.Errorf("should find one users using multiple left join conditions, but got %v", len(users3))
 	}
 
 	var users4 []User
-	DB.Joins("inner join pets on pets.user_id = users.id AND pets.name = ?", user.Pets[0].Name).Joins("join accounts on accounts.user_id = users.id AND accounts.number = ?", user.Account.AccountNumber+"non-exist").Where("users.name = ?", user.Name).First(&users4)
+	DB.Joins(`inner join "pets" on "pets"."user_id" = "users"."id" AND "pets"."name" = ?`, user.Pets[0].Name).Joins(`join "accounts" on "accounts"."user_id" = "users"."id" AND "accounts"."account_number" = ?`, user.Account.AccountNumber+"non-exist").Where(`"users"."name" = ?`, user.Name).First(&users4)
 	if len(users4) != 0 {
 		t.Errorf("should find no user when searching with unexisting credit card, but got %v", len(users4))
 	}
 
 	var users5 []User
-	db5 := DB.Joins("inner join pets on pets.user_id = users.id AND pets.name = ?", user.Pets[0].Name).Joins("join accounts on accounts.user_id = users.id AND accounts.number = ?", user.Account.AccountNumber).Where(User{Model: gorm.Model{ID: 1}}).Where(Account{Model: gorm.Model{ID: 1}}).Not(Pet{Model: gorm.Model{ID: 1}}).Find(&users5)
+	db5 := DB.Joins(`inner join "pets" on "pets"."user_id" = "users"."id" AND "pets"."name" = ?`, user.Pets[0].Name).Joins(`join "accounts" on "accounts"."user_id" = "users"."id" AND "accounts"."account_number" = ?`, user.Account.AccountNumber).Where(User{Model: gorm.Model{ID: 1}}).Where(Account{Model: gorm.Model{ID: 1}}).Not(Pet{Model: gorm.Model{ID: 1}}).Find(&users5)
 	if db5.Error != nil {
 		t.Errorf("Should not raise error for join where identical fields in different tables. Error: %s", db5.Error.Error())
 	}
 
 	var users6 []User
-	DB.Joins("inner join pets on pets.user_id = users.id AND pets.name = @Name", user.Pets[0]).Where("users.name = ?", user.Name).First(&users6)
+	DB.Joins(`inner join "pets" on "pets"."user_id" = "users"."id" AND "pets"."name" = @Name`, user.Pets[0]).Where(`"users"."name" = ?`, user.Name).First(&users6)
 	if len(users6) != 1 {
 		t.Errorf("should find one users using left join with conditions, but got %v", len(users6))
 	}
 
 	dryDB := DB.Session(&gorm.Session{DryRun: true})
-	stmt := dryDB.Joins("left join pets on pets.user_id = users.id AND pets.name = ?", user.Pets[0].Name).Joins("join accounts on accounts.user_id = users.id AND accounts.number = ?", user.Account.AccountNumber).Where(User{Model: gorm.Model{ID: 1}}).Where(Account{Model: gorm.Model{ID: 1}}).Not(Pet{Model: gorm.Model{ID: 1}}).Find(&users5).Statement
+	stmt := dryDB.Joins(`left join "pets" on "pets"."user_id" = "users"."id" AND "pets"."name" = ?`, user.Pets[0].Name).Joins(`join "accounts" on "accounts""."user_id" = "users"."id" AND "accounts"."number" = ?`, user.Account.AccountNumber).Where(User{Model: gorm.Model{ID: 1}}).Where(Account{Model: gorm.Model{ID: 1}}).Not(Pet{Model: gorm.Model{ID: 1}}).Find(&users5).Statement
 
-	if !regexp.MustCompile("SELECT .* FROM .users. left join pets.*join accounts.*").MatchString(stmt.SQL.String()) {
+	if !regexp.MustCompile(`SELECT .* FROM\s+"users"\s+left join\s+"pets".*join\s+"accounts".*`).MatchString(stmt.SQL.String()) {
 		t.Errorf("joins should be ordered, but got %v", stmt.SQL.String())
 	}
 
-	iv := DB.Table(`table_invoices`).Select(`seller, SUM(total) as total, SUM(paid) as paid, SUM(balance) as balance`).Group(`seller`)
-	stmt = dryDB.Table(`table_employees`).Select(`id, name, iv.total, iv.paid, iv.balance`).Joins(`LEFT JOIN (?) iv ON iv.seller = table_employees.id`, iv).Scan(&user).Statement
-	if !regexp.MustCompile("SELECT id, name, iv.total, iv.paid, iv.balance FROM .table_employees. LEFT JOIN \\(SELECT seller, SUM\\(total\\) as total, SUM\\(paid\\) as paid, SUM\\(balance\\) as balance FROM .table_invoices. GROUP BY .seller.\\) iv ON iv.seller = table_employees.id").MatchString(stmt.SQL.String()) {
+	iv := DB.Table(`"table_invoices"`).Select(`"seller", SUM("total") as "total", SUM("paid") as "paid", SUM("balance") as "balance"`).Group(`"seller"`)
+	stmt = dryDB.Table(`"table_employees"`).Select(`"id", "name", "iv"."total", "iv"."paid", "iv"."balance"`).Joins(`LEFT JOIN (?) "iv" ON "iv"."seller" = "table_employees"."id"`, iv).Scan(&user).Statement
+	if !regexp.MustCompile(`SELECT\s+.*"id".*FROM\s+"table_employees"\s+LEFT JOIN\s+\(SELECT\s+.*"seller".*FROM\s+"table_invoices".*GROUP\s+BY\s+"seller"\)\s+"iv"\s+ON\s+.*"seller".*=.*"table_employees"\."id"`).MatchString(stmt.SQL.String()) {
 		t.Errorf("joins should be ordered, but got %v", stmt.SQL.String())
 	}
 }
@@ -159,7 +159,7 @@ func TestJoinOn(t *testing.T) {
 	var user1 User
 	onQuery := DB.Where(&Pet{Name: "joins-on_pet_1"})
 
-	if err := DB.Joins("NamedPet", onQuery).Where("users.name = ?", user.Name).First(&user1).Error; err != nil {
+	if err := DB.Joins("NamedPet", onQuery).Where("\"users\".\"name\" = ?", user.Name).First(&user1).Error; err != nil {
 		t.Fatalf("Failed to load with joins on, got error: %v", err)
 	}
 
@@ -167,7 +167,7 @@ func TestJoinOn(t *testing.T) {
 
 	onQuery2 := DB.Where(&Pet{Name: "joins-on_pet_2"})
 	var user2 User
-	if err := DB.Joins("NamedPet", onQuery2).Where("users.name = ?", user.Name).First(&user2).Error; err != nil {
+	if err := DB.Joins("NamedPet", onQuery2).Where("\"users\".\"name\" = ?", user.Name).First(&user2).Error; err != nil {
 		t.Fatalf("Failed to load with joins on, got error: %v", err)
 	}
 	tests.AssertEqual(t, user2.NamedPet.Name, "joins-on_pet_2")
@@ -281,17 +281,17 @@ func TestInnerJoins(t *testing.T) {
 
 	var user2 User
 	var err error
-	err = DB.InnerJoins("Company").InnerJoins("Manager").InnerJoins("Account").First(&user2, "users.name = ?", user.Name).Error
+	err = DB.InnerJoins("Company").InnerJoins("Manager").InnerJoins("Account").First(&user2, "\"users\".\"name\" = ?", user.Name).Error
 	tests.AssertEqual(t, err, nil)
 	CheckUser(t, user2, user)
 
 	// inner join and NamedPet is nil
-	err = DB.InnerJoins("NamedPet").InnerJoins("Company").InnerJoins("Manager").InnerJoins("Account").First(&user2, "users.name = ?", user.Name).Error
+	err = DB.InnerJoins("NamedPet").InnerJoins("Company").InnerJoins("Manager").InnerJoins("Account").First(&user2, "\"users\".\"name\" = ?", user.Name).Error
 	tests.AssertEqual(t, err, gorm.ErrRecordNotFound)
 
 	// mixed inner join and left join
 	var user3 User
-	err = DB.Joins("NamedPet").InnerJoins("Company").InnerJoins("Manager").InnerJoins("Account").First(&user3, "users.name = ?", user.Name).Error
+	err = DB.Joins("NamedPet").InnerJoins("Company").InnerJoins("Manager").InnerJoins("Account").First(&user3, "\"users\".\"name\" = ?", user.Name).Error
 	tests.AssertEqual(t, err, nil)
 	CheckUser(t, user3, user)
 }
@@ -334,7 +334,7 @@ func TestJoinArgsWithDB(t *testing.T) {
 	// test where
 	var user1 User
 	onQuery := DB.Where(&Pet{Name: "joins-args-db_pet_2"})
-	if err := DB.Joins("NamedPet", onQuery).Where("users.name = ?", user.Name).First(&user1).Error; err != nil {
+	if err := DB.Joins("NamedPet", onQuery).Where("\"users\".\"name\" = ?", user.Name).First(&user1).Error; err != nil {
 		t.Fatalf("Failed to load with joins on, got error: %v", err)
 	}
 
@@ -343,7 +343,7 @@ func TestJoinArgsWithDB(t *testing.T) {
 	// test where and omit
 	onQuery2 := DB.Where(&Pet{Name: "joins-args-db_pet_2"}).Omit("Name")
 	var user2 User
-	if err := DB.Joins("NamedPet", onQuery2).Where("users.name = ?", user.Name).First(&user2).Error; err != nil {
+	if err := DB.Joins("NamedPet", onQuery2).Where("\"users\".\"name\" = ?", user.Name).First(&user2).Error; err != nil {
 		t.Fatalf("Failed to load with joins on, got error: %v", err)
 	}
 	tests.AssertEqual(t, user2.NamedPet.ID, user1.NamedPet.ID)
@@ -352,7 +352,7 @@ func TestJoinArgsWithDB(t *testing.T) {
 	// test where and select
 	onQuery3 := DB.Where(&Pet{Name: "joins-args-db_pet_2"}).Select("Name")
 	var user3 User
-	if err := DB.Joins("NamedPet", onQuery3).Where("users.name = ?", user.Name).First(&user3).Error; err != nil {
+	if err := DB.Joins("NamedPet", onQuery3).Where("\"users\".\"name\" = ?", user.Name).First(&user3).Error; err != nil {
 		t.Fatalf("Failed to load with joins on, got error: %v", err)
 	}
 	tests.AssertEqual(t, user3.NamedPet.ID, 0)
@@ -361,7 +361,7 @@ func TestJoinArgsWithDB(t *testing.T) {
 	// test select
 	onQuery4 := DB.Select("ID")
 	var user4 User
-	if err := DB.Joins("NamedPet", onQuery4).Where("users.name = ?", user.Name).First(&user4).Error; err != nil {
+	if err := DB.Joins("NamedPet", onQuery4).Where("\"users\".\"name\" = ?", user.Name).First(&user4).Error; err != nil {
 		t.Fatalf("Failed to load with joins on, got error: %v", err)
 	}
 	if user4.NamedPet.ID == 0 {
