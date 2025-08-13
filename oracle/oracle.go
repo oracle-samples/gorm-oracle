@@ -133,11 +133,6 @@ func (d Dialector) Migrator(db *gorm.DB) gorm.Migrator {
 
 // Determines the data type for a schema field
 func (d Dialector) DataTypeOf(field *schema.Field) string {
-	// TODO : Not sure why this is added in the reference implementation
-	if _, found := field.TagSettings["RESTRICT"]; found {
-		delete(field.TagSettings, "RESTRICT")
-	}
-
 	switch field.DataType {
 	case schema.Bool:
 		return d.getBooleanType()
