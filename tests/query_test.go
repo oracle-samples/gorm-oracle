@@ -308,7 +308,6 @@ func TestQueryWithAssociation(t *testing.T) {
 }
 
 func TestFindInBatches(t *testing.T) {
-	t.Skip()
 	users := []User{
 		*GetUser("find_in_batches", Config{}),
 		*GetUser("find_in_batches", Config{}),
@@ -361,7 +360,6 @@ func TestFindInBatches(t *testing.T) {
 }
 
 func TestFindInBatchesWithOffsetLimit(t *testing.T) {
-	t.Skip()
 	users := []User{
 		*GetUser("find_in_batches_with_offset_limit", Config{}),
 		*GetUser("find_in_batches_with_offset_limit", Config{}),
@@ -424,7 +422,6 @@ func TestFindInBatchesWithOffsetLimit(t *testing.T) {
 }
 
 func TestFindInBatchesWithError(t *testing.T) {
-	t.Skip()
 	users := []User{
 		*GetUser("find_in_batches_with_error", Config{}),
 		*GetUser("find_in_batches_with_error", Config{}),
@@ -864,7 +861,6 @@ func TestSelect(t *testing.T) {
 }
 
 func TestOmit(t *testing.T) {
-	t.Skip()
 	user := User{Name: "OmitUser1", Age: 20}
 	DB.Save(&user)
 
@@ -880,7 +876,6 @@ func TestOmit(t *testing.T) {
 }
 
 func TestOmitWithAllFields(t *testing.T) {
-	t.Skip()
 	user := User{Name: "OmitUser1", Age: 20}
 	DB.Save(&user)
 
@@ -905,7 +900,6 @@ func TestOmitWithAllFields(t *testing.T) {
 }
 
 func TestMapColumns(t *testing.T) {
-	t.Skip()
 	user := User{Name: "MapColumnsUser", Age: 12}
 	DB.Save(&user)
 
@@ -1305,7 +1299,6 @@ func TestSubQueryWithHaving(t *testing.T) {
 }
 
 func TestScanNullValue(t *testing.T) {
-	t.Skip()
 	user := GetUser("scan_null_value", Config{})
 	DB.Create(&user)
 
