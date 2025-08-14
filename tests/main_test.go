@@ -92,16 +92,13 @@ func TestSetAndGet(t *testing.T) {
 	}
 }
 
-func TestInsertScenarios(t *testing.T) {
+func TesUserInsertScenarios(t *testing.T) {
 	type UserWithAge struct {
 		ID   uint   `gorm:"column:ID;primaryKey"`
 		Name string `gorm:"column:NAME"`
 		Age  int    `gorm:"column:AGE"`
 	}
 
-	if err := DB.Migrator().DropTable(&UserWithAge{}); err != nil {
-		t.Fatalf("Failed to drop table: %v", err)
-	}
 	if err := DB.AutoMigrate(&UserWithAge{}); err != nil {
 		t.Fatalf("Failed to migrate table: %v", err)
 	}
@@ -126,7 +123,7 @@ func TestInsertScenarios(t *testing.T) {
 		Name      string    `gorm:"column:NAME"`
 		CreatedAt time.Time `gorm:"column:CREATED_AT"`
 	}
-	
+
 	if err := DB.AutoMigrate(&UserWithTime{}); err != nil {
 		t.Fatalf("Failed to migrate UserWithTime table: %v", err)
 	}

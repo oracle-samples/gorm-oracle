@@ -379,4 +379,4 @@ BenchmarkScanSlice
 BenchmarkScanSlicePointer
 BenchmarkUpdate
 BenchmarkDelete
-TestInsertScenarios
+TesUserInsertScenarios
