@@ -379,3 +379,7 @@ BenchmarkScanSlice
 BenchmarkScanSlicePointer
 BenchmarkUpdate
 BenchmarkDelete
+TestRawQueryInjection
+TestWhereClauseInjection
+TestUpdateInjection
+TestFirstOrCreateInjection
