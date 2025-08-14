@@ -41,6 +41,7 @@ package tests
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	. "github.com/oracle-samples/gorm-oracle/tests/utils"
 )
@@ -88,5 +89,39 @@ func TestSetAndGet(t *testing.T) {
 
 	if _, ok := DB.Get("non_existing"); ok {
 		t.Errorf("Get non existing key should return error")
+	}
+}
+
+func TestInsertScenarios(t *testing.T) {
+	if err := DB.Migrator().DropTable(&User{}); err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+	}
+	if err := DB.AutoMigrate(&User{}); err != nil {
+		t.Fatalf("Failed to migrate table: %v", err)
+	}
+
+	user1 := User{Name: "Alice", Age: 30}
+	if err := DB.Create(&user1).Error; err != nil {
+		t.Errorf("Basic insert failed: %v", err)
+	}
+
+	user2 := User{Name: "Bob"}
+	if err := DB.Create(&user2).Error; err != nil {
+		t.Errorf("Insert with NULL failed: %v", err)
+	}
+
+	user3 := User{Name: "O'Reilly", Age: 45}
+	if err := DB.Create(&user3).Error; err != nil {
+		t.Errorf("Insert with special characters failed: %v", err)
+	}
+
+	type UserWithTime struct {
+		ID        uint
+		Name      string
+		CreatedAt time.Time
+	}
+	user4 := User{Name: "Charlie"}
+	if err := DB.Create(&user4).Error; err != nil {
+		t.Errorf("Insert with default timestamp failed: %v", err)
 	}
 }
