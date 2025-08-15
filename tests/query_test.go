@@ -1389,7 +1389,7 @@ func TestQueryScannerWithSingleColumn(t *testing.T) {
 	DB.Create(&user)
 
 	var result1 DoubleInt64
-	if err := DB.Model(&User{}).Where("name LIKE ?", "scanner_raw_%").Limit(1).Pluck(
+	if err := DB.Model(&User{}).Where("\"name\" LIKE ?", "scanner_raw_%").Limit(1).Pluck(
 		"age", &result1).Error; err != nil {
 		t.Errorf("Failed, got error: %v", err)
 	}
@@ -1397,7 +1397,7 @@ func TestQueryScannerWithSingleColumn(t *testing.T) {
 	tests.AssertEqual(t, result1.data, 20)
 
 	var result2 DoubleInt64
-	if err := DB.Model(&User{}).Where("name LIKE ?", "scanner_raw_%").Limit(1).Select(
+	if err := DB.Model(&User{}).Where("\"name\" LIKE ?", "scanner_raw_%").Limit(1).Select(
 		"age").Scan(&result2).Error; err != nil {
 		t.Errorf("Failed, got error: %v", err)
 	}
