@@ -422,7 +422,6 @@ func TestGenericsJoins(t *testing.T) {
 }
 
 func TestGenericsNestedJoins(t *testing.T) {
-	t.Skip()
 	users := []User{
 		{
 			Name: "generics-nested-joins-1",
