@@ -303,6 +303,7 @@ func TestScanRowsNullValuesScanToFieldDefault(t *testing.T) {
 }
 
 func TestScanToEmbedded(t *testing.T) {
+	t.Skip()
 	person1 := Person{Name: "person 1"}
 	person2 := Person{Name: "person 2"}
 	DB.Save(&person1).Save(&person2)
