@@ -1385,7 +1385,6 @@ func (t *DoubleInt64) Scan(v any) error {
 
 // https://github.com/go-gorm/gorm/issues/5091
 func TestQueryScannerWithSingleColumn(t *testing.T) {
-	t.Skip()
 	user := User{Name: "scanner_raw_1", Age: 10}
 	DB.Create(&user)
 
