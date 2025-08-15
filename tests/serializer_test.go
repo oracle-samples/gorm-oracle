@@ -60,8 +60,8 @@ type SerializerStruct struct {
 	Roles3                 *Roles                 `gorm:"serializer:json;not null"`
 	Contracts              map[string]interface{} `gorm:"serializer:json"`
 	JobInfo                Job                    `gorm:"type:bytes;serializer:gob"`
-	CreatedTime            int64                  `gorm:"serializer:unixtime;type:datetime"` // store time in db, use int as field type
-	UpdatedTime            *int64                 `gorm:"serializer:unixtime;type:datetime"` // store time in db, use int as field type
+	CreatedTime            int64                  `gorm:"serializer:unixtime;type:timestamp"` // store time in db, use int as field type
+	UpdatedTime            *int64                 `gorm:"serializer:unixtime;type:timestamp"` // store time in db, use int as field type
 	CustomSerializerString string                 `gorm:"serializer:custom"`
 	EncryptedString        EncryptedString
 }
