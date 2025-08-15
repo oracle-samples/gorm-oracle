@@ -39,6 +39,7 @@
 package tests
 
 import (
+	"fmt"
 	"regexp"
 	"testing"
 
@@ -52,7 +53,6 @@ import (
 )
 
 func TestUpsert(t *testing.T) {
-	t.Skip()
 	lang := Language{Code: "upsert", Name: "Upsert"}
 	if err := DB.Clauses(clause.OnConflict{DoNothing: true}).Create(&lang).Error; err != nil {
 		t.Fatalf("failed to upsert, got %v", err)
@@ -64,10 +64,10 @@ func TestUpsert(t *testing.T) {
 	}
 
 	var langs []Language
-	if err := DB.Find(&langs, "code = ?", lang.Code).Error; err != nil {
-		t.Errorf("no error should happen when find languages with code, but got %v", err)
+	if err := DB.Find(&langs, "\"code\" = ?", lang.Code).Error; err != nil {
+		t.Fatalf("no error should happen when find languages with code, but got %v", err)
 	} else if len(langs) != 1 {
-		t.Errorf("should only find only 1 languages, but got %+v", langs)
+		t.Fatalf("should only find only 1 languages, but got %+v", langs)
 	}
 
 	lang3 := Language{Code: "upsert", Name: "Upsert"}
@@ -78,12 +78,12 @@ func TestUpsert(t *testing.T) {
 		t.Fatalf("failed to upsert, got %v", err)
 	}
 
-	if err := DB.Find(&langs, "code = ?", lang.Code).Error; err != nil {
-		t.Errorf("no error should happen when find languages with code, but got %v", err)
+	if err := DB.Find(&langs, "\"code\" = ?", lang.Code).Error; err != nil {
+		t.Fatalf("no error should happen when find languages with code, but got %v", err)
 	} else if len(langs) != 1 {
-		t.Errorf("should only find only 1 languages, but got %+v", langs)
+		t.Fatalf("should only find only 1 languages, but got %+v", langs)
 	} else if langs[0].Name != "upsert-new" {
-		t.Errorf("should update name on conflict, but got name %+v", langs[0].Name)
+		t.Fatalf("should update name on conflict, but got name %+v", langs[0].Name)
 	}
 
 	lang = Language{Code: "upsert", Name: "Upsert-Newname"}
@@ -92,27 +92,25 @@ func TestUpsert(t *testing.T) {
 	}
 
 	var result Language
-	if err := DB.Find(&result, "code = ?", lang.Code).Error; err != nil || result.Name != lang.Name {
+	if err := DB.Find(&result, "\"code\" = ?", lang.Code).Error; err != nil || result.Name != lang.Name {
 		t.Fatalf("failed to upsert, got name %v", result.Name)
 	}
 
-	if name := DB.Dialector.Name(); name != "sqlserver" {
-		type RestrictedLanguage struct {
-			Code string `gorm:"primarykey"`
-			Name string
-			Lang string `gorm:"<-:create"`
-		}
+	type RestrictedLanguage struct {
+		Code string `gorm:"primarykey"`
+		Name string
+		Lang string `gorm:"<-:create"`
+	}
 
-		r := DB.Session(&gorm.Session{DryRun: true}).Clauses(clause.OnConflict{UpdateAll: true}).Create(&RestrictedLanguage{Code: "upsert_code", Name: "upsert_name", Lang: "upsert_lang"})
-		if !regexp.MustCompile(`INTO .restricted_languages. .*\(.code.,.name.,.lang.\) .* (SET|UPDATE) .name.=.*.name.\W*$`).MatchString(r.Statement.SQL.String()) {
-			t.Errorf("Table with escape character, got %v", r.Statement.SQL.String())
-		}
+	r := DB.Session(&gorm.Session{DryRun: true}).Clauses(clause.OnConflict{UpdateAll: true}).Create(&RestrictedLanguage{Code: "upsert_code", Name: "upsert_name", Lang: "upsert_lang"})
+	if !regexp.MustCompile(`MERGE INTO "restricted_languages".*WHEN MATCHED THEN UPDATE SET "name"="excluded"."name".*INSERT \("code","name","lang"\)`).MatchString(r.Statement.SQL.String()) {
+		t.Fatalf("Table with escape character, got %v", r.Statement.SQL.String())
 	}
 
 	user := *GetUser("upsert_on_conflict", Config{})
 	user.Age = 20
 	if err := DB.Create(&user).Error; err != nil {
-		t.Errorf("failed to create user, got error %v", err)
+		t.Fatalf("failed to create user, got error %v", err)
 	}
 
 	var user2 User
@@ -124,6 +122,8 @@ func TestUpsert(t *testing.T) {
 	} else {
 		var user3 User
 		DB.First(&user3, user.ID)
+		fmt.Printf("%d\n", user3.UpdatedAt.UnixNano())
+		fmt.Printf("%d\n", user2.UpdatedAt.UnixNano())
 		if user3.UpdatedAt.UnixNano() == user2.UpdatedAt.UnixNano() {
 			t.Fatalf("failed to update user's updated_at, old: %v, new: %v", user2.UpdatedAt, user3.UpdatedAt)
 		}
@@ -367,5 +367,229 @@ func TestUpdateWithMissWhere(t *testing.T) {
 
 	if !regexp.MustCompile("WHERE .id. = [^ ]+$").MatchString(tx.Statement.SQL.String()) {
 		t.Fatalf("invalid updating SQL, got %v", tx.Statement.SQL.String())
+	}
+}
+
+type CompositeLang struct {
+	Code string `gorm:"primaryKey;size:100"`
+	Lang string `gorm:"primaryKey;size:10"`
+	Name string
+}
+
+func TestUpsertCompositePK(t *testing.T) {
+	langs := []CompositeLang{
+		{Code: "c1", Lang: "en", Name: "English"},
+		{Code: "c1", Lang: "fr", Name: "French"},
+	}
+
+	DB.Migrator().DropTable(&CompositeLang{})
+	DB.Migrator().AutoMigrate(&CompositeLang{})
+
+	if err := DB.Create(&langs).Error; err != nil {
+		t.Fatalf("failed to insert composite PK: %v", err)
+	}
+
+	for i := range langs {
+		langs[i].Name = langs[i].Name + "_updated"
+	}
+
+	if err := DB.Clauses(clause.OnConflict{
+		UpdateAll: true,
+	}).Create(&langs).Error; err != nil {
+		t.Fatalf("failed to upsert composite PK: %v", err)
+	}
+
+	for _, expected := range langs {
+		var result CompositeLang
+		if err := DB.First(&result, "\"code\" = ? AND \"lang\" = ?", expected.Code, expected.Lang).Error; err != nil {
+			t.Fatalf("failed to fetch row for %+v: %v", expected, err)
+		}
+		if result.Name != expected.Name {
+			t.Fatalf("expected %v, got %v", expected.Name, result.Name)
+		}
+	}
+
+	DB.Migrator().DropTable(&CompositeLang{})
+}
+
+func TestUpsertPrimaryKeyNotUpdated(t *testing.T) {
+	lang := Language{Code: "pk1", Name: "Name1"}
+	DB.Create(&lang)
+
+	lang.Code = "pk2" // try changing PK
+	DB.Clauses(clause.OnConflict{UpdateAll: true}).Create(&lang)
+
+	var result Language
+	DB.First(&result, "\"code\" = ?", "pk1")
+	if result.Name != "Name1" {
+		t.Fatalf("expected original row untouched, got %v", result)
+	}
+}
+
+type LangWithIgnore struct {
+	Code string `gorm:"primaryKey"`
+	Name string
+	Lang string `gorm:"<-:create"` // should not be updated
+}
+
+func TestUpsertIgnoreColumn(t *testing.T) {
+	DB.Migrator().DropTable(&LangWithIgnore{})
+	DB.Migrator().AutoMigrate(&LangWithIgnore{})
+	lang := LangWithIgnore{Code: "upsert_ignore", Name: "OldName", Lang: "en"}
+	DB.Create(&lang)
+
+	lang.Name = "NewName"
+	lang.Lang = "fr"
+	DB.Clauses(clause.OnConflict{UpdateAll: true}).Create(&lang)
+
+	var result LangWithIgnore
+	DB.First(&result, "\"code\" = ?", lang.Code)
+	if result.Name != "NewName" {
+		t.Fatalf("expected Name updated, got %v", result.Name)
+	}
+	if result.Lang != "en" {
+		t.Fatalf("Lang should not be updated, got %v", result.Lang)
+	}
+	DB.Migrator().DropTable(&LangWithIgnore{})
+}
+
+func TestUpsertNullValues(t *testing.T) {
+	lang := Language{Code: "upsert_null", Name: ""}
+	DB.Clauses(clause.OnConflict{UpdateAll: true}).Create(&lang)
+
+	var result Language
+	DB.First(&result, "\"code\" = ?", lang.Code)
+	if result.Name != "" {
+		t.Fatalf("expected empty Name, got %v", result.Name)
+	}
+}
+
+func TestUpsertWithNullUnique(t *testing.T) {
+	type NullLang struct {
+		Code *string `gorm:"uniqueIndex"`
+		Name string
+	}
+	DB.Migrator().DropTable(&NullLang{})
+	DB.Migrator().AutoMigrate(&NullLang{})
+
+	DB.Create(&NullLang{Code: nil, Name: "First"})
+
+	if err := DB.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "code"}},
+		DoUpdates: clause.AssignmentColumns([]string{"name"}),
+	}).Create(&NullLang{Code: nil, Name: "Second"}).Error; err != nil {
+		t.Fatalf("unexpected error on upsert with NULL: %v", err)
+	}
+
+	var count int64
+	DB.Model(&NullLang{}).Count(&count)
+	if count != 2 {
+		t.Fatalf("expected 2 rows due to NULL uniqueness, got %d", count)
+	}
+}
+
+func TestUpsertSliceMixed(t *testing.T) {
+	DB.Create(&Language{Code: "m1", Name: "Old1"})
+	langs := []Language{
+		{Code: "m1", Name: "New1"}, // exists
+		{Code: "m2", Name: "New2"}, // new
+	}
+
+	DB.Clauses(clause.OnConflict{UpdateAll: true}).Create(&langs)
+
+	var l1, l2 Language
+	DB.First(&l1, "\"code\" = ?", "m1")
+	DB.First(&l2, "\"code\" = ?", "m2")
+	if l1.Name != "New1" || l2.Name != "New2" {
+		t.Fatalf("batch mixed upsert failed: %+v, %+v", l1, l2)
+	}
+}
+
+func TestUpsertWithExpressions(t *testing.T) {
+	lang := Language{Code: "expr1", Name: "Name1"}
+	DB.Create(&lang)
+
+	DB.Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name: "code"}},
+		DoUpdates: clause.Assignments(map[string]interface{}{
+			"name": gorm.Expr("UPPER(?)", "newname"),
+		}),
+	}).Create(&lang)
+
+	var result Language
+	DB.First(&result, "\"code\" = ?", "expr1")
+	if result.Name != "NEWNAME" {
+		t.Fatalf("expected NEWNAME, got %v", result.Name)
+	}
+}
+
+func TestUpsertLargeBatch(t *testing.T) {
+	var langs []Language
+	for i := 0; i < 1000; i++ {
+		langs = append(langs, Language{Code: fmt.Sprintf("lb_%d", i), Name: "Name"})
+	}
+	if err := DB.Clauses(clause.OnConflict{DoNothing: true}).Create(&langs).Error; err != nil {
+		t.Fatalf("failed large batch insert: %v", err)
+	}
+}
+
+func TestUpsertFromSubquery(t *testing.T) {
+	DB.Migrator().DropTable(&Language{})
+	if err := DB.AutoMigrate(&Language{}); err != nil {
+		t.Fatalf("failed to migrate: %v", err)
+	}
+
+	initial := []Language{
+		{Code: "en", Name: "English"},
+		{Code: "fr", Name: "French - Old"},  // Will be updated
+		{Code: "es", Name: "Spanish - Old"}, // Will be updated
+	}
+	if err := DB.Create(&initial).Error; err != nil {
+		t.Fatalf("failed to seed: %v", err)
+	}
+
+	updates := []Language{
+		{Code: "fr", Name: "French - Updated"},
+		{Code: "es", Name: "Spanish - Updated"},
+		{Code: "de", Name: "German"}, // New record
+	}
+
+	for _, update := range updates {
+		err := DB.Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "code"}},
+			DoUpdates: clause.AssignmentColumns([]string{"name"}),
+		}).Create(&update).Error
+
+		if err != nil {
+			t.Fatalf("failed upsert: %v", err)
+		}
+	}
+
+	var results []Language
+	if err := DB.Order("\"code\"").Find(&results).Error; err != nil {
+		t.Fatalf("failed to query results: %v", err)
+	}
+
+	expected := []Language{
+		{Code: "de", Name: "German"},            // inserted
+		{Code: "en", Name: "English"},           // unchanged
+		{Code: "es", Name: "Spanish - Updated"}, // updated
+		{Code: "fr", Name: "French - Updated"},  // updated
+	}
+
+	if len(results) != len(expected) {
+		t.Errorf("expected %d rows, got %d", len(expected), len(results))
+	}
+
+	for i := range expected {
+		if i >= len(results) {
+			t.Errorf("missing row %d: expected (%s, %s)", i, expected[i].Code, expected[i].Name)
+			continue
+		}
+		if results[i].Code != expected[i].Code || results[i].Name != expected[i].Name {
+			t.Errorf("row %d mismatch: expected (%s, %s), got (%s, %s)",
+				i, expected[i].Code, expected[i].Name,
+				results[i].Code, results[i].Name)
+		}
 	}
 }
