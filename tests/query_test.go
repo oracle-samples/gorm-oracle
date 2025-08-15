@@ -1393,7 +1393,6 @@ func TestQueryScannerWithSingleColumn(t *testing.T) {
 }
 
 func TestQueryResetNullValue(t *testing.T) {
-	t.Skip()
 	type QueryResetItem struct {
 		ID   string `gorm:"type:varchar(5)"`
 		Name string

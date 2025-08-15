@@ -383,8 +383,6 @@ func TestJoinArgsWithDB(t *testing.T) {
 }
 
 func TestNestedJoins(t *testing.T) {
-	t.Skip()
-	
 	users := []User{
 		{
 			Name: "nested-joins-1",
