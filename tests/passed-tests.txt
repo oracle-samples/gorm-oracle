@@ -266,7 +266,7 @@ TestSubQueryWithHaving
 #TestScanNullValue
 TestQueryWithTableAndConditions
 TestQueryWithTableAndConditionsAndAllFields
-#TestQueryScannerWithSingleColumn
+TestQueryScannerWithSingleColumn
 #TestQueryResetNullValue
 TestQueryError
 TestQueryScanToArray
