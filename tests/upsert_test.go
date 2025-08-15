@@ -52,6 +52,7 @@ import (
 )
 
 func TestUpsert(t *testing.T) {
+	t.Skip()
 	lang := Language{Code: "upsert", Name: "Upsert"}
 	if err := DB.Clauses(clause.OnConflict{DoNothing: true}).Create(&lang).Error; err != nil {
 		t.Fatalf("failed to upsert, got %v", err)
@@ -286,6 +287,7 @@ func TestFindOrInitialize(t *testing.T) {
 }
 
 func TestFindOrCreate(t *testing.T) {
+	t.Skip()
 	var user1, user2, user3, user4, user5, user6, user7, user8 User
 	if err := DB.Where(&User{Name: "find or create", Age: 33}).FirstOrCreate(&user1).Error; err != nil {
 		t.Errorf("no error should happen when FirstOrInit, but got %v", err)

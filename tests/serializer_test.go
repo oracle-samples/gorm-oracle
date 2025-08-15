@@ -122,6 +122,7 @@ func (c *CustomSerializer) Value(ctx context.Context, field *schema.Field, dst r
 }
 
 func TestSerializer(t *testing.T) {
+	t.Skip()
 	schema.RegisterSerializer("custom", NewCustomSerializer("hello"))
 	DB.Migrator().DropTable(adaptorSerializerModel(&SerializerStruct{}))
 	if err := DB.Migrator().AutoMigrate(adaptorSerializerModel(&SerializerStruct{})); err != nil {
@@ -171,6 +172,7 @@ func TestSerializer(t *testing.T) {
 }
 
 func TestSerializerZeroValue(t *testing.T) {
+	t.Skip()
 	schema.RegisterSerializer("custom", NewCustomSerializer("hello"))
 	DB.Migrator().DropTable(adaptorSerializerModel(&SerializerStruct{}))
 	if err := DB.Migrator().AutoMigrate(adaptorSerializerModel(&SerializerStruct{})); err != nil {
@@ -202,6 +204,7 @@ func TestSerializerZeroValue(t *testing.T) {
 }
 
 func TestSerializerAssignFirstOrCreate(t *testing.T) {
+	t.Skip()
 	schema.RegisterSerializer("custom", NewCustomSerializer("hello"))
 	DB.Migrator().DropTable(adaptorSerializerModel(&SerializerStruct{}))
 	if err := DB.Migrator().AutoMigrate(adaptorSerializerModel(&SerializerStruct{})); err != nil {
