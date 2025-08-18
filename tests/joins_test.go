@@ -383,8 +383,6 @@ func TestJoinArgsWithDB(t *testing.T) {
 }
 
 func TestNestedJoins(t *testing.T) {
-	t.Skip()
-	
 	users := []User{
 		{
 			Name: "nested-joins-1",
@@ -424,7 +422,7 @@ func TestNestedJoins(t *testing.T) {
 		Joins("Manager.NamedPet.Toy").
 		Joins("NamedPet").
 		Joins("NamedPet.Toy").
-		Find(&users2, "users.id IN ?", userIDs).Error; err != nil {
+		Find(&users2, "\"users\".\"id\" IN ?", userIDs).Error; err != nil {
 		t.Fatalf("Failed to load with joins, got error: %v", err)
 	} else if len(users2) != len(users) {
 		t.Fatalf("Failed to load join users, got: %v, expect: %v", len(users2), len(users))

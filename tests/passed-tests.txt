@@ -21,9 +21,9 @@ TestMany2ManyOmitAssociations
 TestMany2ManyAssociationForSlice
 #TestSingleTableMany2ManyAssociation
 #TestSingleTableMany2ManyAssociationForSlice
-#TestDuplicateMany2ManyAssociation
+TestDuplicateMany2ManyAssociation
 TestConcurrentMany2ManyAssociation
-#TestMany2ManyDuplicateBelongsToAssociation
+TestMany2ManyDuplicateBelongsToAssociation
 TestInvalidAssociation
 TestAssociationNotNullClear
 #TestForeignKeyConstraints
@@ -112,7 +112,7 @@ TestGenericsDelete
 TestGenericsFindInBatches
 TestGenericsScopes
 #TestGenericsJoins
-#TestGenericsNestedJoins
+TestGenericsNestedJoins
 #TestGenericsPreloads
 #TestGenericsNestedPreloads
 TestGenericsDistinct
@@ -146,7 +146,7 @@ TestJoinWithSoftDeleted
 TestInnerJoins
 TestJoinWithSameColumnName
 TestJoinArgsWithDB
-#TestNestedJoins
+TestNestedJoins
 TestJoinsPreload_Issue7013
 TestJoinsPreload_Issue7013_RelationEmpty
 TestJoinsPreload_Issue7013_NoEntries
@@ -274,7 +274,7 @@ TestScanNullValue
 TestQueryWithTableAndConditions
 TestQueryWithTableAndConditionsAndAllFields
 #TestQueryScannerWithSingleColumn
-#TestQueryResetNullValue
+TestQueryResetNullValue
 TestQueryError
 TestQueryScanToArray
 TestRownum
