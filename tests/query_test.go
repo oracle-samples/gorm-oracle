@@ -72,7 +72,7 @@ func TestFind(t *testing.T) {
 
 	t.Run("First", func(t *testing.T) {
 		var first User
-		if err := DB.Where("name = ?", "find").First(&first).Error; err != nil {
+		if err := DB.Where("\"name\" = ?", "find").First(&first).Error; err != nil {
 			t.Errorf("errors happened when query first: %v", err)
 		} else {
 			CheckUser(t, first, users[0])
@@ -81,7 +81,7 @@ func TestFind(t *testing.T) {
 
 	t.Run("Last", func(t *testing.T) {
 		var last User
-		if err := DB.Where("name = ?", "find").Last(&last).Error; err != nil {
+		if err := DB.Where("\"name\" = ?", "find").Last(&last).Error; err != nil {
 			t.Errorf("errors happened when query last: %v", err)
 		} else {
 			CheckUser(t, last, users[2])
@@ -89,7 +89,7 @@ func TestFind(t *testing.T) {
 	})
 
 	var all []User
-	if err := DB.Where("name = ?", "find").Find(&all).Error; err != nil || len(all) != 3 {
+	if err := DB.Where("\"name\" = ?", "find").Find(&all).Error; err != nil || len(all) != 3 {
 		t.Errorf("errors happened when query find: %v, length: %v", err, len(all))
 	} else {
 		for idx, user := range users {
@@ -101,7 +101,7 @@ func TestFind(t *testing.T) {
 
 	t.Run("FirstMap", func(t *testing.T) {
 		first := map[string]interface{}{}
-		if err := DB.Model(&User{}).Where("name = ?", "find").First(first).Error; err != nil {
+		if err := DB.Model(&User{}).Where("\"name\" = ?", "find").First(first).Error; err != nil {
 			t.Errorf("errors happened when query first: %v", err)
 		} else {
 			for _, name := range []string{"Name", "Age", "Birthday"} {
@@ -132,7 +132,7 @@ func TestFind(t *testing.T) {
 
 	t.Run("FirstMapWithTable", func(t *testing.T) {
 		first := map[string]interface{}{}
-		if err := DB.Table("users").Where("name = ?", "find").Find(first).Error; err != nil {
+		if err := DB.Table("users").Where("\"name\" = ?", "find").Find(first).Error; err != nil {
 			t.Errorf("errors happened when query first: %v", err)
 		} else {
 			for _, name := range []string{"Name", "Age", "Birthday"} {
@@ -164,7 +164,7 @@ func TestFind(t *testing.T) {
 
 	t.Run("FirstPtrMap", func(t *testing.T) {
 		first := map[string]interface{}{}
-		if err := DB.Model(&User{}).Where("name = ?", "find").First(&first).Error; err != nil {
+		if err := DB.Model(&User{}).Where("\"name\" = ?", "find").First(&first).Error; err != nil {
 			t.Errorf("errors happened when query first: %v", err)
 		} else {
 			for _, name := range []string{"Name", "Age", "Birthday"} {
@@ -179,7 +179,7 @@ func TestFind(t *testing.T) {
 
 	t.Run("FirstSliceOfMap", func(t *testing.T) {
 		allMap := []map[string]interface{}{}
-		if err := DB.Model(&User{}).Where("name = ?", "find").Find(&allMap).Error; err != nil {
+		if err := DB.Model(&User{}).Where("\"name\" = ?", "find").Find(&allMap).Error; err != nil {
 			t.Errorf("errors happened when query find: %v", err)
 		} else {
 			for idx, user := range users {
@@ -214,7 +214,7 @@ func TestFind(t *testing.T) {
 
 	t.Run("FindSliceOfMapWithTable", func(t *testing.T) {
 		allMap := []map[string]interface{}{}
-		if err := DB.Table("users").Where("name = ?", "find").Find(&allMap).Error; err != nil {
+		if err := DB.Table("users").Where("\"name\" = ?", "find").Find(&allMap).Error; err != nil {
 			t.Errorf("errors happened when query find: %v", err)
 		} else {
 			for idx, user := range users {
@@ -249,7 +249,7 @@ func TestFind(t *testing.T) {
 	})
 
 	var models []User
-	if err := DB.Where("name in (?)", []string{"find"}).Find(&models).Error; err != nil || len(models) != 3 {
+	if err := DB.Where("\"name\" in (?)", []string{"find"}).Find(&models).Error; err != nil || len(models) != 3 {
 		t.Errorf("errors happened when query find with in clause: %v, length: %v", err, len(models))
 	} else {
 		for idx, user := range users {
@@ -261,7 +261,7 @@ func TestFind(t *testing.T) {
 
 	// test array
 	var models2 [3]User
-	if err := DB.Where("name in (?)", []string{"find"}).Find(&models2).Error; err != nil {
+	if err := DB.Where("\"name\" in (?)", []string{"find"}).Find(&models2).Error; err != nil {
 		t.Errorf("errors happened when query find with in clause: %v, length: %v", err, len(models2))
 	} else {
 		for idx, user := range users {
@@ -273,7 +273,7 @@ func TestFind(t *testing.T) {
 
 	// test smaller array
 	var models3 [2]User
-	if err := DB.Where("name in (?)", []string{"find"}).Find(&models3).Error; err != nil {
+	if err := DB.Where("\"name\" in (?)", []string{"find"}).Find(&models3).Error; err != nil {
 		t.Errorf("errors happened when query find with in clause: %v, length: %v", err, len(models3))
 	} else {
 		for idx, user := range users[:2] {
@@ -284,7 +284,7 @@ func TestFind(t *testing.T) {
 	}
 
 	var none []User
-	if err := DB.Where("name in (?)", []string{}).Find(&none).Error; err != nil || len(none) != 0 {
+	if err := DB.Where("\"name\" in (?)", []string{}).Find(&none).Error; err != nil || len(none) != 0 {
 		t.Errorf("errors happened when query find with in clause and zero length parameter: %v, length: %v", err, len(none))
 	}
 }
@@ -308,7 +308,6 @@ func TestQueryWithAssociation(t *testing.T) {
 }
 
 func TestFindInBatches(t *testing.T) {
-	t.Skip()
 	users := []User{
 		*GetUser("find_in_batches", Config{}),
 		*GetUser("find_in_batches", Config{}),
@@ -325,7 +324,7 @@ func TestFindInBatches(t *testing.T) {
 		totalBatch int
 	)
 
-	if result := DB.Table("\"users\" u").Where("\"name\" = ?", users[0].Name).FindInBatches(&results, 2, func(tx *gorm.DB, batch int) error {
+	if result := DB.Table("users").Where("\"name\" = ?", users[0].Name).FindInBatches(&results, 2, func(tx *gorm.DB, batch int) error {
 		totalBatch += batch
 
 		if tx.RowsAffected != 2 {
@@ -361,7 +360,6 @@ func TestFindInBatches(t *testing.T) {
 }
 
 func TestFindInBatchesWithOffsetLimit(t *testing.T) {
-	t.Skip()
 	users := []User{
 		*GetUser("find_in_batches_with_offset_limit", Config{}),
 		*GetUser("find_in_batches_with_offset_limit", Config{}),
@@ -383,7 +381,7 @@ func TestFindInBatchesWithOffsetLimit(t *testing.T) {
 	)
 
 	// offset limit
-	if result := DB.Offset(3).Limit(5).Where("name = ?", users[0].Name).FindInBatches(&sub, 2, func(tx *gorm.DB, batch int) error {
+	if result := DB.Offset(3).Limit(5).Where("\"name\" = ?", users[0].Name).FindInBatches(&sub, 2, func(tx *gorm.DB, batch int) error {
 		results = append(results, sub...)
 		lastBatch = batch
 		return nil
@@ -401,7 +399,7 @@ func TestFindInBatchesWithOffsetLimit(t *testing.T) {
 
 	var sub1 []User
 	// limit < batchSize
-	if result := DB.Limit(5).Where("name = ?", users[0].Name).FindInBatches(&sub1, 10, func(tx *gorm.DB, batch int) error {
+	if result := DB.Limit(5).Where("\"name\" = ?", users[0].Name).FindInBatches(&sub1, 10, func(tx *gorm.DB, batch int) error {
 		return nil
 	}); result.Error != nil || result.RowsAffected != 5 {
 		t.Errorf("Failed to batch find, got error %v, rows affected: %v", result.Error, result.RowsAffected)
@@ -409,14 +407,14 @@ func TestFindInBatchesWithOffsetLimit(t *testing.T) {
 
 	var sub2 []User
 	// only offset
-	if result := DB.Offset(3).Where("name = ?", users[0].Name).FindInBatches(&sub2, 2, func(tx *gorm.DB, batch int) error {
+	if result := DB.Offset(3).Where("\"name\" = ?", users[0].Name).FindInBatches(&sub2, 2, func(tx *gorm.DB, batch int) error {
 		return nil
 	}); result.Error != nil || result.RowsAffected != 7 {
 		t.Errorf("Failed to batch find, got error %v, rows affected: %v", result.Error, result.RowsAffected)
 	}
 
 	var sub3 []User
-	if result := DB.Limit(4).Where("name = ?", users[0].Name).FindInBatches(&sub3, 2, func(tx *gorm.DB, batch int) error {
+	if result := DB.Limit(4).Where("\"name\" = ?", users[0].Name).FindInBatches(&sub3, 2, func(tx *gorm.DB, batch int) error {
 		return nil
 	}); result.Error != nil || result.RowsAffected != 4 {
 		t.Errorf("Failed to batch find, got error %v, rows affected: %v", result.Error, result.RowsAffected)
@@ -424,7 +422,6 @@ func TestFindInBatchesWithOffsetLimit(t *testing.T) {
 }
 
 func TestFindInBatchesWithError(t *testing.T) {
-	t.Skip()
 	users := []User{
 		*GetUser("find_in_batches_with_error", Config{}),
 		*GetUser("find_in_batches_with_error", Config{}),
@@ -441,7 +438,7 @@ func TestFindInBatchesWithError(t *testing.T) {
 		totalBatch int
 	)
 
-	if result := DB.Table("wrong_table").Where("name = ?", users[0].Name).FindInBatches(&results, 2, func(tx *gorm.DB, batch int) error {
+	if result := DB.Table("wrong_table").Where("\"name\" = ?", users[0].Name).FindInBatches(&results, 2, func(tx *gorm.DB, batch int) error {
 		totalBatch += batch
 		return nil
 	}); result.Error == nil || result.RowsAffected > 0 {
@@ -451,7 +448,7 @@ func TestFindInBatchesWithError(t *testing.T) {
 		t.Fatalf("incorrect total batch, expected: %v, got: %v", 0, totalBatch)
 	}
 
-	if result := DB.Omit("id").Where("name = ?", users[0].Name).FindInBatches(&results, 2, func(tx *gorm.DB, batch int) error {
+	if result := DB.Omit("id").Where("\"name\" = ?", users[0].Name).FindInBatches(&results, 2, func(tx *gorm.DB, batch int) error {
 		totalBatch += batch
 		return nil
 	}); result.Error != gorm.ErrPrimaryKeyRequired {
@@ -864,12 +861,11 @@ func TestSelect(t *testing.T) {
 }
 
 func TestOmit(t *testing.T) {
-	t.Skip()
 	user := User{Name: "OmitUser1", Age: 20}
 	DB.Save(&user)
 
 	var result User
-	DB.Where("name = ?", user.Name).Omit("name").Find(&result)
+	DB.Where("\"name\"= ?", user.Name).Omit("name").Find(&result)
 	if result.ID == 0 {
 		t.Errorf("Should not have ID because only selected name, %+v", result.ID)
 	}
@@ -880,12 +876,11 @@ func TestOmit(t *testing.T) {
 }
 
 func TestOmitWithAllFields(t *testing.T) {
-	t.Skip()
 	user := User{Name: "OmitUser1", Age: 20}
 	DB.Save(&user)
 
 	var userResult User
-	DB.Session(&gorm.Session{QueryFields: true}).Where("users.name = ?", user.Name).Omit("name").Find(&userResult)
+	DB.Session(&gorm.Session{QueryFields: true}).Where("\"users\".\"name\" = ?", user.Name).Omit("name").Find(&userResult)
 	if userResult.ID == 0 {
 		t.Errorf("Should not have ID because only selected name, %+v", userResult.ID)
 	}
@@ -905,7 +900,6 @@ func TestOmitWithAllFields(t *testing.T) {
 }
 
 func TestMapColumns(t *testing.T) {
-	t.Skip()
 	user := User{Name: "MapColumnsUser", Age: 12}
 	DB.Save(&user)
 
@@ -915,7 +909,7 @@ func TestMapColumns(t *testing.T) {
 		Age      uint
 	}
 	var res result
-	DB.Table("users").Where("name = ?", user.Name).MapColumns(map[string]string{"name": "nickname"}).Scan(&res)
+	DB.Table("users").Where("\"name\" = ?", user.Name).MapColumns(map[string]string{"name": "nickname"}).Scan(&res)
 	if res.Nickname != user.Name {
 		t.Errorf("Expected res.Nickname to be %s, but got %s", user.Name, res.Nickname)
 	}
@@ -1305,7 +1299,6 @@ func TestSubQueryWithHaving(t *testing.T) {
 }
 
 func TestScanNullValue(t *testing.T) {
-	t.Skip()
 	user := GetUser("scan_null_value", Config{})
 	DB.Create(&user)
 
@@ -1314,7 +1307,7 @@ func TestScanNullValue(t *testing.T) {
 	}
 
 	var result User
-	if err := DB.First(&result, "id = ?", user.ID).Error; err != nil {
+	if err := DB.First(&result, "\"id\" = ?", user.ID).Error; err != nil {
 		t.Fatalf("failed to query struct data with null age, got error %v", err)
 	}
 
@@ -1332,7 +1325,7 @@ func TestScanNullValue(t *testing.T) {
 	}
 
 	var results []User
-	if err := DB.Find(&results, "name like ?", "scan_null_value_for_slice%").Error; err != nil {
+	if err := DB.Find(&results, "\"name\" like ?", "scan_null_value_for_slice%").Error; err != nil {
 		t.Fatalf("failed to query slice data with null age, got error %v", err)
 	}
 }
@@ -1376,7 +1369,7 @@ func TestQueryScannerWithSingleColumn(t *testing.T) {
 	DB.Create(&user)
 
 	var result1 DoubleInt64
-	if err := DB.Model(&User{}).Where("name LIKE ?", "scanner_raw_%").Limit(1).Pluck(
+	if err := DB.Model(&User{}).Where("\"name\" LIKE ?", "scanner_raw_%").Limit(1).Pluck(
 		"age", &result1).Error; err != nil {
 		t.Errorf("Failed, got error: %v", err)
 	}
@@ -1384,7 +1377,7 @@ func TestQueryScannerWithSingleColumn(t *testing.T) {
 	tests.AssertEqual(t, result1.data, 20)
 
 	var result2 DoubleInt64
-	if err := DB.Model(&User{}).Where("name LIKE ?", "scanner_raw_%").Limit(1).Select(
+	if err := DB.Model(&User{}).Where("\"name\" LIKE ?", "scanner_raw_%").Limit(1).Select(
 		"age").Scan(&result2).Error; err != nil {
 		t.Errorf("Failed, got error: %v", err)
 	}

@@ -241,9 +241,9 @@ TestPreparedStmtClose
 TestPreparedStmtConcurrentClose
 #TestFind
 TestQueryWithAssociation
-#TestFindInBatches
-#TestFindInBatchesWithOffsetLimit
-#TestFindInBatchesWithError
+TestFindInBatches
+TestFindInBatchesWithOffsetLimit
+TestFindInBatchesWithError
 TestFillSmallerStruct
 TestFillSmallerStructWithAllFields
 TestNot
@@ -252,9 +252,9 @@ TestOr
 TestOrWithAllFields
 #TestPluck
 TestSelect
-#TestOmit
-#TestOmitWithAllFields
-#TestMapColumns
+TestOmit
+TestOmitWithAllFields
+TestMapColumns
 TestPluckWithSelect
 #TestSelectWithVariables
 TestSelectWithArrayInput
@@ -270,7 +270,7 @@ TestSearchWithStruct
 TestSubQuery
 TestSubQueryWithRaw
 TestSubQueryWithHaving
-#TestScanNullValue
+TestScanNullValue
 TestQueryWithTableAndConditions
 TestQueryWithTableAndConditionsAndAllFields
 #TestQueryScannerWithSingleColumn
