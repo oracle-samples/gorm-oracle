@@ -147,8 +147,6 @@ func TestSerializer(t *testing.T) {
 		},
 		CustomSerializerString: "world",
 	}
-	// empty := Roles{}
-	// data.Roles3 = &empty
 
 	if err := DB.Create(&data).Error; err != nil {
 		t.Fatalf("failed to create data, got error %v", err)
