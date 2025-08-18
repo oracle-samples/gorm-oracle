@@ -100,10 +100,6 @@ func TestUserInsertScenarios(t *testing.T) {
 		Age  int    `gorm:"column:AGE"`
 	}
 
-	if err := DB.Migrator().DropTable(&UserWithAge{}); err != nil {
-		t.Fatalf("Failed to drop table: %v", err)
-	}
-	
 	if err := DB.AutoMigrate(&UserWithAge{}); err != nil {
 		t.Fatalf("Failed to migrate table: %v", err)
 	}
