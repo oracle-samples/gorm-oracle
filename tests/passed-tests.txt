@@ -104,7 +104,7 @@ TestEmbeddedTagSetting
 TestDialectorWithErrorTranslatorSupport
 TestSupportedDialectorWithErrDuplicatedKey
 TestSupportedDialectorWithErrForeignKeyViolated
-#TestGenericsCreate
+TestGenericsCreate
 TestGenericsCreateInBatches
 #TestGenericsExecAndUpdate
 TestGenericsRow
@@ -113,7 +113,7 @@ TestGenericsFindInBatches
 TestGenericsScopes
 #TestGenericsJoins
 TestGenericsNestedJoins
-#TestGenericsPreloads
+TestGenericsPreloads
 #TestGenericsNestedPreloads
 TestGenericsDistinct
 TestGenericsGroupHaving
