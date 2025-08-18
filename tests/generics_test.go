@@ -56,7 +56,6 @@ import (
 )
 
 func TestGenericsCreate(t *testing.T) {
-	t.Skip()
 	ctx := context.Background()
 
 	user := User{Name: "TestGenericsCreate", Age: 18}
@@ -68,25 +67,25 @@ func TestGenericsCreate(t *testing.T) {
 		t.Fatalf("no primary key found for %v", user)
 	}
 
-	if u, err := gorm.G[User](DB).Where("name = ?", user.Name).First(ctx); err != nil {
+	if u, err := gorm.G[User](DB).Where(`"name" = ?`, user.Name).First(ctx); err != nil {
 		t.Fatalf("failed to find user, got error: %v", err)
 	} else if u.Name != user.Name || u.ID != user.ID {
 		t.Errorf("found invalid user, got %v, expect %v", u, user)
 	}
 
-	if u, err := gorm.G[User](DB).Where("name = ?", user.Name).Take(ctx); err != nil {
+	if u, err := gorm.G[User](DB).Where(`"name" = ?`, user.Name).Take(ctx); err != nil {
 		t.Fatalf("failed to find user, got error: %v", err)
 	} else if u.Name != user.Name || u.ID != user.ID {
 		t.Errorf("found invalid user, got %v, expect %v", u, user)
 	}
 
-	if u, err := gorm.G[User](DB).Select("name").Where("name = ?", user.Name).First(ctx); err != nil {
+	if u, err := gorm.G[User](DB).Select("name").Where(`"name" = ?`, user.Name).First(ctx); err != nil {
 		t.Fatalf("failed to find user, got error: %v", err)
 	} else if u.Name != user.Name || u.Age != 0 {
 		t.Errorf("found invalid user, got %v, expect %v", u, user)
 	}
 
-	if u, err := gorm.G[User](DB).Omit("name").Where("name = ?", user.Name).First(ctx); err != nil {
+	if u, err := gorm.G[User](DB).Omit("name").Where(`"name" = ?`, user.Name).First(ctx); err != nil {
 		t.Fatalf("failed to find user, got error: %v", err)
 	} else if u.Name != "" || u.Age != user.Age {
 		t.Errorf("found invalid user, got %v, expect %v", u, user)
@@ -96,13 +95,13 @@ func TestGenericsCreate(t *testing.T) {
 		ID   int
 		Name string
 	}{}
-	if err := gorm.G[User](DB).Where("name = ?", user.Name).Scan(ctx, &result); err != nil {
+	if err := gorm.G[User](DB).Where(`"name" = ?`, user.Name).Scan(ctx, &result); err != nil {
 		t.Fatalf("failed to scan user, got error: %v", err)
 	} else if result.Name != user.Name || uint(result.ID) != user.ID {
 		t.Errorf("found invalid user, got %v, expect %v", result, user)
 	}
 
-	mapResult, err := gorm.G[map[string]interface{}](DB).Table("users").Where("name = ?", user.Name).MapColumns(map[string]string{"name": "user_name"}).Take(ctx)
+	mapResult, err := gorm.G[map[string]interface{}](DB).Table("users").Where(`"name" = ?`, user.Name).MapColumns(map[string]string{"name": "user_name"}).Take(ctx)
 	if v := mapResult["user_name"]; fmt.Sprint(v) != user.Name {
 		t.Errorf("failed to find map results, got %v, err %v", mapResult, err)
 	}
