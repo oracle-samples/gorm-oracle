@@ -383,3 +383,4 @@ TestRawQueryInjection
 TestWhereClauseInjection
 TestUpdateInjection
 TestFirstOrCreateInjection
+TestUserInsertScenarios
