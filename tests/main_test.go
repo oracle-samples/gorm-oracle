@@ -41,6 +41,8 @@ package tests
 import (
 	"fmt"
 	"testing"
+	"time"
+	"strings"
 
 	. "github.com/oracle-samples/gorm-oracle/tests/utils"
 )
@@ -88,5 +90,67 @@ func TestSetAndGet(t *testing.T) {
 
 	if _, ok := DB.Get("non_existing"); ok {
 		t.Errorf("Get non existing key should return error")
+	}
+}
+
+func TestUserInsertScenarios(t *testing.T) {
+	type UserWithAge struct {
+		ID   uint   `gorm:"column:ID;primaryKey"`
+		Name string `gorm:"column:NAME;not null;size:100"`
+		Age  int    `gorm:"column:AGE"`
+	}
+
+	if err := DB.AutoMigrate(&UserWithAge{}); err != nil {
+		t.Fatalf("Failed to migrate table: %v", err)
+	}
+
+	user1 := UserWithAge{Name: "Alice", Age: 30}
+	if err := DB.Create(&user1).Error; err != nil {
+		t.Errorf("Basic insert failed: %v", err)
+	}
+
+	user2 := UserWithAge{Name: "Bob"}
+	if err := DB.Create(&user2).Error; err != nil {
+		t.Errorf("Insert with NULL failed: %v", err)
+	}
+
+	user3 := UserWithAge{Name: "O'Reilly", Age: 45}
+	if err := DB.Create(&user3).Error; err != nil {
+		t.Errorf("Insert with special characters failed: %v", err)
+	}
+
+	type UserWithTime struct {
+		ID        uint      `gorm:"column:ID;primaryKey"`
+		Name      string    `gorm:"column:NAME;not null;size:100"`
+		CreatedAt time.Time `gorm:"column:CREATED_AT"`
+	}
+
+	if err := DB.AutoMigrate(&UserWithTime{}); err != nil {
+		t.Fatalf("Failed to migrate UserWithTime table: %v", err)
+	}
+
+	user4 := UserWithTime{Name: "Charlie"}
+	if err := DB.Create(&user4).Error; err != nil {
+		t.Errorf("Insert with default timestamp failed: %v", err)
+	}
+
+	invalidUser1 := UserWithAge{Age: 50}
+	if err := DB.Create(&invalidUser1).Error; err == nil {
+		t.Errorf("Expected NOT NULL constraint failure, got no error")
+	}
+
+	invalidUser2 := UserWithAge{ID: user1.ID, Name: "Duplicate", Age: 40}
+	if err := DB.Create(&invalidUser2).Error; err == nil {
+		t.Errorf("Expected duplicate primary key error, got no error")
+	}
+
+	invalidUser3 := UserWithAge{Name: "InvalidAge", Age: -10}
+	if err := DB.Create(&invalidUser3).Error; err != nil {
+		t.Logf("Insert with negative age failed as expected: %v", err)
+	}
+
+	invalidUser4 := UserWithAge{Name: strings.Repeat("A", 300), Age: 20}
+	if err := DB.Create(&invalidUser4).Error; err == nil {
+		t.Errorf("Expected value too large error for oversized string, got no error")
 	}
 }
