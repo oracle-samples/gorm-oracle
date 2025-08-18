@@ -114,7 +114,7 @@ TestGenericsScopes
 #TestGenericsJoins
 TestGenericsNestedJoins
 TestGenericsPreloads
-#TestGenericsNestedPreloads
+TestGenericsNestedPreloads
 TestGenericsDistinct
 TestGenericsGroupHaving
 TestGenericsSubQuery

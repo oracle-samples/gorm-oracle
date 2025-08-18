@@ -632,7 +632,6 @@ func TestGenericsPreloads(t *testing.T) {
 }
 
 func TestGenericsNestedPreloads(t *testing.T) {
-	t.Skip()
 	user := *GetUser("generics_nested_preload", Config{Pets: 2})
 	user.Friends = []*User{GetUser("generics_nested_preload", Config{Pets: 5})}
 
@@ -659,6 +658,14 @@ func TestGenericsNestedPreloads(t *testing.T) {
 	}
 
 	user3, err := db.Preload("Pets.Toy", nil).Preload("Friends.Pets", func(db gorm.PreloadBuilder) error {
+		db.Select(
+			"pets.id",
+			"pets.created_at",
+			"pets.updated_at",
+			"pets.deleted_at",
+			"pets.user_id",
+			"pets.name",
+		)
 		db.LimitPerRecord(3)
 		return nil
 	}).Where(user.ID).Take(ctx)
