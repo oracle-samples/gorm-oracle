@@ -118,3 +118,142 @@ func TestNamedArg(t *testing.T) {
 		t.Errorf("should return record not found error, but got %v", err)
 	}
 }
+
+func TestNamedArgMultipleSameParamRefs(t *testing.T) {
+	type NamedUser struct {
+		gorm.Model
+		Name1 string
+	}
+	DB.Migrator().DropTable(&NamedUser{})
+	DB.AutoMigrate(&NamedUser{})
+
+	user := NamedUser{Name1: "multi-ref"}
+	DB.Create(&user)
+
+	var result NamedUser
+	if err := DB.Raw(`SELECT * FROM "named_users" WHERE @name = @name AND "name1" = @name`,
+		sql.Named("name", "multi-ref")).Scan(&result).Error; err != nil {
+		t.Errorf("failed with multiple same param refs: %v", err)
+	}
+	tests.AssertEqual(t, result, user)
+}
+
+func TestNamedArgNullValues(t *testing.T) {
+	type NamedUser struct {
+		gorm.Model
+		Name1 *string
+	}
+	DB.Migrator().DropTable(&NamedUser{})
+	DB.AutoMigrate(&NamedUser{})
+
+	DB.Create(&NamedUser{Name1: nil})
+
+	var count int64
+	if err := DB.Raw(`SELECT count(*) FROM "named_users" WHERE (:name IS NULL AND "name1" IS NULL)`,
+		sql.Named("name", nil)).Scan(&count).Error; err != nil {
+		t.Errorf("failed null param test: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("expected 1 null record, got %d", count)
+	}
+}
+
+func TestNamedArgMixedNamedAndMapParams(t *testing.T) {
+	type NamedUser struct {
+		gorm.Model
+		Name1 string
+		Name2 string
+	}
+	DB.Migrator().DropTable(&NamedUser{})
+	DB.AutoMigrate(&NamedUser{})
+
+	user := NamedUser{Name1: "n1", Name2: "n2"}
+	DB.Create(&user)
+
+	var result NamedUser
+	if err := DB.Raw(`SELECT * FROM "named_users" WHERE "name1" = @name1 AND "name2" = @name2`,
+		sql.Named("name1", "n1"), map[string]interface{}{"name2": "n2"}).Scan(&result).Error; err != nil {
+		t.Errorf("failed mixed param test: %v", err)
+	}
+	tests.AssertEqual(t, result, user)
+}
+
+func TestNamedArgUnusedParameter(t *testing.T) {
+	type NamedUser struct {
+		gorm.Model
+		Name1 string
+	}
+	DB.Migrator().DropTable(&NamedUser{})
+	DB.AutoMigrate(&NamedUser{})
+
+	user := NamedUser{Name1: "unused"}
+	DB.Create(&user)
+
+	var result NamedUser
+	if err := DB.Raw(`SELECT * FROM "named_users" WHERE "name1" = @name1`,
+		sql.Named("name1", "unused"), sql.Named("extra", "notused")).Scan(&result).Error; err != nil {
+		t.Errorf("failed unused param test: %v", err)
+	}
+	tests.AssertEqual(t, result, user)
+}
+
+func TestNamedArgCaseSensitivity(t *testing.T) {
+	type NamedUser struct {
+		gorm.Model
+		Name1 string
+	}
+	DB.Migrator().DropTable(&NamedUser{})
+	DB.AutoMigrate(&NamedUser{})
+
+	user := NamedUser{Name1: "CaseTest"}
+	DB.Create(&user)
+
+	var result NamedUser
+	if err := DB.Raw(`SELECT * FROM "named_users" WHERE "name1" = @Name`,
+		sql.Named("Name", "CaseTest")).Scan(&result).Error; err != nil {
+		t.Errorf("failed case sensitivity test: %v", err)
+	}
+	tests.AssertEqual(t, result, user)
+}
+
+func TestNamedArgInClause(t *testing.T) {
+	type NamedUser struct {
+		gorm.Model
+		Name1 string
+	}
+	DB.Migrator().DropTable(&NamedUser{})
+	DB.AutoMigrate(&NamedUser{})
+
+	user1 := NamedUser{Name1: "in1"}
+	user2 := NamedUser{Name1: "in2"}
+	DB.Create(&user1)
+	DB.Create(&user2)
+
+	var results []NamedUser
+	if err := DB.Raw(`SELECT * FROM "named_users" WHERE "name1" IN (@n1, @n2)`,
+		sql.Named("n1", "in1"), sql.Named("n2", "in2")).Scan(&results).Error; err != nil {
+		t.Errorf("failed IN clause test: %v", err)
+	}
+	if len(results) != 2 {
+		t.Errorf("expected 2 results, got %d", len(results))
+	}
+}
+
+func TestNamedArgReservedWordParam(t *testing.T) {
+	type NamedUser struct {
+		gorm.Model
+		Name1 string
+	}
+	DB.Migrator().DropTable(&NamedUser{})
+	DB.AutoMigrate(&NamedUser{})
+
+	user := NamedUser{Name1: "reserved"}
+	DB.Create(&user)
+
+	var result NamedUser
+	if err := DB.Raw(`SELECT * FROM "named_users" WHERE "name1" = @order`,
+		sql.Named("order", "reserved")).Scan(&result).Error; err != nil {
+		t.Errorf("failed reserved word param test: %v", err)
+	}
+	tests.AssertEqual(t, result, user)
+}
