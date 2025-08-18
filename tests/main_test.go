@@ -42,6 +42,7 @@ import (
 	"fmt"
 	"testing"
 	"time"
+	"strings"
 
 	. "github.com/oracle-samples/gorm-oracle/tests/utils"
 )
@@ -92,13 +93,17 @@ func TestSetAndGet(t *testing.T) {
 	}
 }
 
-func TesUserInsertScenarios(t *testing.T) {
+func TestUserInsertScenarios(t *testing.T) {
 	type UserWithAge struct {
 		ID   uint   `gorm:"column:ID;primaryKey"`
-		Name string `gorm:"column:NAME"`
+		Name string `gorm:"column:NAME;not null;size:100"`
 		Age  int    `gorm:"column:AGE"`
 	}
 
+	if err := DB.Migrator().DropTable(&UserWithAge{}); err != nil {
+		t.Fatalf("Failed to drop table: %v", err)
+	}
+	
 	if err := DB.AutoMigrate(&UserWithAge{}); err != nil {
 		t.Fatalf("Failed to migrate table: %v", err)
 	}
@@ -120,7 +125,7 @@ func TesUserInsertScenarios(t *testing.T) {
 
 	type UserWithTime struct {
 		ID        uint      `gorm:"column:ID;primaryKey"`
-		Name      string    `gorm:"column:NAME"`
+		Name      string    `gorm:"column:NAME;not null;size:100"`
 		CreatedAt time.Time `gorm:"column:CREATED_AT"`
 	}
 
@@ -131,5 +136,25 @@ func TesUserInsertScenarios(t *testing.T) {
 	user4 := UserWithTime{Name: "Charlie"}
 	if err := DB.Create(&user4).Error; err != nil {
 		t.Errorf("Insert with default timestamp failed: %v", err)
+	}
+
+	invalidUser1 := UserWithAge{Age: 50}
+	if err := DB.Create(&invalidUser1).Error; err == nil {
+		t.Errorf("Expected NOT NULL constraint failure, got no error")
+	}
+
+	invalidUser2 := UserWithAge{ID: user1.ID, Name: "Duplicate", Age: 40}
+	if err := DB.Create(&invalidUser2).Error; err == nil {
+		t.Errorf("Expected duplicate primary key error, got no error")
+	}
+
+	invalidUser3 := UserWithAge{Name: "InvalidAge", Age: -10}
+	if err := DB.Create(&invalidUser3).Error; err != nil {
+		t.Logf("Insert with negative age failed as expected: %v", err)
+	}
+
+	invalidUser4 := UserWithAge{Name: strings.Repeat("A", 300), Age: 20}
+	if err := DB.Create(&invalidUser4).Error; err == nil {
+		t.Errorf("Expected value too large error for oversized string, got no error")
 	}
 }
