@@ -45,6 +45,7 @@ import (
 	. "github.com/oracle-samples/gorm-oracle/tests/utils"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"gorm.io/gorm/schema"
 	"gorm.io/gorm/utils/tests"
 )
@@ -59,7 +60,6 @@ func (UserWithTable) TableName() string {
 }
 
 func TestTable(t *testing.T) {
-	t.Skip()
 	dryDB := DB.Session(&gorm.Session{DryRun: true})
 
 	r := dryDB.Table("`user`").Find(&User{}).Statement
@@ -67,8 +67,32 @@ func TestTable(t *testing.T) {
 		t.Errorf("Table with escape character, got %v", r.Statement.SQL.String())
 	}
 
+	r = dryDB.Table("USER U").
+		Clauses(clause.Select{Columns: []clause.Column{{Table: "U", Name: "name"}}}).
+		Find(&User{}).Statement
+	if !regexp.MustCompile("SELECT .U.\\..name. FROM USER U WHERE .U.\\..deleted_at. IS NULL").MatchString(r.Statement.SQL.String()) {
+		t.Errorf("Table with escape character, got %v", r.Statement.SQL.String())
+	}
+
+	r = dryDB.Table("USER U").
+		Clauses(clause.Select{Columns: []clause.Column{{Table: "U", Name: "NAME"}}}).
+		Find(&User{}).Statement
+	if !regexp.MustCompile("SELECT .U.\\..NAME. FROM USER U WHERE .U.\\..deleted_at. IS NULL").MatchString(r.Statement.SQL.String()) {
+		t.Errorf("Table with escape character, got %v", r.Statement.SQL.String())
+	}
+
+	r = dryDB.Table("USER U").Select("name").Find(&User{}).Statement
+	if !regexp.MustCompile("SELECT .name. FROM USER U WHERE .U.\\..deleted_at. IS NULL").MatchString(r.Statement.SQL.String()) {
+		t.Errorf("Table with escape character, got %v", r.Statement.SQL.String())
+	}
+
+	r = dryDB.Table("USER U").Select("Name").Find(&User{}).Statement
+	if !regexp.MustCompile("SELECT .name. FROM USER U WHERE .U.\\..deleted_at. IS NULL").MatchString(r.Statement.SQL.String()) {
+		t.Errorf("Table with escape character, got %v", r.Statement.SQL.String())
+	}
+
 	r = dryDB.Table("USER U").Select("NAME").Find(&User{}).Statement
-	if !regexp.MustCompile("SELECT .NAME. FROM USER U WHERE .U.\\..DELETED_AT. IS NULL").MatchString(r.Statement.SQL.String()) {
+	if !regexp.MustCompile("SELECT NAME FROM USER U WHERE .U.\\..deleted_at. IS NULL").MatchString(r.Statement.SQL.String()) {
 		t.Errorf("Table with escape character, got %v", r.Statement.SQL.String())
 	}
 
@@ -78,47 +102,47 @@ func TestTable(t *testing.T) {
 	}
 
 	r = dryDB.Table("PEOPLE P").Table("USER U").Find(&User{}).Statement
-	if !regexp.MustCompile("SELECT \\* FROM USER U WHERE .U.\\..DELETED_AT. IS NULL").MatchString(r.Statement.SQL.String()) {
+	if !regexp.MustCompile("SELECT \\* FROM USER U WHERE .U.\\..deleted_at. IS NULL").MatchString(r.Statement.SQL.String()) {
 		t.Errorf("Table with escape character, got %v", r.Statement.SQL.String())
 	}
 
 	r = dryDB.Table("PEOPLE P").Table("user").Find(&User{}).Statement
-	if !regexp.MustCompile("SELECT \\* FROM .user. WHERE .user.\\..DELETED_AT. IS NULL").MatchString(r.Statement.SQL.String()) {
+	if !regexp.MustCompile("SELECT \\* FROM .user. WHERE .user.\\..deleted_at. IS NULL").MatchString(r.Statement.SQL.String()) {
 		t.Errorf("Table with escape character, got %v", r.Statement.SQL.String())
 	}
 
 	r = dryDB.Table("gorm.people").Table("user").Find(&User{}).Statement
-	if !regexp.MustCompile("SELECT \\* FROM .user. WHERE .user.\\..DELETED_AT. IS NULL").MatchString(r.Statement.SQL.String()) {
+	if !regexp.MustCompile("SELECT \\* FROM .user. WHERE .user.\\..deleted_at. IS NULL").MatchString(r.Statement.SQL.String()) {
 		t.Errorf("Table with escape character, got %v", r.Statement.SQL.String())
 	}
 
-	r = dryDB.Table("gorm.user").Select("NAME").Find(&User{}).Statement
-	if !regexp.MustCompile("SELECT .NAME. FROM .gorm.\\..user. WHERE .user.\\..DELETED_AT. IS NULL").MatchString(r.Statement.SQL.String()) {
+	r = dryDB.Table("gorm.user").Select("name").Find(&User{}).Statement
+	if !regexp.MustCompile("SELECT .name. FROM .gorm.\\..user. WHERE .user.\\..deleted_at. IS NULL").MatchString(r.Statement.SQL.String()) {
 		t.Errorf("Table with escape character, got %v", r.Statement.SQL.String())
 	}
 
-	r = dryDB.Select("NAME").Find(&UserWithTable{}).Statement
-	if !regexp.MustCompile("SELECT .NAME. FROM .gorm.\\..user. WHERE .user.\\..DELETED_AT. IS NULL").MatchString(r.Statement.SQL.String()) {
+	r = dryDB.Select("name").Find(&UserWithTable{}).Statement
+	if !regexp.MustCompile("SELECT .name. FROM .gorm.\\..user. WHERE .user.\\..deleted_at. IS NULL").MatchString(r.Statement.SQL.String()) {
 		t.Errorf("Table with escape character, got %v", r.Statement.SQL.String())
 	}
 
 	r = dryDB.Create(&UserWithTable{}).Statement
-	if !regexp.MustCompile(`INSERT INTO .user. (.*NAME.*) VALUES (.*)`).MatchString(r.Statement.SQL.String()) {
+	if !regexp.MustCompile(`INSERT INTO .user. (.*name.*) VALUES (.*)`).MatchString(r.Statement.SQL.String()) {
 		t.Errorf("Table with escape character, got %v", r.Statement.SQL.String())
 	}
 
-	r = dryDB.Table("(?) AS U", DB.Model(&User{}).Select("NAME")).Find(&User{}).Statement
-	if !regexp.MustCompile("SELECT \\* FROM \\(SELECT .NAME. FROM .USERS. WHERE .USERS.\\..DELETED_AT. IS NULL\\) AS U WHERE .U.\\..DELETED_AT. IS NULL").MatchString(r.Statement.SQL.String()) {
+	r = dryDB.Table("(?) AS U", DB.Model(&User{}).Select("name")).Find(&User{}).Statement
+	if !regexp.MustCompile("SELECT \\* FROM \\(SELECT .name. FROM .users. WHERE .users.\\..deleted_at. IS NULL\\) AS U WHERE .U.\\..deleted_at. IS NULL").MatchString(r.Statement.SQL.String()) {
 		t.Errorf("Table with escape character, got %v", r.Statement.SQL.String())
 	}
 
-	r = dryDB.Table("(?) AS U, (?) AS P", DB.Model(&User{}).Select("NAME"), DB.Model(&Pet{}).Select("NAME")).Find(&User{}).Statement
-	if !regexp.MustCompile("SELECT \\* FROM \\(SELECT .NAME. FROM .USERS. WHERE .USERS.\\..DELETED_AT. IS NULL\\) AS U, \\(SELECT .NAME. FROM .PETS. WHERE .PETS.\\..DELETED_AT. IS NULL\\) AS P WHERE .U.\\..DELETED_AT. IS NULL").MatchString(r.Statement.SQL.String()) {
+	r = dryDB.Table("(?) AS U, (?) AS P", DB.Model(&User{}).Select("name"), DB.Model(&Pet{}).Select("name")).Find(&User{}).Statement
+	if !regexp.MustCompile("SELECT \\* FROM \\(SELECT .name. FROM .users. WHERE .users.\\..deleted_at. IS NULL\\) AS U, \\(SELECT .name. FROM .pets. WHERE .pets.\\..deleted_at. IS NULL\\) AS P WHERE .U.\\..deleted_at. IS NULL").MatchString(r.Statement.SQL.String()) {
 		t.Errorf("Table with escape character, got %v", r.Statement.SQL.String())
 	}
 
-	r = dryDB.Where("name = ?", 1).Table("(?) AS U, (?) AS P", DB.Model(&User{}).Select("NAME").Where("name = ?", 2), DB.Model(&Pet{}).Where("name = ?", 4).Select("NAME")).Where("name = ?", 3).Find(&User{}).Statement
-	if !regexp.MustCompile("SELECT \\* FROM \\(SELECT .NAME. FROM .USERS. WHERE name = .+ AND .USERS.\\..DELETED_AT. IS NULL\\) AS U, \\(SELECT .NAME. FROM .PETS. WHERE name = .+ AND .PETS.\\..DELETED_AT. IS NULL\\) AS P WHERE name = .+ AND name = .+ AND .U.\\..DELETED_AT. IS NULL").MatchString(r.Statement.SQL.String()) {
+	r = dryDB.Where("name = ?", 1).Table("(?) AS U, (?) AS P", DB.Model(&User{}).Select("name").Where("name = ?", 2), DB.Model(&Pet{}).Where("name = ?", 4).Select("name")).Where("name = ?", 3).Find(&User{}).Statement
+	if !regexp.MustCompile("SELECT \\* FROM \\(SELECT .name. FROM .users. WHERE name = .+ AND .users.\\..deleted_at. IS NULL\\) AS U, \\(SELECT .name. FROM .pets. WHERE name = .+ AND .pets.\\..deleted_at. IS NULL\\) AS P WHERE name = .+ AND name = .+ AND .U.\\..deleted_at. IS NULL").MatchString(r.Statement.SQL.String()) {
 		t.Errorf("Table with escape character, got %v", r.Statement.SQL.String())
 	}
 
@@ -126,7 +150,6 @@ func TestTable(t *testing.T) {
 }
 
 func TestTableWithAllFields(t *testing.T) {
-	t.Skip()
 	dryDB := DB.Session(&gorm.Session{DryRun: true, QueryFields: true})
 	userQuery := "SELECT .*USER.*ID.*USER.*CREATED_AT.*USER.*UPDATED_AT.*USER.*DELETED_AT.*USER.*NAME.*USER.*AGE" +
 		".*USER.*BIRTHDAY.*USER.*COMPANY_ID.*USER.*MANAGER_ID.*USER.*ACTIVE.* "
