@@ -176,6 +176,8 @@ func validateCreateData(stmt *gorm.Statement) error {
 
 // Build PL/SQL block for bulk INSERT/MERGE with RETURNING
 func buildBulkInsertPLSQL(db *gorm.DB, createValues clause.Values) {
+	sanitizeCreateValuesForBulkArrays(db.Statement, &createValues)
+
 	stmt := db.Statement
 	schema := stmt.Schema
 
@@ -238,6 +240,8 @@ func buildBulkInsertPLSQL(db *gorm.DB, createValues clause.Values) {
 
 // Build PL/SQL block for bulk MERGE with RETURNING (OnConflict case)
 func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClause clause.Clause) {
+	sanitizeCreateValuesForBulkArrays(db.Statement, &createValues)
+
 	stmt := db.Statement
 	schema := stmt.Schema
 
@@ -408,6 +412,25 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 				updateCount++
 			}
 		}
+		plsqlBuilder.WriteString("\n")
+	} else {
+		onCols := map[string]struct{}{}
+		for _, c := range conflictColumns {
+			onCols[strings.ToUpper(c.Name)] = struct{}{}
+		}
+
+		// Picking the first non-ON column from the INSERT/MERGE columns
+		var noopCol string
+		for _, c := range createValues.Columns {
+			if _, inOn := onCols[strings.ToUpper(c.Name)]; !inOn {
+				noopCol = c.Name
+				break
+			}
+		}
+		plsqlBuilder.WriteString("    WHEN MATCHED THEN UPDATE SET t.")
+		writeQuotedIdentifier(&plsqlBuilder, noopCol)
+		plsqlBuilder.WriteString(" = t.")
+		writeQuotedIdentifier(&plsqlBuilder, noopCol)
 		plsqlBuilder.WriteString("\n")
 	}
 
@@ -920,6 +943,32 @@ func handleLastInsertId(db *gorm.DB, result sql.Result) {
 	case reflect.Struct:
 		if _, isZero := pkField.ValueOf(stmt.Context, stmt.ReflectValue); isZero {
 			db.AddError(pkField.Set(stmt.Context, stmt.ReflectValue, insertID))
+		}
+	}
+}
+func sanitizeCreateValuesForBulkArrays(stmt *gorm.Statement, cv *clause.Values) {
+	for r := range cv.Values {
+		for c, col := range cv.Columns {
+			v := cv.Values[r][c]
+			switch v.(type) {
+			case clause.Expr:
+				if f := findFieldByDBName(stmt.Schema, col.Name); f != nil {
+					switch f.DataType {
+					case schema.Int, schema.Uint:
+						cv.Values[r][c] = sql.NullInt64{} // NULL
+					case schema.Float:
+						cv.Values[r][c] = sql.NullFloat64{}
+					case schema.String:
+						cv.Values[r][c] = sql.NullString{}
+					case schema.Time:
+						cv.Values[r][c] = sql.NullTime{}
+					default:
+						cv.Values[r][c] = nil
+					}
+				} else {
+					cv.Values[r][c] = nil
+				}
+			}
 		}
 	}
 }
