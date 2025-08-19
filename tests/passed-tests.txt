@@ -124,7 +124,7 @@ TestGenericsReuse
 TestGenericsWithTransaction
 TestGenericsToSQL
 TestOpen
-#TestReturningWithNullToZeroValues
+TestReturningWithNullToZeroValues
 TestGroupBy
 TestRunCallbacks
 TestCallbacksWithErrors
