@@ -285,9 +285,7 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 
 	// Start PL/SQL block
 	plsqlBuilder.WriteString("DECLARE\n")
-	plsqlBuilder.WriteString("  TYPE t_records IS TABLE OF ")
-	writeQuotedIdentifier(&plsqlBuilder, stmt.Table)
-	plsqlBuilder.WriteString("%ROWTYPE;\n")
+	writeTableRecordCollectionDecl(&plsqlBuilder, stmt.Schema.DBNames, stmt.Table)
 	plsqlBuilder.WriteString("  l_affected_records t_records;\n")
 
 	// Create array types and variables for each column
@@ -526,9 +524,7 @@ func buildBulkInsertOnlyPLSQL(db *gorm.DB, createValues clause.Values) {
 
 	// Start PL/SQL block
 	plsqlBuilder.WriteString("DECLARE\n")
-	plsqlBuilder.WriteString("  TYPE t_records IS TABLE OF ")
-	writeQuotedIdentifier(&plsqlBuilder, stmt.Table)
-	plsqlBuilder.WriteString("%ROWTYPE;\n")
+	writeTableRecordCollectionDecl(&plsqlBuilder, stmt.Schema.DBNames, stmt.Table)
 	plsqlBuilder.WriteString("  l_inserted_records t_records;\n")
 
 	// Create array types and variables for each column

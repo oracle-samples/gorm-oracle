@@ -424,6 +424,52 @@ func writeQuotedIdentifier(builder *strings.Builder, identifier string) {
 	builder.WriteByte('"')
 }
 
+// writeTableRecordCollectionDecl writes the PL/SQL declarations needed to
+// define a custom record type and a collection of that record type,
+// based on the schema of the given table.
+//
+// Specifically, it generates:
+//   - A RECORD type (`t_record`) with fields corresponding to the table's columns.
+//   - A nested TABLE type (`t_records`) of `t_record`.
+//
+// The declarations are written into the provided strings.Builder in the
+// correct PL/SQL syntax, so they can be used as part of a larger PL/SQL block.
+//
+// Example output:
+//
+//	DECLARE
+//	  TYPE t_record IS RECORD (
+//	    "id" "users"."id"%TYPE,
+//	    "created_at" "users"."created_at"%TYPE,
+//	    ...
+//	  );
+//	  TYPE t_records IS TABLE OF t_record;
+//	  l_inserted_records t_records;
+//
+// Parameters:
+//   - plsqlBuilder: The builder to write the PL/SQL code into.
+//   - dbNames: The slice containing the column names.
+//   - table: The table name
+func writeTableRecordCollectionDecl(plsqlBuilder *strings.Builder, dbNames []string, table string) {
+	// Declare a record where each element has the same structure as a row from the given table
+	plsqlBuilder.WriteString("  TYPE t_record IS RECORD (\n")
+	for i, field := range dbNames {
+		if i > 0 {
+			plsqlBuilder.WriteString(",\n")
+		}
+		plsqlBuilder.WriteString("    ")
+		writeQuotedIdentifier(plsqlBuilder, field)
+		plsqlBuilder.WriteString(" ")
+		writeQuotedIdentifier(plsqlBuilder, table)
+		plsqlBuilder.WriteString(".")
+		writeQuotedIdentifier(plsqlBuilder, field)
+		plsqlBuilder.WriteString("%TYPE")
+	}
+	plsqlBuilder.WriteString("\n")
+	plsqlBuilder.WriteString("  );\n")
+	plsqlBuilder.WriteString("  TYPE t_records IS TABLE OF t_record;\n")
+}
+
 // Helper function to check if a value represents NULL
 func isNullValue(value interface{}) bool {
 	if value == nil {
