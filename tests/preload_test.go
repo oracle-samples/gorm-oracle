@@ -57,7 +57,6 @@ import (
 )
 
 func TestPreloadWithAssociations(t *testing.T) {
-	t.Skip()
 	user := *GetUser("preload_with_associations", Config{
 		Account:   true,
 		Pets:      2,
@@ -95,7 +94,6 @@ func TestPreloadWithAssociations(t *testing.T) {
 }
 
 func TestNestedPreload(t *testing.T) {
-	t.Skip()
 	user := *GetUser("nested_preload", Config{Pets: 2})
 
 	for idx, pet := range user.Pets {
@@ -209,7 +207,6 @@ func TestPreloadWithConds(t *testing.T) {
 }
 
 func TestNestedPreloadWithConds(t *testing.T) {
-	t.Skip()
 	users := []User{
 		*GetUser("slice_nested_preload_1", Config{Pets: 2}),
 		*GetUser("slice_nested_preload_2", Config{Pets: 0}),
@@ -300,7 +297,6 @@ func TestPreloadGoroutine(t *testing.T) {
 }
 
 func TestPreloadWithDiffModel(t *testing.T) {
-	t.Skip()
 	user := *GetUser("preload_with_diff_model", Config{Account: true})
 
 	if err := DB.Create(&user).Error; err != nil {
@@ -319,7 +315,6 @@ func TestPreloadWithDiffModel(t *testing.T) {
 }
 
 func TestNestedPreloadWithUnscoped(t *testing.T) {
-	t.Skip()
 	user := *GetUser("nested_preload", Config{Pets: 1})
 	pet := user.Pets[0]
 	pet.Toy = Toy{Name: "toy_nested_preload_" + strconv.Itoa(1)}
@@ -434,7 +429,6 @@ func TestNestedPreloadWithNestedJoin(t *testing.T) {
 }
 
 func TestMergeNestedPreloadWithNestedJoin(t *testing.T) {
-	t.Skip()
 	users := []User{
 		{
 			Name: "TestMergeNestedPreloadWithNestedJoin-1",
@@ -473,7 +467,7 @@ func TestMergeNestedPreloadWithNestedJoin(t *testing.T) {
 	err := sess.
 		Joins("Manager").
 		Preload("Manager.Tools").
-		Where("users.name Like ?", "TestMergeNestedPreloadWithNestedJoin%").
+		Where("\"users\".\"name\" Like ?", "TestMergeNestedPreloadWithNestedJoin%").
 		Find(&result).Error
 
 	if err != nil {
@@ -541,7 +535,6 @@ func TestNestedPreloadWithPointerJoin(t *testing.T) {
 }
 
 func TestEmbedPreload(t *testing.T) {
-	t.Skip()
 	type Country struct {
 		ID   int `gorm:"primaryKey"`
 		Name string
@@ -666,7 +659,7 @@ func TestEmbedPreload(t *testing.T) {
 	for _, test := range testList {
 		t.Run(test.name, func(t *testing.T) {
 			actual := Org{}
-			tx := DB.Where("id = ?", org.ID).Session(&gorm.Session{})
+			tx := DB.Where("\"id\" = ?", org.ID).Session(&gorm.Session{})
 			for name, args := range test.preloads {
 				tx = tx.Preload(name, args...)
 			}
