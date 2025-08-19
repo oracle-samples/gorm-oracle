@@ -40,6 +40,9 @@ package tests
 
 import (
 	"fmt"
+	"log"
+	"os"
+	"sync"
 	"testing"
 
 	"gorm.io/gorm"
@@ -63,5 +66,93 @@ func TestWithSingleConnection(t *testing.T) {
 
 	if actualString != expectedString {
 		t.Errorf("WithSingleConnection() method should get correct value, expect: %v, got %v", expectedString, actualString)
+	}
+}
+
+func TestConnectionWithInvalidQuery(t *testing.T) {
+	err := DB.Connection(func(tx *gorm.DB) error {
+		return tx.Exec("SELECT * FROM non_existent_table").Error
+	})
+	if err == nil {
+		t.Errorf("Expected error for invalid query in Connection, got nil")
+	}
+}
+
+func TestMultipleSequentialConnections(t *testing.T) {
+	for i := 0; i < 20; i++ {
+		var val int
+		err := DB.Connection(func(tx *gorm.DB) error {
+			return tx.Raw("SELECT 1 FROM dual").Scan(&val).Error
+		})
+		if err != nil {
+			t.Fatalf("Sequential Connection #%d failed: %v", i+1, err)
+		}
+		if val != 1 {
+			t.Fatalf("Sequential Connection #%d got wrong result: %v", i+1, val)
+		}
+	}
+}
+
+func TestConnectionAfterDBClose(t *testing.T) {
+	sqlDB, err := DB.DB()
+	if err != nil {
+		t.Fatalf("DB.DB() should not fail, got: %v", err)
+	}
+	err = sqlDB.Close()
+	if err != nil {
+		t.Fatalf("sqlDB.Close() failed: %v", err)
+	}
+	cerr := DB.Connection(func(tx *gorm.DB) error {
+		var v int
+		return tx.Raw("SELECT 1 FROM dual").Scan(&v).Error
+	})
+	if cerr == nil {
+		t.Errorf("Expected error when calling Connection after DB closed, got nil")
+	}
+	if DB, err = OpenTestConnection(&gorm.Config{Logger: newLogger}); err != nil {
+		log.Printf("failed to connect database, got error %v", err)
+		os.Exit(1)
+	}
+}
+
+func TestConnectionHandlesPanic(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("Expected panic inside Connection, but none occurred")
+		}
+	}()
+	DB.Connection(func(tx *gorm.DB) error {
+		panic("panic in connection callback")
+	})
+	t.Errorf("Should have panicked inside connection callback")
+}
+
+func TestConcurrentConnections(t *testing.T) {
+	const goroutines = 10
+	var wg sync.WaitGroup
+	wg.Add(goroutines)
+	errChan := make(chan error, goroutines)
+
+	for i := 0; i < goroutines; i++ {
+		go func(i int) {
+			defer wg.Done()
+			var val int
+			err := DB.Connection(func(tx *gorm.DB) error {
+				return tx.Raw("SELECT 1 FROM dual").Scan(&val).Error
+			})
+			if err != nil {
+				errChan <- fmt.Errorf("goroutine #%d: connection err: %v", i, err)
+				return
+			}
+			if val != 1 {
+				errChan <- fmt.Errorf("goroutine #%d: got wrong result: %v", i, val)
+			}
+		}(i)
+	}
+
+	wg.Wait()
+	close(errChan)
+	for err := range errChan {
+		t.Error(err)
 	}
 }
