@@ -1352,19 +1352,32 @@ type DoubleInt64 struct {
 	data int64
 }
 
-func (t *DoubleInt64) Scan(val interface{}) error {
-	switch v := val.(type) {
-	case int64:
-		t.data = v * 2
+func (t *DoubleInt64) Scan(v any) error {
+	if v == nil {
+		t.data = 0
 		return nil
-	default:
-		return fmt.Errorf("DoubleInt64 cant not scan with:%v", v)
 	}
+	switch x := v.(type) {
+	case int64:
+		t.data = x * 2
+	case float64:
+		t.data = int64(x) * 2
+	default:
+		if s, ok := x.(fmt.Stringer); ok { // e.g., godror.Number
+			n, err := strconv.ParseInt(strings.TrimSpace(s.String()), 10, 64)
+			if err != nil {
+				return fmt.Errorf("DoubleInt64: %w", err)
+			}
+			t.data = n * 2
+			return nil
+		}
+		return fmt.Errorf("DoubleInt64: cannot scan %T", v)
+	}
+	return nil
 }
 
 // https://github.com/go-gorm/gorm/issues/5091
 func TestQueryScannerWithSingleColumn(t *testing.T) {
-	t.Skip()
 	user := User{Name: "scanner_raw_1", Age: 10}
 	DB.Create(&user)
 
