@@ -437,14 +437,12 @@ func writeQuotedIdentifier(builder *strings.Builder, identifier string) {
 //
 // Example output:
 //
-//	DECLARE
-//	  TYPE t_record IS RECORD (
-//	    "id" "users"."id"%TYPE,
-//	    "created_at" "users"."created_at"%TYPE,
-//	    ...
-//	  );
-//	  TYPE t_records IS TABLE OF t_record;
-//	  l_inserted_records t_records;
+//	TYPE t_record IS RECORD (
+//	  "id" "users"."id"%TYPE,
+//	  "created_at" "users"."created_at"%TYPE,
+//	  ...
+//	);
+//	TYPE t_records IS TABLE OF t_record;
 //
 // Parameters:
 //   - plsqlBuilder: The builder to write the PL/SQL code into.
