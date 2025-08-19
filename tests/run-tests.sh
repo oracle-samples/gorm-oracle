@@ -40,7 +40,7 @@ echo "Processing tests from passed-tests.txt..."
 echo ""
 
 # Read the file line by line
-while IFS= read -r line; do
+while IFS= read -r line || [[ -n "$line" ]]; do
     # Skip empty lines - keep them as is
     if [[ -z "$line" ]]; then
         echo "$line" >> "$temp_file"

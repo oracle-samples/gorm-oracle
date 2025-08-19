@@ -544,7 +544,7 @@ func buildUpdatePLSQL(db *gorm.DB) {
 		for _, column := range allColumns {
 			field := findFieldByDBName(schema, column)
 			if field != nil {
-				dest := createTypedDestination(field.FieldType)
+				dest := createTypedDestination(field)
 				stmt.Vars = append(stmt.Vars, sql.Out{Dest: dest})
 			}
 		}
