@@ -319,8 +319,8 @@ TestGroupConditions
 TestCombineStringConditions
 TestFromWithJoins
 TestToSQL
-#TestTable
-#TestTableWithAllFields
+TestTable
+TestTableWithAllFields
 TestTableWithNamer
 TestTransaction
 TestCancelTransaction
