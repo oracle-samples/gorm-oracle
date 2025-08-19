@@ -434,7 +434,6 @@ func TestNestedPreloadWithNestedJoin(t *testing.T) {
 }
 
 func TestMergeNestedPreloadWithNestedJoin(t *testing.T) {
-	t.Skip()
 	users := []User{
 		{
 			Name: "TestMergeNestedPreloadWithNestedJoin-1",
@@ -473,7 +472,7 @@ func TestMergeNestedPreloadWithNestedJoin(t *testing.T) {
 	err := sess.
 		Joins("Manager").
 		Preload("Manager.Tools").
-		Where("users.name Like ?", "TestMergeNestedPreloadWithNestedJoin%").
+		Where("\"users\".\"name\" Like ?", "TestMergeNestedPreloadWithNestedJoin%").
 		Find(&result).Error
 
 	if err != nil {
@@ -541,7 +540,6 @@ func TestNestedPreloadWithPointerJoin(t *testing.T) {
 }
 
 func TestEmbedPreload(t *testing.T) {
-	t.Skip()
 	type Country struct {
 		ID   int `gorm:"primaryKey"`
 		Name string
@@ -666,7 +664,7 @@ func TestEmbedPreload(t *testing.T) {
 	for _, test := range testList {
 		t.Run(test.name, func(t *testing.T) {
 			actual := Org{}
-			tx := DB.Where("id = ?", org.ID).Session(&gorm.Session{})
+			tx := DB.Where("\"id\" = ?", org.ID).Session(&gorm.Session{})
 			for name, args := range test.preloads {
 				tx = tx.Preload(name, args...)
 			}
