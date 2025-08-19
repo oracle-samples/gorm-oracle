@@ -60,33 +60,13 @@ type SerializerStruct struct {
 	Roles3                 *Roles                 `gorm:"serializer:json;not null"`
 	Contracts              map[string]interface{} `gorm:"serializer:json"`
 	JobInfo                Job                    `gorm:"type:bytes;serializer:gob"`
-	CreatedTime            int64                  `gorm:"serializer:unixtime;type:datetime"` // store time in db, use int as field type
-	UpdatedTime            *int64                 `gorm:"serializer:unixtime;type:datetime"` // store time in db, use int as field type
+	CreatedTime            int64                  `gorm:"serializer:unixtime;type:timestamp"` // store time in db, use int as field type
+	UpdatedTime            *int64                 `gorm:"serializer:unixtime;type:timestamp"` // store time in db, use int as field type
 	CustomSerializerString string                 `gorm:"serializer:custom"`
 	EncryptedString        EncryptedString
 }
-
-type SerializerPostgresStruct struct {
-	gorm.Model
-	Name                   []byte                 `gorm:"json"`
-	Roles                  Roles                  `gorm:"serializer:json"`
-	Roles2                 *Roles                 `gorm:"serializer:json"`
-	Roles3                 *Roles                 `gorm:"serializer:json;not null"`
-	Contracts              map[string]interface{} `gorm:"serializer:json"`
-	JobInfo                Job                    `gorm:"type:bytes;serializer:gob"`
-	CreatedTime            int64                  `gorm:"serializer:unixtime;type:timestamptz"` // store time in db, use int as field type
-	UpdatedTime            *int64                 `gorm:"serializer:unixtime;type:timestamptz"` // store time in db, use int as field type
-	CustomSerializerString string                 `gorm:"serializer:custom"`
-	EncryptedString        EncryptedString
-}
-
-func (*SerializerPostgresStruct) TableName() string { return "serializer_structs" }
 
 func adaptorSerializerModel(s *SerializerStruct) interface{} {
-	if DB.Dialector.Name() == "postgres" {
-		sps := SerializerPostgresStruct(*s)
-		return &sps
-	}
 	return s
 }
 
@@ -142,7 +122,6 @@ func (c *CustomSerializer) Value(ctx context.Context, field *schema.Field, dst r
 }
 
 func TestSerializer(t *testing.T) {
-	t.Skip()
 	schema.RegisterSerializer("custom", NewCustomSerializer("hello"))
 	DB.Migrator().DropTable(adaptorSerializerModel(&SerializerStruct{}))
 	if err := DB.Migrator().AutoMigrate(adaptorSerializerModel(&SerializerStruct{})); err != nil {
@@ -155,6 +134,7 @@ func TestSerializer(t *testing.T) {
 	data := SerializerStruct{
 		Name:            []byte("jinzhu"),
 		Roles:           []string{"r1", "r2"},
+		Roles3:          &Roles{},
 		Contracts:       map[string]interface{}{"name": "jinzhu", "age": 10},
 		EncryptedString: EncryptedString("pass"),
 		CreatedTime:     createdAt.Unix(),
@@ -173,13 +153,13 @@ func TestSerializer(t *testing.T) {
 	}
 
 	var result SerializerStruct
-	if err := DB.Where("roles2 IS NULL AND roles3 = ?", "").First(&result, data.ID).Error; err != nil {
+	if err := DB.Where("\"roles2\" IS NULL AND \"roles3\" = ?", "[]").First(&result, data.ID).Error; err != nil {
 		t.Fatalf("failed to query data, got error %v", err)
 	}
 
 	tests.AssertEqual(t, result, data)
 
-	if err := DB.Model(&result).Update("roles", "").Error; err != nil {
+	if err := DB.Model(&result).Update("roles", []string{}).Error; err != nil {
 		t.Fatalf("failed to update data's roles, got error %v", err)
 	}
 
@@ -189,7 +169,6 @@ func TestSerializer(t *testing.T) {
 }
 
 func TestSerializerZeroValue(t *testing.T) {
-	t.Skip()
 	schema.RegisterSerializer("custom", NewCustomSerializer("hello"))
 	DB.Migrator().DropTable(adaptorSerializerModel(&SerializerStruct{}))
 	if err := DB.Migrator().AutoMigrate(adaptorSerializerModel(&SerializerStruct{})); err != nil {
@@ -197,6 +176,8 @@ func TestSerializerZeroValue(t *testing.T) {
 	}
 
 	data := SerializerStruct{}
+	// If left as is Roles3 value will be "" which will be translated by OracleDB to NULL which is not allowed for Role3 column
+	data.Roles3 = &Roles{}
 
 	if err := DB.Create(&data).Error; err != nil {
 		t.Fatalf("failed to create data, got error %v", err)
@@ -209,7 +190,7 @@ func TestSerializerZeroValue(t *testing.T) {
 
 	tests.AssertEqual(t, result, data)
 
-	if err := DB.Model(&result).Update("roles", "").Error; err != nil {
+	if err := DB.Model(&result).Update("roles", []string{}).Error; err != nil {
 		t.Fatalf("failed to update data's roles, got error %v", err)
 	}
 
@@ -219,7 +200,6 @@ func TestSerializerZeroValue(t *testing.T) {
 }
 
 func TestSerializerAssignFirstOrCreate(t *testing.T) {
-	t.Skip()
 	schema.RegisterSerializer("custom", NewCustomSerializer("hello"))
 	DB.Migrator().DropTable(adaptorSerializerModel(&SerializerStruct{}))
 	if err := DB.Migrator().AutoMigrate(adaptorSerializerModel(&SerializerStruct{})); err != nil {
@@ -231,6 +211,7 @@ func TestSerializerAssignFirstOrCreate(t *testing.T) {
 	data := SerializerStruct{
 		Name:            []byte("ag9920"),
 		Roles:           []string{"r1", "r2"},
+		Roles3:          &Roles{},
 		Contracts:       map[string]interface{}{"name": "jing1", "age": 11},
 		EncryptedString: EncryptedString("pass"),
 		CreatedTime:     createdAt.Unix(),
