@@ -74,7 +74,7 @@ func TestConnectionWithInvalidQuery(t *testing.T) {
 		return tx.Exec("SELECT * FROM non_existent_table").Error
 	})
 	if err == nil {
-		t.Errorf("Expected error for invalid query in Connection, got nil")
+		t.Fatalf("Expected error for invalid query in Connection, got nil")
 	}
 }
 
@@ -107,7 +107,7 @@ func TestConnectionAfterDBClose(t *testing.T) {
 		return tx.Raw("SELECT 1 FROM dual").Scan(&v).Error
 	})
 	if cerr == nil {
-		t.Errorf("Expected error when calling Connection after DB closed, got nil")
+		t.Fatalf("Expected error when calling Connection after DB closed, got nil")
 	}
 	if DB, err = OpenTestConnection(&gorm.Config{Logger: newLogger}); err != nil {
 		log.Printf("failed to connect database, got error %v", err)
@@ -118,13 +118,13 @@ func TestConnectionAfterDBClose(t *testing.T) {
 func TestConnectionHandlesPanic(t *testing.T) {
 	defer func() {
 		if r := recover(); r == nil {
-			t.Errorf("Expected panic inside Connection, but none occurred")
+			t.Fatalf("Expected panic inside Connection, but none occurred")
 		}
 	}()
 	DB.Connection(func(tx *gorm.DB) error {
 		panic("panic in connection callback")
 	})
-	t.Errorf("Should have panicked inside connection callback")
+	t.Fatalf("Should have panicked inside connection callback")
 }
 
 func TestConcurrentConnections(t *testing.T) {
