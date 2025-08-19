@@ -259,7 +259,7 @@ func TestJoinWithSoftDeleted(t *testing.T) {
 
 	var user1 User
 	DB.Model(&User{}).Joins("NamedPet").Joins("Account").First(&user1, user.ID)
-	if user1.NamedPet == nil || user1.Account.ID == 0 {
+	if user1.NamedPet.ID == 0 || user1.Account.ID == 0 {
 		t.Fatalf("joins NamedPet and Account should not empty:%v", user1)
 	}
 
@@ -268,8 +268,8 @@ func TestJoinWithSoftDeleted(t *testing.T) {
 
 	var user2 User
 	DB.Model(&User{}).Joins("NamedPet").Joins("Account").First(&user2, user.ID)
-	if user2.NamedPet == nil || user2.Account.ID != 0 {
-		t.Fatalf("joins Account should not empty:%v", user2)
+	if user2.NamedPet.ID == 0 || user2.Account.ID != 0 {
+		t.Fatalf("joins Account should be empty:%v", user2)
 	}
 
 	// NamedPet should empty
@@ -277,8 +277,8 @@ func TestJoinWithSoftDeleted(t *testing.T) {
 
 	var user3 User
 	DB.Model(&User{}).Joins("NamedPet").Joins("Account").First(&user3, user.ID)
-	if user3.NamedPet != nil || user2.Account.ID != 0 {
-		t.Fatalf("joins NamedPet and Account should not empty:%v", user2)
+	if user3.NamedPet.ID != 0 || user3.Account.ID != 0 {
+		t.Fatalf("joins NamedPet and Account should be empty:%v", user3)
 	}
 }
 
@@ -383,8 +383,6 @@ func TestJoinArgsWithDB(t *testing.T) {
 }
 
 func TestNestedJoins(t *testing.T) {
-	t.Skip()
-	
 	users := []User{
 		{
 			Name: "nested-joins-1",
@@ -424,7 +422,7 @@ func TestNestedJoins(t *testing.T) {
 		Joins("Manager.NamedPet.Toy").
 		Joins("NamedPet").
 		Joins("NamedPet.Toy").
-		Find(&users2, "users.id IN ?", userIDs).Error; err != nil {
+		Find(&users2, "\"users\".\"id\" IN ?", userIDs).Error; err != nil {
 		t.Fatalf("Failed to load with joins, got error: %v", err)
 	} else if len(users2) != len(users) {
 		t.Fatalf("Failed to load join users, got: %v, expect: %v", len(users2), len(users))

@@ -513,7 +513,7 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 	for rowIdx := 0; rowIdx < len(createValues.Values); rowIdx++ {
 		for _, column := range allColumns {
 			if field := findFieldByDBName(schema, column); field != nil {
-				stmt.Vars = append(stmt.Vars, sql.Out{Dest: createTypedDestination(field.FieldType)})
+				stmt.Vars = append(stmt.Vars, sql.Out{Dest: createTypedDestination(field)})
 				plsqlBuilder.WriteString(fmt.Sprintf("  IF l_affected_records.COUNT > %d THEN :%d := l_affected_records(%d).", rowIdx, outParamIndex+1, rowIdx+1))
 				writeQuotedIdentifier(&plsqlBuilder, column)
 				plsqlBuilder.WriteString("; END IF;\n")
@@ -625,7 +625,7 @@ func buildBulkInsertOnlyPLSQL(db *gorm.DB, createValues clause.Values) {
 			quotedColumn := columnBuilder.String()
 
 			if field := findFieldByDBName(schema, column); field != nil {
-				stmt.Vars = append(stmt.Vars, sql.Out{Dest: createTypedDestination(field.FieldType)})
+				stmt.Vars = append(stmt.Vars, sql.Out{Dest: createTypedDestination(field)})
 				plsqlBuilder.WriteString(fmt.Sprintf("  IF l_inserted_records.COUNT > %d THEN :%d := l_inserted_records(%d).%s; END IF;\n",
 					rowIdx, outParamIndex+1, rowIdx+1, quotedColumn))
 				outParamIndex++
