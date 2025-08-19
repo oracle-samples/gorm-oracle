@@ -229,9 +229,9 @@ TestPreloadGoroutine
 TestPreloadWithDiffModel
 TestNestedPreloadWithUnscoped
 TestNestedPreloadWithNestedJoin
-#TestMergeNestedPreloadWithNestedJoin
+TestMergeNestedPreloadWithNestedJoin
 TestNestedPreloadWithPointerJoin
-#TestEmbedPreload
+TestEmbedPreload
 TestPreparedStmt
 TestPreparedStmtFromTransaction
 TestPreparedStmtLruFromTransaction
