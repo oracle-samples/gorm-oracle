@@ -79,7 +79,7 @@ TestBlockGlobalDelete
 TestDeleteWithAssociations
 TestDeleteAssociationsWithUnscoped
 TestDeleteSliceWithAssociations
-#TestSoftDeleteReturning
+TestSoftDeleteReturning
 TestDeleteReturning
 TestDeleteByPrimaryKeyOnly
 TestHardDeleteAfterSoftDelete
