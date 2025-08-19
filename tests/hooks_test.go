@@ -296,12 +296,12 @@ func TestUseDBInHooks(t *testing.T) {
 	}
 
 	var result Product2
-	if err := DB.First(&result, "name = ?", "Nice").Error; err != nil {
+	if err := DB.First(&result, "\"name\" = ?", "Nice").Error; err != nil {
 		t.Fatalf("Failed to query product, got error: %v", err)
 	}
 
 	var resultClone Product2
-	if err := DB.First(&resultClone, "name = ?", "Nice_clone").Error; err != nil {
+	if err := DB.First(&resultClone, "\"name\" = ?", "Nice_clone").Error; err != nil {
 		t.Fatalf("Failed to find cloned product, got error: %v", err)
 	}
 
@@ -311,7 +311,7 @@ func TestUseDBInHooks(t *testing.T) {
 
 	DB.Model(&result).Update("Price", 500)
 	var result2 Product2
-	DB.First(&result2, "name = ?", "Nice")
+	DB.First(&result2, "\"name\" = ?", "Nice")
 
 	if result2.Price != 500 {
 		t.Errorf("Failed to update product's price, expects: %v, got %v", 500, result2.Price)
@@ -323,13 +323,13 @@ func TestUseDBInHooks(t *testing.T) {
 	}
 
 	var result3 Product2
-	if err := DB.First(&result3, "name = ?", "Nice2").Error; err != nil {
+	if err := DB.First(&result3, "\"name\" = ?", "Nice2").Error; err != nil {
 		t.Fatalf("Failed to query product, got error: %v", err)
 	}
 
 	DB.Model(&result3).Update("Price", 800)
 	var result4 Product2
-	DB.First(&result4, "name = ?", "Nice2")
+	DB.First(&result4, "\"name\" = ?", "Nice2")
 
 	if result4.Price != 600 {
 		t.Errorf("Admin product's price should not be changed, expects: %v, got %v", 600, result4.Price)

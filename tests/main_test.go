@@ -39,10 +39,9 @@
 package tests
 
 import (
-	"fmt"
+	"strings"
 	"testing"
 	"time"
-	"strings"
 
 	. "github.com/oracle-samples/gorm-oracle/tests/utils"
 )
@@ -54,9 +53,6 @@ func TestExceptionsWithInvalidSql(t *testing.T) {
 		t.Errorf("Should got error with invalid SQL")
 	}
 
-	tx := DB.Model(&User{}).Where("name = ?", "sd;;;aa").Pluck("name", &columns)
-	fmt.Println(tx.Error)
-
 	if DB.Model(&User{}).Where("sdsd.zaaa = ?", "sd;;;aa").Pluck("aaa", &columns).Error == nil {
 		t.Errorf("Should got error with invalid SQL")
 	}
@@ -65,13 +61,20 @@ func TestExceptionsWithInvalidSql(t *testing.T) {
 		t.Errorf("Should got error with invalid SQL")
 	}
 
+	// Create a user
+	user := *GetUser("user-for-test-exceptions-with-invalid-sql", Config{})
+
+	if results := DB.Create(&user); results.Error != nil {
+		t.Errorf("errors happened when create: %v", results.Error)
+	}
+
 	var count1, count2 int64
 	DB.Model(&User{}).Count(&count1)
 	if count1 <= 0 {
 		t.Errorf("Should find some users")
 	}
 
-	if DB.Where("name = ?", "jinzhu; delete * from users").First(&User{}).Error == nil {
+	if DB.Where("\"name\" = ?", "jinzhu; delete * from users").First(&User{}).Error == nil {
 		t.Errorf("Should got error with invalid SQL")
 	}
 

@@ -128,7 +128,7 @@ TestOpen
 TestGroupBy
 TestRunCallbacks
 TestCallbacksWithErrors
-#TestUseDBInHooks
+TestUseDBInHooks
 TestSetColumn
 TestHooksForSlice
 TestFailedToSaveAssociationShouldRollback
@@ -150,7 +150,7 @@ TestNestedJoins
 TestJoinsPreload_Issue7013
 TestJoinsPreload_Issue7013_RelationEmpty
 TestJoinsPreload_Issue7013_NoEntries
-#TestExceptionsWithInvalidSql
+TestExceptionsWithInvalidSql
 TestSetAndGet
 TestMigrate
 TestAutoMigrateInt8PG
