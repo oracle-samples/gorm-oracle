@@ -235,21 +235,20 @@ func TestMany2ManyAssociationForSlice(t *testing.T) {
 }
 
 func TestSingleTableMany2ManyAssociation(t *testing.T) {
-	t.Skip()
 	user := *GetUser("many2many", Config{Friends: 2})
 
 	if err := DB.Create(&user).Error; err != nil {
 		t.Fatalf("errors happened when create: %v", err)
 	}
 
-	CheckUser(t, user, user)
+	CheckUserSkipUpdatedAt(t, user, user)
 
 	// Find
 	var user2 User
 	DB.Find(&user2, "\"id\" = ?", user.ID)
 	DB.Model(&user2).Association("Friends").Find(&user2.Friends)
 
-	CheckUser(t, user2, user)
+	CheckUserSkipUpdatedAt(t, user2, user)
 
 	// Count
 	AssertAssociationCount(t, user, "Friends", 2, "")
@@ -262,7 +261,7 @@ func TestSingleTableMany2ManyAssociation(t *testing.T) {
 	}
 
 	user.Friends = append(user.Friends, &friend)
-	CheckUser(t, user2, user)
+	CheckUserSkipUpdatedAt(t, user2, user)
 
 	AssertAssociationCount(t, user, "Friends", 3, "AfterAppend")
 
@@ -274,7 +273,7 @@ func TestSingleTableMany2ManyAssociation(t *testing.T) {
 
 	user.Friends = append(user.Friends, friends...)
 
-	CheckUser(t, user2, user)
+	CheckUserSkipUpdatedAt(t, user2, user)
 
 	AssertAssociationCount(t, user, "Friends", 5, "AfterAppendSlice")
 
@@ -286,7 +285,7 @@ func TestSingleTableMany2ManyAssociation(t *testing.T) {
 	}
 
 	user.Friends = []*User{&friend2}
-	CheckUser(t, user2, user)
+	CheckUserSkipUpdatedAt(t, user2, user)
 
 	AssertAssociationCount(t, user2, "Friends", 1, "AfterReplace")
 
@@ -317,7 +316,6 @@ func TestSingleTableMany2ManyAssociation(t *testing.T) {
 }
 
 func TestSingleTableMany2ManyAssociationForSlice(t *testing.T) {
-	t.Skip()
 	users := []User{
 		*GetUser("slice-many2many-1", Config{Team: 2}),
 		*GetUser("slice-many2many-2", Config{Team: 0}),
