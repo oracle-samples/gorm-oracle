@@ -138,13 +138,13 @@ func TestConcurrentConnections(t *testing.T) {
 			defer wg.Done()
 			var val int
 			err := DB.Connection(func(tx *gorm.DB) error {
-				return tx.Raw("SELECT 1 FROM dual").Scan(&val).Error
+				return tx.Raw("SELECT ? FROM dual", i).Scan(&val).Error
 			})
 			if err != nil {
 				errChan <- fmt.Errorf("goroutine #%d: connection err: %v", i, err)
 				return
 			}
-			if val != 1 {
+			if val != i {
 				errChan <- fmt.Errorf("goroutine #%d: got wrong result: %v", i, val)
 			}
 		}(i)
