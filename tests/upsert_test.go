@@ -344,11 +344,11 @@ func TestFindOrCreate(t *testing.T) {
 	}
 
 	DB.Where(&User{Name: "find or create embedded struct"}).Assign(User{Age: 44, Account: Account{AccountNumber: "1231231231"}, Pets: []*Pet{{Name: "first_or_create_pet1"}, {Name: "first_or_create_pet2"}}}).FirstOrCreate(&user8)
-	if err := DB.Where("name = ?", "first_or_create_pet1").First(&Pet{}).Error; err != nil {
+	if err := DB.Where("\"name\" = ?", "first_or_create_pet1").First(&Pet{}).Error; err != nil {
 		t.Errorf("has many association should be saved")
 	}
 
-	if err := DB.Where("number = ?", "1231231231").First(&Account{}).Error; err != nil {
+	if err := DB.Where("\"account_number\" = ?", "1231231231").First(&Account{}).Error; err != nil {
 		t.Errorf("belongs to association should be saved")
 	}
 }
