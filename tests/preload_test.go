@@ -148,7 +148,6 @@ func TestNestedPreloadForSlice(t *testing.T) {
 }
 
 func TestPreloadWithConds(t *testing.T) {
-	t.Skip()
 	users := []User{
 		*GetUser("slice_nested_preload_1", Config{Account: true}),
 		*GetUser("slice_nested_preload_2", Config{Account: false}),
@@ -165,7 +164,7 @@ func TestPreloadWithConds(t *testing.T) {
 	}
 
 	var users2 []User
-	DB.Preload("Account", clause.Eq{Column: "account_number", Value: users[0].Account.AccountNumber}).Find(&users2, "id IN ?", userIDs)
+	DB.Preload("Account", clause.Eq{Column: "account_number", Value: users[0].Account.AccountNumber}).Find(&users2, "\"id\" IN ?", userIDs)
 	sort.Slice(users2, func(i, j int) bool {
 		return users2[i].ID < users2[j].ID
 	})
@@ -180,8 +179,8 @@ func TestPreloadWithConds(t *testing.T) {
 
 	var users3 []User
 	if err := DB.Preload("Account", func(tx *gorm.DB) *gorm.DB {
-		return tx.Table("accounts a").Select("a.*")
-	}).Find(&users3, "id IN ?", userIDs).Error; err != nil {
+		return tx.Table("\"accounts\" \"a\"").Select("\"a\".*")
+	}).Find(&users3, "\"id\" IN ?", userIDs).Error; err != nil {
 		t.Errorf("failed to query, got error %v", err)
 	}
 	sort.Slice(users3, func(i, j int) bool {
@@ -195,13 +194,13 @@ func TestPreloadWithConds(t *testing.T) {
 	var user4 User
 	DB.Delete(&users3[0].Account)
 
-	if err := DB.Preload(clause.Associations).Take(&user4, "id = ?", users3[0].ID).Error; err != nil || user4.Account.ID != 0 {
+	if err := DB.Preload(clause.Associations).Take(&user4, "\"id\" = ?", users3[0].ID).Error; err != nil || user4.Account.ID != 0 {
 		t.Errorf("failed to query, got error %v, account: %#v", err, user4.Account)
 	}
 
 	if err := DB.Preload(clause.Associations, func(tx *gorm.DB) *gorm.DB {
 		return tx.Unscoped()
-	}).Take(&user4, "id = ?", users3[0].ID).Error; err != nil || user4.Account.ID == 0 {
+	}).Take(&user4, "\"id\" = ?", users3[0].ID).Error; err != nil || user4.Account.ID == 0 {
 		t.Errorf("failed to query, got error %v, account: %#v", err, user4.Account)
 	}
 }
