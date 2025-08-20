@@ -222,7 +222,7 @@ TestPreloadManyToManyCallbacks
 TestPreloadWithAssociations
 TestNestedPreload
 TestNestedPreloadForSlice
-#TestPreloadWithConds
+TestPreloadWithConds
 TestNestedPreloadWithConds
 TestPreloadEmptyData
 TestPreloadGoroutine
