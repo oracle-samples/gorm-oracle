@@ -47,7 +47,6 @@ import (
 )
 
 func TestUpdateMany2ManyAssociations(t *testing.T) {
-	t.Skip()
 	user := *GetUser("update-many2many", Config{})
 
 	if err := DB.Create(&user).Error; err != nil {

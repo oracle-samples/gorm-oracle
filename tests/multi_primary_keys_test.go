@@ -455,7 +455,7 @@ func TestManyToManyWithCustomizedForeignKeys2(t *testing.T) {
 
 func TestCompositePrimaryKeysAssociations(t *testing.T) {
 	t.Skip()
-	
+
 	type Label struct {
 		BookID *uint  `gorm:"primarykey"`
 		Name   string `gorm:"primarykey"`
