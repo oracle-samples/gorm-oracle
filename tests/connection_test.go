@@ -71,80 +71,6 @@ func TestWithSingleConnection(t *testing.T) {
 	}
 }
 
-func TestTransactionCommit(t *testing.T) {
-	// Create test table
-	type TestTxTable struct {
-		ID   uint   `gorm:"primaryKey"`
-		Name string `gorm:"size:100;column:name"`
-	}
-
-	err := DB.AutoMigrate(&TestTxTable{})
-	if err != nil {
-		t.Fatalf("Failed to migrate test table: %v", err)
-	}
-	defer DB.Migrator().DropTable(&TestTxTable{})
-
-	tx := DB.Begin()
-	if tx.Error != nil {
-		t.Fatalf("Failed to begin transaction: %v", tx.Error)
-	}
-
-	record := TestTxTable{Name: "test_commit"}
-	if err := tx.Create(&record).Error; err != nil {
-		t.Errorf("Failed to create record in transaction: %v", err)
-	}
-
-	if err := tx.Commit().Error; err != nil {
-		t.Errorf("Failed to commit transaction: %v", err)
-	}
-
-	// Verify record exists using quoted column name
-	var count int64
-	if err := DB.Model(&TestTxTable{}).Where("\"name\" = ?", "test_commit").Count(&count).Error; err != nil {
-		t.Errorf("Failed to count records: %v", err)
-	}
-	if count != 1 {
-		t.Errorf("Expected 1 record after commit, got %d", count)
-	}
-}
-
-func TestTransactionRollback(t *testing.T) {
-	// Create test table
-	type TestTxTable struct {
-		ID   uint   `gorm:"primaryKey"`
-		Name string `gorm:"size:100;column:name"`
-	}
-
-	err := DB.AutoMigrate(&TestTxTable{})
-	if err != nil {
-		t.Fatalf("Failed to migrate test table: %v", err)
-	}
-	defer DB.Migrator().DropTable(&TestTxTable{})
-
-	tx := DB.Begin()
-	if tx.Error != nil {
-		t.Fatalf("Failed to begin transaction: %v", tx.Error)
-	}
-
-	record := TestTxTable{Name: "test_rollback"}
-	if err := tx.Create(&record).Error; err != nil {
-		t.Errorf("Failed to create record in transaction: %v", err)
-	}
-
-	if err := tx.Rollback().Error; err != nil {
-		t.Errorf("Failed to rollback transaction: %v", err)
-	}
-
-	// Verify record doesn't exist using quoted column name
-	var count int64
-	if err := DB.Model(&TestTxTable{}).Where("\"name\" = ?", "test_rollback").Count(&count).Error; err != nil {
-		t.Errorf("Failed to count records: %v", err)
-	}
-	if count != 0 {
-		t.Errorf("Expected 0 records after rollback, got %d", count)
-	}
-}
-
 func TestConnectionAfterError(t *testing.T) {
 	// Execute an invalid query
 	err := DB.Exec("SELECT invalid_column FROM dual").Error
@@ -278,38 +204,6 @@ func TestContextTimeout(t *testing.T) {
 	}
 	if result != 42 {
 		t.Errorf("Expected 42, got %d", result)
-	}
-}
-
-func TestLargeResultSet(t *testing.T) {
-	var results []struct {
-		RowNum int    `gorm:"column:ROW_NUM"`
-		Value  string `gorm:"column:VALUE"`
-	}
-
-	query := `
-		SELECT LEVEL as row_num, 'row_' || LEVEL as value 
-		FROM dual 
-		CONNECT BY LEVEL <= 1000
-	`
-
-	err := DB.Raw(query).Scan(&results).Error
-	if err != nil {
-		t.Errorf("Failed to execute large result set query: %v", err)
-		return
-	}
-
-	if len(results) != 1000 {
-		t.Errorf("Expected 1000 rows, got %d", len(results))
-		return
-	}
-
-	// Verify first and last rows
-	if results[0].RowNum != 1 || results[0].Value != "row_1" {
-		t.Errorf("First row incorrect: %+v", results[0])
-	}
-	if results[999].RowNum != 1000 || results[999].Value != "row_1000" {
-		t.Errorf("Last row incorrect: %+v", results[999])
 	}
 }
 

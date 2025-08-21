@@ -63,7 +63,6 @@ TestRecoveryAfterInvalidQuery
 TestContextCancellationHandling
 TestConnectionPingAndHealth
 TestPoolStatisticsOverTime
-setupConnectionPoolTestTables
 TestNestedConnection
 TestMultipleSequentialConnections
 TestConnectionAfterDBClose

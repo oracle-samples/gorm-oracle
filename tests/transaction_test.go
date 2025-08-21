@@ -689,3 +689,77 @@ func TestTransactionWithRawSQL(t *testing.T) {
 		t.Errorf("Expected age %d, got %d", user.Age+1, result.Age)
 	}
 }
+
+func TestTransactionCommit(t *testing.T) {
+	// Create test table
+	type TestTxTable struct {
+		ID   uint   `gorm:"primaryKey"`
+		Name string `gorm:"size:100;column:name"`
+	}
+
+	err := DB.AutoMigrate(&TestTxTable{})
+	if err != nil {
+		t.Fatalf("Failed to migrate test table: %v", err)
+	}
+	defer DB.Migrator().DropTable(&TestTxTable{})
+
+	tx := DB.Begin()
+	if tx.Error != nil {
+		t.Fatalf("Failed to begin transaction: %v", tx.Error)
+	}
+
+	record := TestTxTable{Name: "test_commit"}
+	if err := tx.Create(&record).Error; err != nil {
+		t.Errorf("Failed to create record in transaction: %v", err)
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		t.Errorf("Failed to commit transaction: %v", err)
+	}
+
+	// Verify record exists using quoted column name
+	var count int64
+	if err := DB.Model(&TestTxTable{}).Where("\"name\" = ?", "test_commit").Count(&count).Error; err != nil {
+		t.Errorf("Failed to count records: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("Expected 1 record after commit, got %d", count)
+	}
+}
+
+func TestTransactionRollback(t *testing.T) {
+	// Create test table
+	type TestTxTable struct {
+		ID   uint   `gorm:"primaryKey"`
+		Name string `gorm:"size:100;column:name"`
+	}
+
+	err := DB.AutoMigrate(&TestTxTable{})
+	if err != nil {
+		t.Fatalf("Failed to migrate test table: %v", err)
+	}
+	defer DB.Migrator().DropTable(&TestTxTable{})
+
+	tx := DB.Begin()
+	if tx.Error != nil {
+		t.Fatalf("Failed to begin transaction: %v", tx.Error)
+	}
+
+	record := TestTxTable{Name: "test_rollback"}
+	if err := tx.Create(&record).Error; err != nil {
+		t.Errorf("Failed to create record in transaction: %v", err)
+	}
+
+	if err := tx.Rollback().Error; err != nil {
+		t.Errorf("Failed to rollback transaction: %v", err)
+	}
+
+	// Verify record doesn't exist using quoted column name
+	var count int64
+	if err := DB.Model(&TestTxTable{}).Where("\"name\" = ?", "test_rollback").Count(&count).Error; err != nil {
+		t.Errorf("Failed to count records: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("Expected 0 records after rollback, got %d", count)
+	}
+}
