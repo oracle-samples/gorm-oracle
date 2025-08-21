@@ -106,7 +106,7 @@ TestSupportedDialectorWithErrDuplicatedKey
 TestSupportedDialectorWithErrForeignKeyViolated
 #TestGenericsCreate
 TestGenericsCreateInBatches
-#TestGenericsExecAndUpdate
+TestGenericsExecAndUpdate
 TestGenericsRow
 TestGenericsDelete
 TestGenericsFindInBatches
