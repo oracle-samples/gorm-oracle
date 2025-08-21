@@ -38,6 +38,12 @@ TestPluginCallbacks
 TestCallbacksGet
 TestCallbacksRemove
 TestWithSingleConnection
+TestConnectionWithInvalidQuery
+TestNestedConnection
+TestMultipleSequentialConnections
+TestConnectionAfterDBClose
+TestConnectionHandlesPanic
+TestConcurrentConnections
 TestCountWithGroup
 TestCount
 TestCountOnEmptyTable
@@ -79,7 +85,7 @@ TestBlockGlobalDelete
 TestDeleteWithAssociations
 TestDeleteAssociationsWithUnscoped
 TestDeleteSliceWithAssociations
-#TestSoftDeleteReturning
+TestSoftDeleteReturning
 TestDeleteReturning
 TestDeleteByPrimaryKeyOnly
 TestHardDeleteAfterSoftDelete
