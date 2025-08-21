@@ -38,6 +38,16 @@ TestPluginCallbacks
 TestCallbacksGet
 TestCallbacksRemove
 TestWithSingleConnection
+TestTransactionCommitRollback
+TestConnectionAfterError
+TestConcurrentConnections
+TestContextTimeout
+TestLargeResultSet
+TestSessionInfo
+TestConnectionPing
+TestIntervalDataTypes
+TestConnectionPoolStats
+TestDatabaseVersionInfo
 TestCountWithGroup
 TestCount
 TestCountOnEmptyTable
