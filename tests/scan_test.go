@@ -305,9 +305,12 @@ func TestScanRowsNullValuesScanToFieldDefault(t *testing.T) {
 
 func TestScanToEmbedded(t *testing.T) {
 	if err := DB.Migrator().DropTable(&Person{}, &Address{}, &PersonAddress{}); err != nil {
-		fmt.Printf("===== %v", err)
+		fmt.Printf("--------- %v\n", err)
+	} else {
+		fmt.Println("--------- successfully drop tables")
 	}
-	if err := DB.AutoMigrate(&Person{}, &Address{}, &PersonAddress{}); err != nil {
+	fmt.Println("--------- start AutoMigrate()")
+	if err := DB.AutoMigrate(&PersonAddress{}); err != nil {
 		t.Fatalf("Failed to migrate, got %v", err)
 	}
 
