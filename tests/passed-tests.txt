@@ -38,6 +38,12 @@ TestPluginCallbacks
 TestCallbacksGet
 TestCallbacksRemove
 TestWithSingleConnection
+TestConnectionWithInvalidQuery
+TestNestedConnection
+TestMultipleSequentialConnections
+TestConnectionAfterDBClose
+TestConnectionHandlesPanic
+TestConcurrentConnections
 TestCountWithGroup
 TestCount
 TestCountOnEmptyTable
