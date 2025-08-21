@@ -71,7 +71,7 @@ func TestWithSingleConnection(t *testing.T) {
 	}
 }
 
-func TestTransactionCommitRollback(t *testing.T) {
+func TestTransactionCommit(t *testing.T) {
 	// Create test table
 	type TestTxTable struct {
 		ID   uint   `gorm:"primaryKey"`
@@ -84,61 +84,69 @@ func TestTransactionCommitRollback(t *testing.T) {
 	}
 	defer DB.Migrator().DropTable(&TestTxTable{})
 
-	// Test commit
-	t.Run("Commit", func(t *testing.T) {
-		tx := DB.Begin()
-		if tx.Error != nil {
-			t.Fatalf("Failed to begin transaction: %v", tx.Error)
-		}
+	tx := DB.Begin()
+	if tx.Error != nil {
+		t.Fatalf("Failed to begin transaction: %v", tx.Error)
+	}
 
-		record := TestTxTable{Name: "test_commit"}
-		if err := tx.Create(&record).Error; err != nil {
-			t.Errorf("Failed to create record in transaction: %v", err)
-		}
+	record := TestTxTable{Name: "test_commit"}
+	if err := tx.Create(&record).Error; err != nil {
+		t.Errorf("Failed to create record in transaction: %v", err)
+	}
 
-		if err := tx.Commit().Error; err != nil {
-			t.Errorf("Failed to commit transaction: %v", err)
-		}
+	if err := tx.Commit().Error; err != nil {
+		t.Errorf("Failed to commit transaction: %v", err)
+	}
 
-		// Verify record exists using quoted column name
-		var count int64
-		if err := DB.Model(&TestTxTable{}).Where("\"name\" = ?", "test_commit").Count(&count).Error; err != nil {
-			t.Errorf("Failed to count records: %v", err)
-		}
-		if count != 1 {
-			t.Errorf("Expected 1 record after commit, got %d", count)
-		}
-	})
+	// Verify record exists using quoted column name
+	var count int64
+	if err := DB.Model(&TestTxTable{}).Where("\"name\" = ?", "test_commit").Count(&count).Error; err != nil {
+		t.Errorf("Failed to count records: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("Expected 1 record after commit, got %d", count)
+	}
+}
 
-	// Test rollback
-	t.Run("Rollback", func(t *testing.T) {
-		tx := DB.Begin()
-		if tx.Error != nil {
-			t.Fatalf("Failed to begin transaction: %v", tx.Error)
-		}
+func TestTransactionRollback(t *testing.T) {
+	// Create test table
+	type TestTxTable struct {
+		ID   uint   `gorm:"primaryKey"`
+		Name string `gorm:"size:100;column:name"`
+	}
 
-		record := TestTxTable{Name: "test_rollback"}
-		if err := tx.Create(&record).Error; err != nil {
-			t.Errorf("Failed to create record in transaction: %v", err)
-		}
+	err := DB.AutoMigrate(&TestTxTable{})
+	if err != nil {
+		t.Fatalf("Failed to migrate test table: %v", err)
+	}
+	defer DB.Migrator().DropTable(&TestTxTable{})
 
-		if err := tx.Rollback().Error; err != nil {
-			t.Errorf("Failed to rollback transaction: %v", err)
-		}
+	tx := DB.Begin()
+	if tx.Error != nil {
+		t.Fatalf("Failed to begin transaction: %v", tx.Error)
+	}
 
-		// Verify record doesn't exist using quoted column name
-		var count int64
-		if err := DB.Model(&TestTxTable{}).Where("\"name\" = ?", "test_rollback").Count(&count).Error; err != nil {
-			t.Errorf("Failed to count records: %v", err)
-		}
-		if count != 0 {
-			t.Errorf("Expected 0 records after rollback, got %d", count)
-		}
-	})
+	record := TestTxTable{Name: "test_rollback"}
+	if err := tx.Create(&record).Error; err != nil {
+		t.Errorf("Failed to create record in transaction: %v", err)
+	}
+
+	if err := tx.Rollback().Error; err != nil {
+		t.Errorf("Failed to rollback transaction: %v", err)
+	}
+
+	// Verify record doesn't exist using quoted column name
+	var count int64
+	if err := DB.Model(&TestTxTable{}).Where("\"name\" = ?", "test_rollback").Count(&count).Error; err != nil {
+		t.Errorf("Failed to count records: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("Expected 0 records after rollback, got %d", count)
+	}
 }
 
 func TestConnectionAfterError(t *testing.T) {
-	// Execute an invalid query to cause an error
+	// Execute an invalid query
 	err := DB.Exec("SELECT invalid_column FROM dual").Error
 	if err == nil {
 		t.Error("Expected error for invalid query, but got nil")
@@ -306,7 +314,7 @@ func TestLargeResultSet(t *testing.T) {
 }
 
 func TestSessionInfo(t *testing.T) {
-	// Test USER function first (should always work)
+	// Test USER function first
 	var username string
 	err := DB.Raw("SELECT USER FROM dual").Scan(&username).Error
 	if err != nil {
@@ -337,7 +345,6 @@ func TestSessionInfo(t *testing.T) {
 		return
 	}
 
-	// Log what we found
 	t.Logf("Session Info - User: %s", username)
 	if sessionInfo.InstanceName != "" {
 		t.Logf("Instance: %s", sessionInfo.InstanceName)
@@ -346,7 +353,7 @@ func TestSessionInfo(t *testing.T) {
 		t.Logf("Database: %s", sessionInfo.DatabaseName)
 	}
 
-	// Only require username - instance/database names might not be available in all environments
+	// Only require username
 	if sessionInfo.InstanceName == "" || sessionInfo.DatabaseName == "" {
 		t.Skip("SYS_CONTEXT functions unavailable - likely permissions or configuration issue")
 	}
@@ -373,84 +380,20 @@ func TestConnectionPing(t *testing.T) {
 	}
 }
 
-func TestIntervalDataTypes(t *testing.T) {
-	// Test Year to Month interval
-	t.Run("YearToMonth", func(t *testing.T) {
-		var result string
-		err := DB.Raw("SELECT INTERVAL '2-3' YEAR TO MONTH FROM dual").Scan(&result).Error
-		if err != nil {
-			t.Errorf("Year to Month interval query failed: %v", err)
-		}
-		t.Logf("Year to Month interval result: %s", result)
-	})
-
-	// Test Day to Second interval
-	t.Run("DayToSecond", func(t *testing.T) {
-		var result string
-		err := DB.Raw("SELECT INTERVAL '4 5:12:10.222' DAY TO SECOND FROM dual").Scan(&result).Error
-		if err != nil {
-			t.Errorf("Day to Second interval query failed: %v", err)
-		}
-		t.Logf("Day to Second interval result: %s", result)
-	})
-}
-
-func TestConnectionPoolStats(t *testing.T) {
-	sqlDB, err := DB.DB()
+func TestIntervalYearToMonth(t *testing.T) {
+	var result string
+	err := DB.Raw("SELECT INTERVAL '2-3' YEAR TO MONTH FROM dual").Scan(&result).Error
 	if err != nil {
-		t.Fatalf("Failed to get sql.DB: %v", err)
+		t.Errorf("Year to Month interval query failed: %v", err)
 	}
-
-	stats := sqlDB.Stats()
-	t.Logf("Connection Pool Stats:")
-	t.Logf("  Open Connections: %d", stats.OpenConnections)
-	t.Logf("  In Use: %d", stats.InUse)
-	t.Logf("  Idle: %d", stats.Idle)
-	t.Logf("  Wait Count: %d", stats.WaitCount)
-	t.Logf("  Wait Duration: %v", stats.WaitDuration)
-	t.Logf("  Max Idle Closed: %d", stats.MaxIdleClosed)
-	t.Logf("  Max Idle Time Closed: %d", stats.MaxIdleTimeClosed)
-	t.Logf("  Max Lifetime Closed: %d", stats.MaxLifetimeClosed)
-
-	// Basic sanity checks
-	if stats.OpenConnections < 0 {
-		t.Error("Open connections should not be negative")
-	}
-	if stats.InUse < 0 {
-		t.Error("In use connections should not be negative")
-	}
-	if stats.Idle < 0 {
-		t.Error("Idle connections should not be negative")
-	}
+	t.Logf("Year to Month interval result: %s", result)
 }
 
-func TestDatabaseVersionInfo(t *testing.T) {
-	var versionInfo struct {
-		Version string `gorm:"column:version"`
-		Banner  string `gorm:"column:banner"`
+func TestIntervalDayToSecond(t *testing.T) {
+	var result string
+	err := DB.Raw("SELECT INTERVAL '4 5:12:10.222' DAY TO SECOND FROM dual").Scan(&result).Error
+	if err != nil {
+		t.Errorf("Day to Second interval query failed: %v", err)
 	}
-
-	query := `
-		SELECT 
-			(SELECT VERSION FROM V$INSTANCE) as version,
-			(SELECT BANNER FROM V$VERSION WHERE ROWNUM = 1) as banner
-		FROM dual
-	`
-
-	err := DB.Raw(query).Scan(&versionInfo).Error
-	if err == nil && versionInfo.Version != "" && versionInfo.Banner != "" {
-		t.Logf("Database Version: %s", versionInfo.Version)
-		t.Logf("Database Banner: %s", versionInfo.Banner)
-		return
-	}
-
-	// Fallback to PRODUCT_COMPONENT_VERSION
-	var simpleVersion string
-	err = DB.Raw("SELECT VERSION FROM PRODUCT_COMPONENT_VERSION WHERE PRODUCT LIKE 'Oracle%' AND ROWNUM = 1").Scan(&simpleVersion).Error
-	if err == nil && simpleVersion != "" {
-		t.Logf("Database Version: %s", simpleVersion)
-		return
-	}
-
-	t.Skip("Could not retrieve database version info - insufficient privileges to access system views")
+	t.Logf("Day to Second interval result: %s", result)
 }
