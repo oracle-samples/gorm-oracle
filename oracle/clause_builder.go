@@ -300,7 +300,6 @@ func OnConflictClauseBuilder(c clause.Clause, builder clause.Builder) {
 			if len(conflictColumns) == 0 {
 				// If no columns specified, try to use primary key fields as default
 				if stmt.Schema == nil || len(stmt.Schema.PrimaryFields) == 0 {
-					stmt.AddError(fmt.Errorf("OnConflict requires either explicit columns or primary key fields"))
 					return
 				}
 				for _, primaryField := range stmt.Schema.PrimaryFields {

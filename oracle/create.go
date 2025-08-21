@@ -219,7 +219,6 @@ func buildBulkInsertPLSQL(db *gorm.DB, createValues clause.Values) {
 		conflictColumns := onConflict.Columns
 		if len(conflictColumns) == 0 {
 			if len(schema.PrimaryFields) == 0 {
-				db.AddError(fmt.Errorf("OnConflict requires either explicit columns or primary key fields"))
 				return
 			}
 			for _, primaryField := range schema.PrimaryFields {
@@ -255,7 +254,6 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 	conflictColumns := onConflict.Columns
 	if len(conflictColumns) == 0 {
 		if schema == nil || len(schema.PrimaryFields) == 0 {
-			db.AddError(fmt.Errorf("OnConflict requires either explicit columns or primary key fields"))
 			return
 		}
 		for _, primaryField := range schema.PrimaryFields {

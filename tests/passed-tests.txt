@@ -142,7 +142,7 @@ TestHooksForSlice
 TestFailedToSaveAssociationShouldRollback
 TestUpdateCallbacks
 TestPropagateUnscoped
-#TestOverrideJoinTable
+TestOverrideJoinTable
 TestJoins
 TestJoinsForSlice
 TestJoinConds
