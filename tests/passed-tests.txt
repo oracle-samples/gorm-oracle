@@ -48,6 +48,13 @@ TestConnectionPing
 TestIntervalDataTypes
 TestConnectionPoolStats
 TestDatabaseVersionInfo
+TestConnectionPooling
+TestPoolConfiguration
+TestBasicPoolOperations
+TestPoolExhaustion
+TestConcurrentDatabaseOperations
+TestPoolConnectionRecovery
+TestPoolLifecycleManagement
 TestCountWithGroup
 TestCount
 TestCountOnEmptyTable
