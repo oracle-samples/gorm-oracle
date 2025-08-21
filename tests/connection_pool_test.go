@@ -24,7 +24,6 @@ type TestCategory struct {
 }
 
 func TestConnectionPooling(t *testing.T) {
-	t.Skip()
 	setupConnectionPoolTestTables(t)
 
 	sqlDB, err := DB.DB()
@@ -95,7 +94,7 @@ func TestConnectionPooling(t *testing.T) {
 				case 2:
 					// Long-running query (simulate connection hold)
 					var products []TestProduct
-					err := DB.Raw("SELECT * FROM test_products WHERE ROWNUM <= 10").Scan(&products).Error
+					err := DB.Raw("SELECT * FROM \"test_products\" WHERE ROWNUM <= 10").Scan(&products).Error
 					time.Sleep(100 * time.Millisecond)
 					if err != nil {
 						results <- fmt.Sprintf("Goroutine %d LONG-QUERY failed: %v", id, err)
