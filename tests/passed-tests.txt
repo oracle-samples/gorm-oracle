@@ -111,7 +111,7 @@ TestGenericsRow
 TestGenericsDelete
 TestGenericsFindInBatches
 TestGenericsScopes
-#TestGenericsJoins
+TestGenericsJoins
 TestGenericsNestedJoins
 TestGenericsPreloads
 TestGenericsNestedPreloads
