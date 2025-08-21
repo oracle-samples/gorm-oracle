@@ -66,7 +66,6 @@ type PersonAddress struct {
 }
 
 func TestOverrideJoinTable(t *testing.T) {
-	t.Skip()
 	DB.Migrator().DropTable(&Person{}, &Address{}, &PersonAddress{})
 
 	if err := DB.SetupJoinTable(&Person{}, "Addresses", &PersonAddress{}); err != nil {
@@ -95,7 +94,7 @@ func TestOverrideJoinTable(t *testing.T) {
 		t.Fatalf("Should have one address left")
 	}
 
-	if DB.Find(&[]PersonAddress{}, "person_id = ?", person.ID).RowsAffected != 1 {
+	if DB.Find(&[]PersonAddress{}, "\"person_id\" = ?", person.ID).RowsAffected != 1 {
 		t.Fatalf("Should found one address")
 	}
 
@@ -113,7 +112,7 @@ func TestOverrideJoinTable(t *testing.T) {
 		t.Fatalf("Failed to find address, got error %v, length: %v", err, len(addresses3))
 	}
 
-	if DB.Unscoped().Find(&[]PersonAddress{}, "person_id = ?", person.ID).RowsAffected != 2 {
+	if DB.Unscoped().Find(&[]PersonAddress{}, "\"person_id\" = ?", person.ID).RowsAffected != 2 {
 		t.Fatalf("Should found soft deleted addresses with unscoped")
 	}
 
