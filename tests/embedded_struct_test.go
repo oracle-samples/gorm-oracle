@@ -332,20 +332,20 @@ func TestZeroValueEmbeddedStruct(t *testing.T) {
 		City  string
 		State string
 	}
-	type User struct {
+	type UserWithAddress struct {
 		ID      uint
 		Address Address `gorm:"embedded"`
 	}
 
-	DB.Migrator().DropTable(&User{})
-	err := DB.Migrator().AutoMigrate(&User{})
+	DB.Migrator().DropTable(&UserWithAddress{})
+	err := DB.Migrator().AutoMigrate(&UserWithAddress{})
 	tests.AssertEqual(t, err, nil)
 
-	user := User{}
+	user := UserWithAddress{}
 	err = DB.Save(&user).Error
 	tests.AssertEqual(t, err, nil)
 
-	var loaded User
+	var loaded UserWithAddress
 	err = DB.First(&loaded, user.ID).Error
 	tests.AssertEqual(t, err, nil)
 
@@ -359,24 +359,23 @@ func TestUpdateEmbeddedFields(t *testing.T) {
 		City  string
 		State string
 	}
-	type User struct {
+	type UserWithAddress struct {
 		ID      uint
 		Address Address `gorm:"embedded"`
 	}
 
-	DB.Migrator().DropTable(&User{})
-	err := DB.Migrator().AutoMigrate(&User{})
+	DB.Migrator().DropTable(&UserWithAddress{})
+	err := DB.Migrator().AutoMigrate(&UserWithAddress{})
 	tests.AssertEqual(t, err, nil)
 
-	user := User{Address: Address{City: "Austin", State: "TX"}}
+	user := UserWithAddress{Address: Address{City: "Austin", State: "TX"}}
 	err = DB.Save(&user).Error
 	tests.AssertEqual(t, err, nil)
 
-	// Update embedded field only
-	err = DB.Model(&user).Updates(User{Address: Address{City: "Houston"}}).Error
+	err = DB.Model(&user).Updates(UserWithAddress{Address: Address{City: "Houston"}}).Error
 	tests.AssertEqual(t, err, nil)
 
-	var loaded User
+	var loaded UserWithAddress
 	err = DB.First(&loaded, user.ID).Error
 	tests.AssertEqual(t, err, nil)
 
