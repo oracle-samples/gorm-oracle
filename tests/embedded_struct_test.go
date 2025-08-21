@@ -326,3 +326,60 @@ func TestEmbeddedTagSetting(t *testing.T) {
 		t.Errorf("embedded struct's primary field should be rewritten")
 	}
 }
+
+func TestZeroValueEmbeddedStruct(t *testing.T) {
+	type Address struct {
+		City  string
+		State string
+	}
+	type UserWithAddress struct {
+		ID      uint
+		Address Address `gorm:"embedded"`
+	}
+
+	DB.Migrator().DropTable(&UserWithAddress{})
+	err := DB.Migrator().AutoMigrate(&UserWithAddress{})
+	tests.AssertEqual(t, err, nil)
+
+	user := UserWithAddress{}
+	err = DB.Save(&user).Error
+	tests.AssertEqual(t, err, nil)
+
+	var loaded UserWithAddress
+	err = DB.First(&loaded, user.ID).Error
+	tests.AssertEqual(t, err, nil)
+
+	if loaded.Address.City != "" || loaded.Address.State != "" {
+		t.Errorf("expected zero values for embedded struct fields, got: %+v", loaded.Address)
+	}
+}
+
+func TestUpdateEmbeddedFields(t *testing.T) {
+	type Address struct {
+		City  string
+		State string
+	}
+	type UserWithAddress struct {
+		ID      uint
+		Address Address `gorm:"embedded"`
+	}
+
+	DB.Migrator().DropTable(&UserWithAddress{})
+	err := DB.Migrator().AutoMigrate(&UserWithAddress{})
+	tests.AssertEqual(t, err, nil)
+
+	user := UserWithAddress{Address: Address{City: "Austin", State: "TX"}}
+	err = DB.Save(&user).Error
+	tests.AssertEqual(t, err, nil)
+
+	err = DB.Model(&user).Updates(UserWithAddress{Address: Address{City: "Houston"}}).Error
+	tests.AssertEqual(t, err, nil)
+
+	var loaded UserWithAddress
+	err = DB.First(&loaded, user.ID).Error
+	tests.AssertEqual(t, err, nil)
+
+	if loaded.Address.City != "Houston" {
+		t.Errorf("embedded field not updated: expected Houston, got %s", loaded.Address.City)
+	}
+}
