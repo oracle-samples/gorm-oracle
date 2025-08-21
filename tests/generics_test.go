@@ -151,7 +151,6 @@ func TestGenericsCreateInBatches(t *testing.T) {
 }
 
 func TestGenericsExecAndUpdate(t *testing.T) {
-	t.Skip()
 	ctx := context.Background()
 
 	name := "GenericsExec"
@@ -159,7 +158,7 @@ func TestGenericsExecAndUpdate(t *testing.T) {
 		t.Fatalf("Exec insert failed: %v", err)
 	}
 
-	u, err := gorm.G[User](DB).Table("\"users\" u").Where("u.name = ?", name).First(ctx)
+	u, err := gorm.G[User](DB).Table("\"users\" \"u\"").Where("\"u\".\"name\" = ?", name).First(ctx)
 	if err != nil {
 		t.Fatalf("failed to find user, got error: %v", err)
 	} else if u.Name != name || u.ID == 0 {
