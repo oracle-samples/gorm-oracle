@@ -93,6 +93,22 @@ func Delete(db *gorm.DB) {
 		addPrimaryKeyWhereClause(db)
 	}
 
+	// redirect soft-delete to update clause with bulk returning
+	if stmt.Schema != nil {
+		if deletedAtField := stmt.Schema.LookUpField("deleted_at"); deletedAtField != nil && !stmt.Unscoped {
+			for _, c := range stmt.Schema.DeleteClauses {
+				stmt.AddClause(c)
+			}
+			delete(stmt.Clauses, "DELETE")
+			delete(stmt.Clauses, "FROM")
+			stmt.SQL.Reset()
+			stmt.Vars = stmt.Vars[:0]
+			stmt.AddClauseIfNotExists(clause.Update{})
+			Update(db)
+			return
+		}
+	}
+
 	// This prevents soft deletes from bypassing the safety check
 	checkMissingWhereConditions(db)
 	if db.Error != nil {
@@ -432,25 +448,7 @@ func executeDelete(db *gorm.DB) {
 	_, hasReturning := stmt.Clauses["RETURNING"]
 
 	if hasReturning {
-		// For RETURNING, we need to check if it's a soft delete or hard delete
-		if stmt.Schema != nil {
-			if deletedAtField := stmt.Schema.LookUpField("deleted_at"); deletedAtField != nil && !stmt.Unscoped {
-				// Soft delete with RETURNING - use QueryContext
-				if rows, err := stmt.ConnPool.QueryContext(stmt.Context, stmt.SQL.String(), stmt.Vars...); err == nil {
-					defer rows.Close()
-					gorm.Scan(rows, db, gorm.ScanInitialized)
-
-					if stmt.Result != nil {
-						stmt.Result.RowsAffected = db.RowsAffected
-					}
-				} else {
-					db.AddError(err)
-				}
-				return
-			}
-		}
-
-		// Hard delete with RETURNING - use ExecContext (for PL/SQL blocks)
+		// Hard delete & soft delete with RETURNING - use ExecContext (for PL/SQL blocks)
 		result, err := stmt.ConnPool.ExecContext(stmt.Context, stmt.SQL.String(), stmt.Vars...)
 		if err == nil {
 			db.RowsAffected, _ = result.RowsAffected()

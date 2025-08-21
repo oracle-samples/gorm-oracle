@@ -1037,7 +1037,6 @@ func TestNestedManyToManyPreload2(t *testing.T) {
 }
 
 func TestNestedManyToManyPreload3(t *testing.T) {
-	t.Skip()
 	type (
 		Level1 struct {
 			ID    uint
@@ -1099,7 +1098,7 @@ func TestNestedManyToManyPreload3(t *testing.T) {
 
 	var gots []*Level3
 	if err := DB.Preload("Level2.Level1s", func(db *gorm.DB) *gorm.DB {
-		return db.Order("level1.id ASC")
+		return db.Order("\"level1\".\"id\" ASC")
 	}).Find(&gots).Error; err != nil {
 		t.Error(err)
 	}
@@ -1110,7 +1109,6 @@ func TestNestedManyToManyPreload3(t *testing.T) {
 }
 
 func TestNestedManyToManyPreload3ForStruct(t *testing.T) {
-	t.Skip()
 	type (
 		Level1 struct {
 			ID    uint
@@ -1173,7 +1171,7 @@ func TestNestedManyToManyPreload3ForStruct(t *testing.T) {
 
 	var gots []*Level3
 	if err := DB.Preload("Level2.Level1s", func(db *gorm.DB) *gorm.DB {
-		return db.Order("level1.id ASC")
+		return db.Order("\"level1\".\"id\" ASC")
 	}).Find(&gots).Error; err != nil {
 		t.Error(err)
 	}

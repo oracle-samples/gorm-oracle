@@ -41,6 +41,8 @@ package tests
 import (
 	"context"
 	"fmt"
+	"log"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -151,6 +153,64 @@ func TestConnectionAfterError(t *testing.T) {
 	if result != "connection_works" {
 		t.Errorf("Expected 'connection_works', got '%s'", result)
 	}
+}
+
+func TestConnectionWithInvalidQuery(t *testing.T) {
+	err := DB.Connection(func(tx *gorm.DB) error {
+		return tx.Exec("SELECT * FROM non_existent_table").Error
+	})
+	if err == nil {
+		t.Fatalf("Expected error for invalid query in Connection, got nil")
+	}
+}
+
+func TestMultipleSequentialConnections(t *testing.T) {
+	for i := 0; i < 20; i++ {
+		var val int
+		err := DB.Connection(func(tx *gorm.DB) error {
+			return tx.Raw("SELECT 1 FROM dual").Scan(&val).Error
+		})
+		if err != nil {
+			t.Fatalf("Sequential Connection #%d failed: %v", i+1, err)
+		}
+		if val != 1 {
+			t.Fatalf("Sequential Connection #%d got wrong result: %v", i+1, val)
+		}
+	}
+}
+
+func TestConnectionAfterDBClose(t *testing.T) {
+	sqlDB, err := DB.DB()
+	if err != nil {
+		t.Fatalf("DB.DB() should not fail, got: %v", err)
+	}
+	err = sqlDB.Close()
+	if err != nil {
+		t.Fatalf("sqlDB.Close() failed: %v", err)
+	}
+	cerr := DB.Connection(func(tx *gorm.DB) error {
+		var v int
+		return tx.Raw("SELECT 1 FROM dual").Scan(&v).Error
+	})
+	if cerr == nil {
+		t.Fatalf("Expected error when calling Connection after DB closed, got nil")
+	}
+	if DB, err = OpenTestConnection(&gorm.Config{Logger: newLogger}); err != nil {
+		log.Printf("failed to connect database, got error %v", err)
+		os.Exit(1)
+	}
+}
+
+func TestConnectionHandlesPanic(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatalf("Expected panic inside Connection, but none occurred")
+		}
+	}()
+	DB.Connection(func(tx *gorm.DB) error {
+		panic("panic in connection callback")
+	})
+	t.Fatalf("Should have panicked inside connection callback")
 }
 
 func TestConcurrentConnections(t *testing.T) {

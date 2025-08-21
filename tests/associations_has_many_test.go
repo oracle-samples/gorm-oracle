@@ -47,23 +47,22 @@ import (
 )
 
 func TestHasManyAssociation(t *testing.T) {
-	t.Skip()
 	user := *GetUser("hasmany", Config{Pets: 2})
 
 	if err := DB.Create(&user).Error; err != nil {
 		t.Fatalf("errors happened when create: %v", err)
 	}
 
-	CheckUser(t, user, user)
+	CheckUserSkipUpdatedAt(t, user, user)
 
 	// Find
 	var user2 User
-	DB.Find(&user2, "id = ?", user.ID)
+	DB.Find(&user2, "\"id\" = ?", user.ID)
 	DB.Model(&user2).Association("Pets").Find(&user2.Pets)
-	CheckUser(t, user2, user)
+	CheckUserSkipUpdatedAt(t, user2, user)
 
 	var pets []Pet
-	DB.Model(&user).Where("name = ?", user.Pets[0].Name).Association("Pets").Find(&pets)
+	DB.Model(&user).Where("\"name\" = ?", user.Pets[0].Name).Association("Pets").Find(&pets)
 
 	if len(pets) != 1 {
 		t.Fatalf("should only find one pets, but got %v", len(pets))
@@ -71,11 +70,11 @@ func TestHasManyAssociation(t *testing.T) {
 
 	CheckPet(t, pets[0], *user.Pets[0])
 
-	if count := DB.Model(&user).Where("name = ?", user.Pets[1].Name).Association("Pets").Count(); count != 1 {
+	if count := DB.Model(&user).Where("\"name\" = ?", user.Pets[1].Name).Association("Pets").Count(); count != 1 {
 		t.Fatalf("should only find one pets, but got %v", count)
 	}
 
-	if count := DB.Model(&user).Where("name = ?", "not found").Association("Pets").Count(); count != 0 {
+	if count := DB.Model(&user).Where("\"name\" = ?", "not found").Association("Pets").Count(); count != 0 {
 		t.Fatalf("should only find no pet with invalid conditions, but got %v", count)
 	}
 
@@ -94,7 +93,7 @@ func TestHasManyAssociation(t *testing.T) {
 	}
 
 	user.Pets = append(user.Pets, &pet)
-	CheckUser(t, user2, user)
+	CheckUserSkipUpdatedAt(t, user2, user)
 
 	AssertAssociationCount(t, user, "Pets", 3, "AfterAppend")
 
@@ -113,7 +112,7 @@ func TestHasManyAssociation(t *testing.T) {
 		user.Pets = append(user.Pets, &pet)
 	}
 
-	CheckUser(t, user2, user)
+	CheckUserSkipUpdatedAt(t, user2, user)
 
 	AssertAssociationCount(t, user, "Pets", 5, "AfterAppendSlice")
 
@@ -129,7 +128,7 @@ func TestHasManyAssociation(t *testing.T) {
 	}
 
 	user.Pets = []*Pet{&pet2}
-	CheckUser(t, user2, user)
+	CheckUserSkipUpdatedAt(t, user2, user)
 
 	AssertAssociationCount(t, user2, "Pets", 1, "AfterReplace")
 
@@ -160,20 +159,19 @@ func TestHasManyAssociation(t *testing.T) {
 }
 
 func TestSingleTableHasManyAssociation(t *testing.T) {
-	t.Skip()
 	user := *GetUser("hasmany", Config{Team: 2})
 
 	if err := DB.Create(&user).Error; err != nil {
 		t.Fatalf("errors happened when create: %v", err)
 	}
 
-	CheckUser(t, user, user)
+	CheckUserSkipUpdatedAt(t, user, user)
 
 	// Find
 	var user2 User
-	DB.Find(&user2, "id = ?", user.ID)
+	DB.Find(&user2, "\"id\" = ?", user.ID)
 	DB.Model(&user2).Association("Team").Find(&user2.Team)
-	CheckUser(t, user2, user)
+	CheckUserSkipUpdatedAt(t, user2, user)
 
 	// Count
 	AssertAssociationCount(t, user, "Team", 2, "")
@@ -190,7 +188,7 @@ func TestSingleTableHasManyAssociation(t *testing.T) {
 	}
 
 	user.Team = append(user.Team, team)
-	CheckUser(t, user2, user)
+	CheckUserSkipUpdatedAt(t, user2, user)
 
 	AssertAssociationCount(t, user, "Team", 3, "AfterAppend")
 
@@ -209,7 +207,7 @@ func TestSingleTableHasManyAssociation(t *testing.T) {
 		user.Team = append(user.Team, team)
 	}
 
-	CheckUser(t, user2, user)
+	CheckUserSkipUpdatedAt(t, user2, user)
 
 	AssertAssociationCount(t, user, "Team", 5, "AfterAppendSlice")
 
@@ -225,7 +223,7 @@ func TestSingleTableHasManyAssociation(t *testing.T) {
 	}
 
 	user.Team = []User{team2}
-	CheckUser(t, user2, user)
+	CheckUserSkipUpdatedAt(t, user2, user)
 
 	AssertAssociationCount(t, user2, "Team", 1, "AfterReplace")
 
@@ -256,7 +254,6 @@ func TestSingleTableHasManyAssociation(t *testing.T) {
 }
 
 func TestHasManyAssociationForSlice(t *testing.T) {
-	t.Skip()
 	users := []User{
 		*GetUser("slice-hasmany-1", Config{Pets: 2}),
 		*GetUser("slice-hasmany-2", Config{Pets: 0}),
@@ -311,7 +308,6 @@ func TestHasManyAssociationForSlice(t *testing.T) {
 }
 
 func TestSingleTableHasManyAssociationForSlice(t *testing.T) {
-	t.Skip()
 	users := []User{
 		*GetUser("slice-hasmany-1", Config{Team: 2}),
 		*GetUser("slice-hasmany-2", Config{Team: 0}),
@@ -368,20 +364,19 @@ func TestSingleTableHasManyAssociationForSlice(t *testing.T) {
 }
 
 func TestPolymorphicHasManyAssociation(t *testing.T) {
-	t.Skip()
 	user := *GetUser("hasmany", Config{Toys: 2})
 
 	if err := DB.Create(&user).Error; err != nil {
 		t.Fatalf("errors happened when create: %v", err)
 	}
 
-	CheckUser(t, user, user)
+	CheckUserSkipUpdatedAt(t, user, user)
 
 	// Find
 	var user2 User
-	DB.Find(&user2, "id = ?", user.ID)
+	DB.Find(&user2, "\"id\" = ?", user.ID)
 	DB.Model(&user2).Association("Toys").Find(&user2.Toys)
-	CheckUser(t, user2, user)
+	CheckUserSkipUpdatedAt(t, user2, user)
 
 	// Count
 	AssertAssociationCount(t, user, "Toys", 2, "")
@@ -398,7 +393,7 @@ func TestPolymorphicHasManyAssociation(t *testing.T) {
 	}
 
 	user.Toys = append(user.Toys, toy)
-	CheckUser(t, user2, user)
+	CheckUserSkipUpdatedAt(t, user2, user)
 
 	AssertAssociationCount(t, user, "Toys", 3, "AfterAppend")
 
@@ -417,7 +412,7 @@ func TestPolymorphicHasManyAssociation(t *testing.T) {
 		user.Toys = append(user.Toys, toy)
 	}
 
-	CheckUser(t, user2, user)
+	CheckUserSkipUpdatedAt(t, user2, user)
 
 	AssertAssociationCount(t, user, "Toys", 5, "AfterAppendSlice")
 
@@ -433,7 +428,7 @@ func TestPolymorphicHasManyAssociation(t *testing.T) {
 	}
 
 	user.Toys = []Toy{toy2}
-	CheckUser(t, user2, user)
+	CheckUserSkipUpdatedAt(t, user2, user)
 
 	AssertAssociationCount(t, user2, "Toys", 1, "AfterReplace")
 
@@ -464,7 +459,6 @@ func TestPolymorphicHasManyAssociation(t *testing.T) {
 }
 
 func TestPolymorphicHasManyAssociationForSlice(t *testing.T) {
-	t.Skip()
 	users := []User{
 		*GetUser("slice-hasmany-1", Config{Toys: 2}),
 		*GetUser("slice-hasmany-2", Config{Toys: 0, Tools: 2}),
@@ -601,8 +595,7 @@ func TestHasManyAssociationUnscoped(t *testing.T) {
 }
 
 func TestHasManyAssociationReplaceWithNonValidValue(t *testing.T) {
-	t.Skip()
-	user := User{Name: "jinzhu", Languages: []Language{{Name: "EN"}}}
+	user := User{Name: "jinzhu", Languages: []Language{{Code: "EN", Name: "EN"}}}
 
 	if err := DB.Create(&user).Error; err != nil {
 		t.Fatalf("errors happened when create: %v", err)

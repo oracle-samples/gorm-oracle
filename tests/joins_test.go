@@ -252,8 +252,6 @@ func TestJoinCount(t *testing.T) {
 }
 
 func TestJoinWithSoftDeleted(t *testing.T) {
-	t.Skip()
-
 	user := GetUser("TestJoinWithSoftDeletedUser", Config{Account: true, NamedPet: true})
 	DB.Create(&user)
 
