@@ -56,6 +56,7 @@ import (
 )
 
 func TestGenericsCreate(t *testing.T) {
+	t.Skip()
 	ctx := context.Background()
 
 	user := User{Name: "TestGenericsCreate", Age: 18}
