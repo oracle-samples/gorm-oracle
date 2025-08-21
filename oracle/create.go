@@ -289,9 +289,7 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 
 	// Start PL/SQL block
 	plsqlBuilder.WriteString("DECLARE\n")
-	plsqlBuilder.WriteString("  TYPE t_records IS TABLE OF ")
-	writeQuotedIdentifier(&plsqlBuilder, stmt.Table)
-	plsqlBuilder.WriteString("%ROWTYPE;\n")
+	writeTableRecordCollectionDecl(&plsqlBuilder, stmt.Schema.DBNames, stmt.Table)
 	plsqlBuilder.WriteString("  l_affected_records t_records;\n")
 
 	// Create array types and variables for each column
@@ -549,9 +547,7 @@ func buildBulkInsertOnlyPLSQL(db *gorm.DB, createValues clause.Values) {
 
 	// Start PL/SQL block
 	plsqlBuilder.WriteString("DECLARE\n")
-	plsqlBuilder.WriteString("  TYPE t_records IS TABLE OF ")
-	writeQuotedIdentifier(&plsqlBuilder, stmt.Table)
-	plsqlBuilder.WriteString("%ROWTYPE;\n")
+	writeTableRecordCollectionDecl(&plsqlBuilder, stmt.Schema.DBNames, stmt.Table)
 	plsqlBuilder.WriteString("  l_inserted_records t_records;\n")
 
 	// Create array types and variables for each column
@@ -814,19 +810,6 @@ func handleSingleRowReturning(db *gorm.DB) {
 	}
 }
 
-// Simplified RETURNING clause addition for single row operations
-func addReturningClause(db *gorm.DB, fields []*schema.Field) {
-	if len(fields) == 0 {
-		return
-	}
-
-	columns := make([]clause.Column, len(fields))
-	for idx, field := range fields {
-		columns[idx] = clause.Column{Name: field.DBName}
-	}
-	db.Statement.AddClauseIfNotExists(clause.Returning{Columns: columns})
-}
-
 // Handle bulk RETURNING results for PL/SQL operations
 func getBulkReturningValues(db *gorm.DB, rowCount int) {
 	if db.Statement.Schema == nil {
@@ -946,6 +929,11 @@ func handleLastInsertId(db *gorm.DB, result sql.Result) {
 		}
 	}
 }
+
+// This replaces expressions (clause.Expr) in bulk insert values
+// with appropriate NULL placeholders based on the column's data type. This ensures that
+// PL/SQL array binding remains consistent and avoids unsupported expressions during
+// FORALL bulk operations.
 func sanitizeCreateValuesForBulkArrays(stmt *gorm.Statement, cv *clause.Values) {
 	for r := range cv.Values {
 		for c, col := range cv.Columns {
@@ -955,7 +943,7 @@ func sanitizeCreateValuesForBulkArrays(stmt *gorm.Statement, cv *clause.Values) 
 				if f := findFieldByDBName(stmt.Schema, col.Name); f != nil {
 					switch f.DataType {
 					case schema.Int, schema.Uint:
-						cv.Values[r][c] = sql.NullInt64{} // NULL
+						cv.Values[r][c] = sql.NullInt64{}
 					case schema.Float:
 						cv.Values[r][c] = sql.NullFloat64{}
 					case schema.String:

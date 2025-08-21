@@ -1109,7 +1109,6 @@ func TestNestedManyToManyPreload3(t *testing.T) {
 }
 
 func TestNestedManyToManyPreload3ForStruct(t *testing.T) {
-	t.Skip()
 	type (
 		Level1 struct {
 			ID    uint

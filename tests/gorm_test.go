@@ -54,7 +54,6 @@ func TestOpen(t *testing.T) {
 }
 
 func TestReturningWithNullToZeroValues(t *testing.T) {
-	t.Skip()
 	// This user struct will leverage the existing users table, but override
 	// the Name field to default to null.
 	type user struct {
@@ -72,7 +71,7 @@ func TestReturningWithNullToZeroValues(t *testing.T) {
 	}
 
 	got := user{}
-	results := DB.First(&got, "id = ?", u1.ID)
+	results := DB.First(&got, "\"id\" = ?", u1.ID)
 	if results.Error != nil {
 		t.Fatalf("errors happened on first: %v", results.Error)
 	} else if results.RowsAffected != 1 {
@@ -81,7 +80,7 @@ func TestReturningWithNullToZeroValues(t *testing.T) {
 		t.Fatalf("first expects: %v, got %v", u1, got)
 	}
 
-	results = DB.Select("id, name").Find(&got)
+	results = DB.Select("\"id\", \"name\"").Find(&got)
 	if results.Error != nil {
 		t.Fatalf("errors happened on first: %v", results.Error)
 	} else if results.RowsAffected != 1 {
@@ -112,7 +111,7 @@ func TestReturningWithNullToZeroValues(t *testing.T) {
 	}
 
 	var gotUsers []user
-	results = DB.Where("id in (?, ?)", u1.ID, u2.ID).Order("id asc").Select("id, name").Find(&gotUsers)
+	results = DB.Where("\"id\" in (?, ?)", u1.ID, u2.ID).Order("\"id\" asc").Select("\"id\", \"name\"").Find(&gotUsers)
 	if results.Error != nil {
 		t.Fatalf("errors happened on first: %v", results.Error)
 	} else if results.RowsAffected != 2 {

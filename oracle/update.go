@@ -476,9 +476,7 @@ func buildUpdatePLSQL(db *gorm.DB) {
 
 	// Start PL/SQL block
 	plsqlBuilder.WriteString("DECLARE\n")
-	plsqlBuilder.WriteString("  TYPE t_records IS TABLE OF ")
-	writeQuotedIdentifier(&plsqlBuilder, stmt.Table)
-	plsqlBuilder.WriteString("%ROWTYPE;\n")
+	writeTableRecordCollectionDecl(&plsqlBuilder, stmt.Schema.DBNames, stmt.Table)
 	plsqlBuilder.WriteString("  l_updated_records t_records;\n")
 	plsqlBuilder.WriteString("BEGIN\n")
 
