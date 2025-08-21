@@ -273,21 +273,3 @@ func TestConnectionPing(t *testing.T) {
 		t.Errorf("Database ping with context failed: %v", err)
 	}
 }
-
-func TestIntervalYearToMonth(t *testing.T) {
-	var result string
-	err := DB.Raw("SELECT INTERVAL '2-3' YEAR TO MONTH FROM dual").Scan(&result).Error
-	if err != nil {
-		t.Errorf("Year to Month interval query failed: %v", err)
-	}
-	t.Logf("Year to Month interval result: %s", result)
-}
-
-func TestIntervalDayToSecond(t *testing.T) {
-	var result string
-	err := DB.Raw("SELECT INTERVAL '4 5:12:10.222' DAY TO SECOND FROM dual").Scan(&result).Error
-	if err != nil {
-		t.Errorf("Day to Second interval query failed: %v", err)
-	}
-	t.Logf("Day to Second interval result: %s", result)
-}

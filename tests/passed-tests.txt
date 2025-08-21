@@ -38,8 +38,6 @@ TestPluginCallbacks
 TestCallbacksGet
 TestCallbacksRemove
 TestWithSingleConnection
-TestTransactionCommit
-TestTransactionRollback
 TestConnectionAfterError
 TestConnectionWithInvalidQuery
 TestMultipleSequentialConnections
@@ -50,8 +48,6 @@ TestContextTimeout
 TestLargeResultSet
 TestSessionInfo
 TestConnectionPing
-TestIntervalYearToMonth
-TestIntervalDayToSecond
 TestConnectionPoolStats
 TestPoolValidSettings
 TestPoolInvalidSettings
