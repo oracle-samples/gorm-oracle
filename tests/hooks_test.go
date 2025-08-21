@@ -274,7 +274,10 @@ func (s Product2) BeforeCreate(tx *gorm.DB) (err error) {
 }
 
 func (s *Product2) BeforeUpdate(tx *gorm.DB) (err error) {
-	tx.Statement.Where("\"owner\" != ?", "admin")
+	// In Oracle DB, when owner is NULL, the condition "owner" != 'admin' will
+	// always returns false.
+	// Hence, we use NVL("owner", 'none') to substitute 'none' when owner is NULL.
+	tx.Statement.Where("NVL(\"owner\", 'none') != ?", "admin")
 	return
 }
 
