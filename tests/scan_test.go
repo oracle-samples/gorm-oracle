@@ -39,6 +39,7 @@
 package tests
 
 import (
+	"fmt"
 	"reflect"
 	"sort"
 	"strings"
@@ -303,7 +304,9 @@ func TestScanRowsNullValuesScanToFieldDefault(t *testing.T) {
 }
 
 func TestScanToEmbedded(t *testing.T) {
-	DB.Migrator().DropTable(&Person{}, &Address{}, &PersonAddress{})
+	if err := DB.Migrator().DropTable(&Person{}, &Address{}, &PersonAddress{}); err != nil {
+		fmt.Printf("===== %v", err)
+	}
 	if err := DB.AutoMigrate(&Person{}, &Address{}, &PersonAddress{}); err != nil {
 		t.Fatalf("Failed to migrate, got %v", err)
 	}
