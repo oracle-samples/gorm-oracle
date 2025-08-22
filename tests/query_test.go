@@ -51,6 +51,7 @@ import (
 
 	"time"
 
+	"github.com/godror/godror"
 	. "github.com/oracle-samples/gorm-oracle/tests/utils"
 
 	"gorm.io/gorm"
@@ -59,7 +60,6 @@ import (
 )
 
 func TestFind(t *testing.T) {
-	t.Skip()
 	users := []User{
 		*GetUser("find", Config{}),
 		*GetUser("find", Config{}),
@@ -722,13 +722,23 @@ func (v Int64) Value() (driver.Value, error) {
 }
 
 func (v *Int64) Scan(val interface{}) error {
-	y := val.(int64)
-	*v = Int64(y + 1)
+	switch x := val.(type) {
+	case int64:
+		*v = Int64(x + 1)
 	return nil
+	case godror.Number:
+		i, err := strconv.ParseInt(string(x), 10, 64)
+		if err != nil {
+			return fmt.Errorf("Int64.Scan: cannot parse godror.Number %q: %w", string(x), err)
+		}
+		*v = Int64(i + 1)
+		return nil
+	default:
+		return fmt.Errorf("Int64.Scan: unsupported type %T", val)
+	}
 }
 
 func TestPluck(t *testing.T) {
-	t.Skip()
 	users := []*User{
 		GetUser("pluck-user1", Config{}),
 		GetUser("pluck-user2", Config{}),
@@ -738,12 +748,12 @@ func TestPluck(t *testing.T) {
 	DB.Create(&users)
 
 	var names []string
-	if err := DB.Model(User{}).Where("name like ?", "pluck-user%").Order("name").Pluck("name", &names).Error; err != nil {
+	if err := DB.Model(User{}).Where("\"name\" like ?", "pluck-user%").Order("\"name\"").Pluck("name", &names).Error; err != nil {
 		t.Errorf("got error when pluck name: %v", err)
 	}
 
 	var names2 []string
-	if err := DB.Model(User{}).Where("name like ?", "pluck-user%").Order("name desc").Pluck("name", &names2).Error; err != nil {
+	if err := DB.Model(User{}).Where("\"name\" like ?", "pluck-user%").Order("\"name\" desc").Pluck("name", &names2).Error; err != nil {
 		t.Errorf("got error when pluck name: %v", err)
 	}
 
@@ -751,12 +761,12 @@ func TestPluck(t *testing.T) {
 	tests.AssertEqual(t, names, names2)
 
 	var ids []int
-	if err := DB.Model(User{}).Where("name like ?", "pluck-user%").Pluck("id", &ids).Error; err != nil {
+	if err := DB.Model(User{}).Where("\"name\" like ?", "pluck-user%").Pluck("id", &ids).Error; err != nil {
 		t.Errorf("got error when pluck id: %v", err)
 	}
 
 	var ids2 []Int64
-	if err := DB.Model(User{}).Where("name like ?", "pluck-user%").Pluck("id", &ids2).Error; err != nil {
+	if err := DB.Model(User{}).Where("\"name\" like ?", "pluck-user%").Pluck("id", &ids2).Error; err != nil {
 		t.Errorf("got error when pluck id: %v", err)
 	}
 
@@ -779,7 +789,7 @@ func TestPluck(t *testing.T) {
 	}
 
 	var times []time.Time
-	if err := DB.Model(User{}).Where("name like ?", "pluck-user%").Pluck("created_at", &times).Error; err != nil {
+	if err := DB.Model(User{}).Where("\"name\" like ?", "pluck-user%").Pluck("created_at", &times).Error; err != nil {
 		t.Errorf("got error when pluck time: %v", err)
 	}
 
@@ -788,7 +798,7 @@ func TestPluck(t *testing.T) {
 	}
 
 	var ptrtimes []*time.Time
-	if err := DB.Model(User{}).Where("name like ?", "pluck-user%").Pluck("created_at", &ptrtimes).Error; err != nil {
+	if err := DB.Model(User{}).Where("\"name\" like ?", "pluck-user%").Pluck("created_at", &ptrtimes).Error; err != nil {
 		t.Errorf("got error when pluck time: %v", err)
 	}
 
@@ -797,7 +807,7 @@ func TestPluck(t *testing.T) {
 	}
 
 	var nulltimes []sql.NullTime
-	if err := DB.Model(User{}).Where("name like ?", "pluck-user%").Pluck("created_at", &nulltimes).Error; err != nil {
+	if err := DB.Model(User{}).Where("\"name\" like ?", "pluck-user%").Pluck("created_at", &nulltimes).Error; err != nil {
 		t.Errorf("got error when pluck time: %v", err)
 	}
 
