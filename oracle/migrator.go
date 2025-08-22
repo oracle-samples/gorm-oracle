@@ -212,6 +212,7 @@ func (m Migrator) ReorderModels(values []interface{}, autoAdd bool) (results []i
 	)
 
 	parseDependence = func(value interface{}, addToList bool) {
+		fmt.Printf("----value = %v, addToList = %t\n", value, addToList)
 		dep := Dependency{
 			Statement: &gorm.Statement{DB: m.DB, Dest: value},
 		}
@@ -221,10 +222,12 @@ func (m Migrator) ReorderModels(values []interface{}, autoAdd bool) (results []i
 			m.DB.Logger.Error(context.Background(), "failed to parse value %#v, got error %v", value, err)
 		}
 		if _, ok := parsedSchemas[dep.Statement.Schema]; ok {
+			fmt.Printf("----schema %v has been parsed already, return\n", dep.Statement.Schema)
 			return
 		}
 		parsedSchemas[dep.Statement.Schema] = true
 
+		fmt.Printf("----IgnoreRelationshipsWhenMigrating = %t\n", m.DB.IgnoreRelationshipsWhenMigrating)
 		if !m.DB.IgnoreRelationshipsWhenMigrating {
 			for _, rel := range dep.Schema.Relationships.Relations {
 				if rel.Field.IgnoreMigration {
@@ -254,7 +257,7 @@ func (m Migrator) ReorderModels(values []interface{}, autoAdd bool) (results []i
 		}
 
 		valuesMap[dep.Schema.Table] = dep
-		fmt.Printf("----dep.Schema.Table = %s\n", dep.Schema.Table)
+		fmt.Printf("----dep.Schema.Table = %s, addToList = %t \n", dep.Schema.Table, addToList)
 
 		if addToList {
 			modelNames = append(modelNames, dep.Schema.Table)
