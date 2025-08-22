@@ -114,7 +114,7 @@ TestSupportedDialectorWithErrDuplicatedKey
 TestSupportedDialectorWithErrForeignKeyViolated
 #TestGenericsCreate
 TestGenericsCreateInBatches
-#TestGenericsExecAndUpdate
+TestGenericsExecAndUpdate
 TestGenericsRow
 TestGenericsDelete
 TestGenericsFindInBatches
@@ -230,7 +230,7 @@ TestPreloadManyToManyCallbacks
 TestPreloadWithAssociations
 TestNestedPreload
 TestNestedPreloadForSlice
-#TestPreloadWithConds
+TestPreloadWithConds
 TestNestedPreloadWithConds
 TestPreloadEmptyData
 TestPreloadGoroutine
