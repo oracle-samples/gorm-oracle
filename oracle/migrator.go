@@ -39,9 +39,11 @@
 package oracle
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
+	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -191,6 +193,111 @@ func (m Migrator) CreateTable(values ...interface{}) error {
 		}
 	}
 	return nil
+}
+
+// ReorderModels reorder models according to constraint dependencies
+func (m Migrator) ReorderModels(values []interface{}, autoAdd bool) (results []interface{}) {
+	type Dependency struct {
+		*gorm.Statement
+		Depends []*schema.Schema
+	}
+
+	var (
+		modelNames, orderedModelNames []string
+		orderedModelNamesMap          = map[string]bool{}
+		parsedSchemas                 = map[*schema.Schema]bool{}
+		valuesMap                     = map[string]Dependency{}
+		insertIntoOrderedList         func(name string)
+		parseDependence               func(value interface{}, addToList bool)
+	)
+
+	parseDependence = func(value interface{}, addToList bool) {
+		dep := Dependency{
+			Statement: &gorm.Statement{DB: m.DB, Dest: value},
+		}
+		beDependedOn := map[*schema.Schema]bool{}
+		// support for special table name
+		if err := dep.ParseWithSpecialTableName(value, m.DB.Statement.Table); err != nil {
+			m.DB.Logger.Error(context.Background(), "failed to parse value %#v, got error %v", value, err)
+		}
+		if _, ok := parsedSchemas[dep.Statement.Schema]; ok {
+			return
+		}
+		parsedSchemas[dep.Statement.Schema] = true
+
+		if !m.DB.IgnoreRelationshipsWhenMigrating {
+			for _, rel := range dep.Schema.Relationships.Relations {
+				if rel.Field.IgnoreMigration {
+					continue
+				}
+				if c := rel.ParseConstraint(); c != nil && c.Schema == dep.Statement.Schema && c.Schema != c.ReferenceSchema {
+					dep.Depends = append(dep.Depends, c.ReferenceSchema)
+				}
+
+				if rel.Type == schema.HasOne || rel.Type == schema.HasMany {
+					beDependedOn[rel.FieldSchema] = true
+				}
+
+				if rel.JoinTable != nil {
+					// append join value
+					defer func(rel *schema.Relationship, joinValue interface{}) {
+						if !beDependedOn[rel.FieldSchema] {
+							dep.Depends = append(dep.Depends, rel.FieldSchema)
+						} else {
+							fieldValue := reflect.New(rel.FieldSchema.ModelType).Interface()
+							parseDependence(fieldValue, autoAdd)
+						}
+						parseDependence(joinValue, autoAdd)
+					}(rel, reflect.New(rel.JoinTable.ModelType).Interface())
+				}
+			}
+		}
+
+		valuesMap[dep.Schema.Table] = dep
+		fmt.Printf("----dep.Schema.Table = %s\n", dep.Schema.Table)
+
+		if addToList {
+			modelNames = append(modelNames, dep.Schema.Table)
+		}
+	}
+
+	insertIntoOrderedList = func(name string) {
+		if _, ok := orderedModelNamesMap[name]; ok {
+			return // avoid loop
+		}
+		orderedModelNamesMap[name] = true
+
+		if autoAdd {
+			dep := valuesMap[name]
+			for _, d := range dep.Depends {
+				if _, ok := valuesMap[d.Table]; ok {
+					insertIntoOrderedList(d.Table)
+				} else {
+					parseDependence(reflect.New(d.ModelType).Interface(), autoAdd)
+					insertIntoOrderedList(d.Table)
+				}
+			}
+		}
+
+		orderedModelNames = append(orderedModelNames, name)
+	}
+
+	for _, value := range values {
+		if v, ok := value.(string); ok {
+			results = append(results, v)
+		} else {
+			parseDependence(value, true)
+		}
+	}
+
+	for _, name := range modelNames {
+		insertIntoOrderedList(name)
+	}
+
+	for _, name := range orderedModelNames {
+		results = append(results, valuesMap[name].Statement.Dest)
+	}
+	return
 }
 
 // DropTable drops the table starting from the bottom of the dependency chain.
