@@ -308,15 +308,47 @@ func (m Migrator) DropColumn(value interface{}, name string) error {
 func (m Migrator) AlterColumn(value interface{}, field string) error {
 	return m.RunWithValue(value, func(stmt *gorm.Statement) error {
 		if stmt.Schema != nil {
-			if field := stmt.Schema.LookUpField(field); field != nil {
-				fileType := m.FullDataTypeOf(field)
-				return m.DB.Exec(
-					"ALTER TABLE ? MODIFY ? ?",
-					clause.Table{Name: stmt.Schema.Table},
-					clause.Column{Name: field.DBName},
-					fileType,
-				).Error
+			if f := stmt.Schema.LookUpField(field); f != nil {
+				columnTypes, err := m.ColumnTypes(value)
+				if err != nil {
+					return err
+				}
 
+				var currentNullable bool
+				var currentType string
+				for _, col := range columnTypes {
+					if strings.EqualFold(col.Name(), f.DBName) {
+						currentNullable, _ = col.Nullable()
+						currentType = strings.ToUpper(col.DatabaseTypeName())
+						break
+					}
+				}
+
+				desiredNullable := !f.NotNull
+				desiredType := strings.ToUpper(m.DataTypeOf(f))
+
+				// nullable → non-nullable → skip
+				if currentNullable && !desiredNullable {
+					return nil
+				}
+
+				// same type + same nullability → skip
+				if currentNullable == desiredNullable && strings.Contains(currentType, desiredType) {
+					return nil
+				}
+
+				sql := "ALTER TABLE ? MODIFY ? " + m.DataTypeOf(f)
+				if f.NotNull {
+					sql += " NOT NULL"
+				} else if !currentNullable && desiredNullable {
+					sql += " NULL"
+				}
+
+				return m.DB.Exec(
+					sql,
+					clause.Table{Name: stmt.Schema.Table},
+					clause.Column{Name: f.DBName},
+				).Error
 			}
 		}
 		return fmt.Errorf("failed to look up field with name: %s", field)

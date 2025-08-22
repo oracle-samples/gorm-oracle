@@ -186,7 +186,6 @@ func TestAutoMigrateSelfReferential(t *testing.T) {
 }
 
 func TestAutoMigrateNullable(t *testing.T) {
-	t.Skip()
 	type MigrateNullableColumn struct {
 		ID    uint
 		Bonus float64 `gorm:"not null"`
@@ -1397,7 +1396,7 @@ func TestMigrateExistingBoolColumnPG(t *testing.T) {
 
 func TestMigrateWithUniqueIndexAndUnique(t *testing.T) {
 	t.Skip()
-	
+
 	const table = "unique_struct"
 
 	checkField := func(model interface{}, fieldName string, unique bool, uniqueIndex string) {

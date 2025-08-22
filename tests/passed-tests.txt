@@ -163,7 +163,7 @@ TestSetAndGet
 TestMigrate
 TestAutoMigrateInt8PG
 TestAutoMigrateSelfReferential
-#TestAutoMigrateNullable
+TestAutoMigrateNullable
 TestSmartMigrateColumn
 TestMigrateWithColumnComment
 TestMigrateWithUniqueIndex
