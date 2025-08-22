@@ -57,14 +57,6 @@ type Migrator struct {
 	migrator.Migrator
 }
 
-// RunWithValue runs migration for the given `value`
-func (m Migrator) RunWithValue(value interface{}, fc func(*gorm.Statement) error) error {
-	if table, ok := value.(string); ok {
-		return m.Migrator.RunWithValue(table, fc)
-	}
-	return m.Migrator.RunWithValue(value, fc)
-}
-
 // CurrentDatabase returns the the name of the current Oracle database
 func (m Migrator) CurrentDatabase() string {
 	var name string
@@ -208,6 +200,7 @@ func (m Migrator) DropTable(values ...interface{}) error {
 	var errorList []error
 	values = m.ReorderModels(values, false)
 	for i := len(values) - 1; i >= 0; i-- {
+		fmt.Printf("----Dropping table: values[%d] = %v\n", i, values[i])
 		tx := m.DB.Session(&gorm.Session{})
 		if err := m.RunWithValue(values[i], func(stmt *gorm.Statement) error {
 			fmt.Printf("----Dropping table %s\n", stmt.Table)
@@ -216,6 +209,9 @@ func (m Migrator) DropTable(values ...interface{}) error {
 				clause.Table{Name: stmt.Table}).Error
 		}); err != nil {
 			errorList = append(errorList, err)
+		}
+		if tx.Error != nil {
+			fmt.Printf("-------- tx.Error: %v\n", tx.Error)
 		}
 	}
 
