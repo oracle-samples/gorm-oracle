@@ -959,16 +959,15 @@ func TestPluckWithSelect(t *testing.T) {
 }
 
 func TestSelectWithVariables(t *testing.T) {
-	t.Skip()
 	DB.Save(&User{Name: "select_with_variables"})
 
-	rows, _ := DB.Table("users").Where("name = ?", "select_with_variables").Select("? as fake", gorm.Expr("name")).Rows()
+	rows, _ := DB.Table("users").Where("\"name\" = ?", "select_with_variables").Select("? as fake", gorm.Expr("\"name\"")).Rows()
 
 	if !rows.Next() {
 		t.Errorf("Should have returned at least one row")
 	} else {
 		columns, _ := rows.Columns()
-		tests.AssertEqual(t, columns, []string{"fake"})
+		tests.AssertEqual(t, columns, []string{"FAKE"})
 	}
 
 	rows.Close()
