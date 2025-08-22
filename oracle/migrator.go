@@ -197,6 +197,10 @@ func (m Migrator) CreateTable(values ...interface{}) error {
 // The function returns an error when Oracle databases report a missing table.
 // If multiple errors occur, it returns a combined (joint) error.
 func (m Migrator) DropTable(values ...interface{}) error {
+	for i := len(values) - 1; i >= 0; i-- {
+		fmt.Printf("----Values before ReorderModels(): values[%d] = %v\n", i, values[i])
+	}
+
 	var errorList []error
 	values = m.ReorderModels(values, false)
 	for i := len(values) - 1; i >= 0; i-- {
