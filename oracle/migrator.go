@@ -210,6 +210,7 @@ func (m Migrator) DropTable(values ...interface{}) error {
 	for i := len(values) - 1; i >= 0; i-- {
 		tx := m.DB.Session(&gorm.Session{})
 		if err := m.RunWithValue(values[i], func(stmt *gorm.Statement) error {
+			fmt.Printf("----Dropping table %s\n", stmt.Table)
 			return tx.Exec(
 				"DROP TABLE ? CASCADE CONSTRAINTS",
 				clause.Table{Name: stmt.Table}).Error
