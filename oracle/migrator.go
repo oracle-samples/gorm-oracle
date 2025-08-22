@@ -295,6 +295,7 @@ func (m Migrator) ReorderModels(values []interface{}, autoAdd bool) (results []i
 	}
 
 	for _, name := range orderedModelNames {
+		fmt.Printf("----name = %s\n", name)
 		results = append(results, valuesMap[name].Statement.Dest)
 	}
 	return
