@@ -258,6 +258,7 @@ func (m Migrator) ReorderModels(values []interface{}, autoAdd bool) (results []i
 
 		if addToList {
 			modelNames = append(modelNames, dep.Schema.Table)
+			fmt.Printf("----current modelNames = %v\n", modelNames)
 		}
 	}
 
@@ -292,6 +293,7 @@ func (m Migrator) ReorderModels(values []interface{}, autoAdd bool) (results []i
 	}
 
 	for _, name := range modelNames {
+		fmt.Printf("----name in modelNames = %s\n", name)
 		insertIntoOrderedList(name)
 	}
 
