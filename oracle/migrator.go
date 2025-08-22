@@ -204,6 +204,9 @@ func (m Migrator) DropTable(values ...interface{}) error {
 	var errorList []error
 	values = m.ReorderModels(values, false)
 	for i := len(values) - 1; i >= 0; i-- {
+		fmt.Printf("----Values after ReorderModels(): values[%d] = %v\n", i, values[i])
+	}
+	for i := len(values) - 1; i >= 0; i-- {
 		fmt.Printf("----Dropping table: values[%d] = %v\n", i, values[i])
 		tx := m.DB.Session(&gorm.Session{})
 		if err := m.RunWithValue(values[i], func(stmt *gorm.Statement) error {
