@@ -265,6 +265,7 @@ func (m Migrator) ReorderModels(values []interface{}, autoAdd bool) (results []i
 		if _, ok := orderedModelNamesMap[name]; ok {
 			return // avoid loop
 		}
+		fmt.Printf("----calling insertIntoOrderedList, name = %s\n", name)
 		orderedModelNamesMap[name] = true
 
 		if autoAdd {
