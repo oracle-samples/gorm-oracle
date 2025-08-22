@@ -1664,3 +1664,35 @@ func TestNumberPrecision(t *testing.T) {
 		t.Errorf("Big number mismatch: expected %d, got %d", record.BigNumber, result.BigNumber)
 	}
 }
+
+func TestLargeResultSet(t *testing.T) {
+	var results []struct {
+		RowNum int    `gorm:"column:ROW_NUM"`
+		Value  string `gorm:"column:VALUE"`
+	}
+
+	query := `
+		SELECT LEVEL as row_num, 'row_' || LEVEL as value 
+		FROM dual 
+		CONNECT BY LEVEL <= 1000
+	`
+
+	err := DB.Raw(query).Scan(&results).Error
+	if err != nil {
+		t.Errorf("Failed to execute large result set query: %v", err)
+		return
+	}
+
+	if len(results) != 1000 {
+		t.Errorf("Expected 1000 rows, got %d", len(results))
+		return
+	}
+
+	// Verify first and last rows
+	if results[0].RowNum != 1 || results[0].Value != "row_1" {
+		t.Errorf("First row incorrect: %+v", results[0])
+	}
+	if results[999].RowNum != 1000 || results[999].Value != "row_1000" {
+		t.Errorf("Last row incorrect: %+v", results[999])
+	}
+}
