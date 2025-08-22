@@ -114,8 +114,10 @@ func TestFind(t *testing.T) {
 							t.Errorf("invalid data type for %v, got %#v", dbName, first[dbName])
 						}
 					case "Age":
-						if _, ok := first[dbName].(uint); !ok {
-							t.Errorf("invalid data type for %v, got %#v", dbName, first[dbName])
+						val := fmt.Sprintf("%v", first[dbName])
+						expected := fmt.Sprint(users[0].Age)
+						if val != expected {
+							t.Errorf("expected %v, got %v", expected, val)
 						}
 					case "Birthday":
 						if _, ok := first[dbName].(*time.Time); !ok {
@@ -146,8 +148,10 @@ func TestFind(t *testing.T) {
 							t.Errorf("invalid data type for %v, got %v %#v", dbName, resultType, first[dbName])
 						}
 					case "Age":
-						if !strings.Contains(resultType, "int") {
-							t.Errorf("invalid data type for %v, got %v %#v", dbName, resultType, first[dbName])
+						val := fmt.Sprintf("%v", first[dbName])
+						expected := fmt.Sprint(users[0].Age)
+						if val != expected {
+							t.Errorf("expected %v, got %v", expected, val)
 						}
 					case "Birthday":
 						if !strings.Contains(resultType, "Time") {
@@ -194,8 +198,10 @@ func TestFind(t *testing.T) {
 									t.Errorf("invalid data type for %v, got %#v", dbName, allMap[idx][dbName])
 								}
 							case "Age":
-								if _, ok := allMap[idx][dbName].(uint); !ok {
-									t.Errorf("invalid data type for %v, got %#v", dbName, allMap[idx][dbName])
+								val := fmt.Sprintf("%v", allMap[idx][dbName])
+								expected := fmt.Sprint(users[0].Age)
+								if val != expected {
+									t.Errorf("expected %v, got %v", expected, val)
 								}
 							case "Birthday":
 								if _, ok := allMap[idx][dbName].(*time.Time); !ok {
@@ -230,8 +236,10 @@ func TestFind(t *testing.T) {
 									t.Errorf("invalid data type for %v, got %v %#v", dbName, resultType, allMap[idx][dbName])
 								}
 							case "Age":
-								if !strings.Contains(resultType, "int") {
-									t.Errorf("invalid data type for %v, got %v %#v", dbName, resultType, allMap[idx][dbName])
+								val := fmt.Sprintf("%v", allMap[idx][dbName])
+								expected := fmt.Sprint(users[0].Age)
+								if val != expected {
+									t.Errorf("expected %v, got %v", expected, val)
 								}
 							case "Birthday":
 								if !strings.Contains(resultType, "Time") {
