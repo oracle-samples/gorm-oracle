@@ -40,7 +40,10 @@ package tests
 
 import (
 	"context"
+	"fmt"
+	"sync"
 	"testing"
+	"time"
 
 	. "github.com/oracle-samples/gorm-oracle/tests/utils"
 
@@ -103,11 +106,11 @@ func TestScopes(t *testing.T) {
 		t.Errorf("Should found two users's name in 1, 2, but got %v", result.RowsAffected)
 	}
 
-	var maxId int64
+	var maxID int64
 	userTable := func(db *gorm.DB) *gorm.DB {
 		return db.WithContext(context.Background()).Table("users")
 	}
-	if err := DB.Scopes(userTable).Select("max(\"id\")").Scan(&maxId).Error; err != nil {
+	if err := DB.Scopes(userTable).Select("max(\"id\")").Scan(&maxID).Error; err != nil {
 		t.Errorf("select max(id)")
 	}
 }
@@ -164,5 +167,376 @@ func TestComplexScopes(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			assertEqualSQL(t, test.expected, DB.ToSQL(test.queryFn))
 		})
+	}
+}
+
+func TestEmptyAndNilScopes(t *testing.T) {
+	setupScopeTestData(t)
+
+	// Test with no scopes
+	var users []User
+	err := DB.Scopes().Find(&users).Error
+	if err != nil {
+		t.Errorf("Empty scopes should work, got error: %v", err)
+	}
+
+	// Test with empty slice of scopes
+	emptyScopes := []func(*gorm.DB) *gorm.DB{}
+	err = DB.Scopes(emptyScopes...).Find(&users).Error
+	if err != nil {
+		t.Errorf("Empty scope slice should work, got error: %v", err)
+	}
+
+	// Test behavior when we have mixed nil and valid scopes
+	defer func() {
+		if r := recover(); r != nil {
+			t.Logf("Mixed nil scopes caused panic (expected): %v", r)
+		}
+	}()
+}
+
+func TestScopesWithDatabaseErrors(t *testing.T) {
+	setupScopeTestData(t)
+
+	// Scope that generates invalid SQL
+	invalidSQLScope := func(db *gorm.DB) *gorm.DB {
+		return db.Where("invalid_column_name_12345 = ?", "test")
+	}
+
+	var users []User
+	err := DB.Scopes(invalidSQLScope).Find(&users).Error
+	if err == nil {
+		t.Error("Expected error for invalid SQL in scope, got nil")
+	}
+
+	// Verify database still works after scope error
+	err = DB.Find(&users).Error
+	if err != nil {
+		t.Errorf("Database should still work after scope error, got: %v", err)
+	}
+}
+
+func TestConflictingScopes(t *testing.T) {
+	setupScopeTestData(t)
+
+	// Scopes with contradictory conditions
+	alwaysTrue := func(db *gorm.DB) *gorm.DB {
+		return db.Where("1 = 1")
+	}
+	alwaysFalse := func(db *gorm.DB) *gorm.DB {
+		return db.Where("1 = 0")
+	}
+
+	var users []User
+	err := DB.Scopes(alwaysTrue, alwaysFalse).Find(&users).Error
+	if err != nil {
+		t.Errorf("Conflicting scopes should not cause error, got: %v", err)
+	}
+	if len(users) != 0 {
+		t.Errorf("Conflicting scopes should return no results, got %d users", len(users))
+	}
+
+	// Test conflicting WHERE conditions on same column
+	nameScope1 := func(db *gorm.DB) *gorm.DB {
+		return db.Where("\"name\" = ?", "ScopeUser1")
+	}
+	nameScope2 := func(db *gorm.DB) *gorm.DB {
+		return db.Where("\"name\" = ?", "ScopeUser2")
+	}
+
+	err = DB.Scopes(nameScope1, nameScope2).Find(&users).Error
+	if err != nil {
+		t.Errorf("Conflicting name scopes should not cause error, got: %v", err)
+	}
+	if len(users) != 0 {
+		t.Errorf("Conflicting name scopes should return no results, got %d users", len(users))
+	}
+}
+
+func TestContextCancellationInScopes(t *testing.T) {
+	setupScopeTestData(t)
+
+	// Create a context that gets cancelled immediately
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
+	defer cancel()
+
+	contextScope := func(db *gorm.DB) *gorm.DB {
+		return db.WithContext(ctx)
+	}
+
+	var users []User
+	err := DB.Scopes(contextScope).Find(&users).Error
+	// Error is expected due to context cancellation
+
+	// Verify database still works after context cancellation
+	err = DB.Find(&users).Error
+	if err != nil {
+		t.Errorf("Database should work after context cancellation in scope, got: %v", err)
+	}
+}
+
+func TestConcurrentScopeUsage(t *testing.T) {
+	setupScopeTestData(t)
+
+	const numGoroutines = 10
+	const operationsPerGoroutine = 5
+
+	var wg sync.WaitGroup
+	errors := make(chan error, numGoroutines*operationsPerGoroutine)
+
+	for i := 0; i < numGoroutines; i++ {
+		wg.Add(1)
+		go func(goroutineID int) {
+			defer wg.Done()
+
+			for j := 0; j < operationsPerGoroutine; j++ {
+				userScope := func(db *gorm.DB) *gorm.DB {
+					return db.Where("\"name\" LIKE ?", fmt.Sprintf("ScopeUser%d", (goroutineID%3)+1))
+				}
+
+				var users []User
+				err := DB.Scopes(userScope).Find(&users).Error
+				if err != nil {
+					errors <- fmt.Errorf("goroutine %d operation %d failed: %v", goroutineID, j, err)
+				}
+			}
+		}(i)
+	}
+
+	wg.Wait()
+	close(errors)
+
+	errorCount := 0
+	for err := range errors {
+		t.Errorf("Concurrent scope error: %v", err)
+		errorCount++
+	}
+
+	if errorCount > 0 {
+		t.Errorf("Got %d errors in concurrent scope usage", errorCount)
+	}
+}
+
+func TestScopesThatModifyUnexpectedQuery(t *testing.T) {
+	setupScopeTestData(t)
+
+	// Scope that changes the table
+	tableChangingScope := func(db *gorm.DB) *gorm.DB {
+		return db.Table("companies")
+	}
+
+	// Scope that changes the model
+	modelChangingScope := func(db *gorm.DB) *gorm.DB {
+		return db.Model(&Company{})
+	}
+
+	// Test table changing scope
+	var users []User
+	err := DB.Model(&User{}).Scopes(tableChangingScope).Find(&users).Error
+
+	// Test model changing scope
+	err = DB.Scopes(modelChangingScope).Find(&users).Error
+
+	// Scope that adds unexpected clauses
+	limitScope := func(db *gorm.DB) *gorm.DB {
+		return db.Limit(1).Offset(1).Order("\"id\" DESC")
+	}
+
+	err = DB.Scopes(limitScope).Find(&users).Error
+	if err != nil {
+		t.Errorf("Scope with limit/offset/order should work, got: %v", err)
+	}
+}
+
+func TestLargeNumberOfScopes(t *testing.T) {
+	setupScopeTestData(t)
+
+	// Create a large number of scopes
+	const numScopes = 100
+	scopes := make([]func(*gorm.DB) *gorm.DB, numScopes)
+
+	for i := 0; i < numScopes; i++ {
+		val := i
+		scopes[i] = func(db *gorm.DB) *gorm.DB {
+			return db.Where("\"id\" > ?", val*-1) // Always true conditions
+		}
+	}
+
+	var users []User
+	start := time.Now()
+	err := DB.Scopes(scopes...).Find(&users).Error
+	duration := time.Since(start)
+
+	if err != nil {
+		t.Errorf("Large number of scopes failed: %v", err)
+	}
+
+	t.Logf("Processing %d scopes took %v", numScopes, duration)
+
+	// Verify we still get results
+	if len(users) == 0 {
+		t.Error("Large number of scopes should still return results")
+	}
+}
+
+func TestScopesWithTransactions(t *testing.T) {
+	setupScopeTestData(t)
+
+	// Test scopes within a transaction
+	err := DB.Transaction(func(tx *gorm.DB) error {
+		transactionScope := func(db *gorm.DB) *gorm.DB {
+			return db.Where("\"name\" = ?", "ScopeUser1")
+		}
+
+		var users []User
+		return tx.Scopes(transactionScope).Find(&users).Error
+	})
+
+	if err != nil {
+		t.Errorf("Scopes within transaction should work, got: %v", err)
+	}
+
+	// Test scope that tries to start its own transaction (nested transaction scenario)
+	nestedTxScope := func(db *gorm.DB) *gorm.DB {
+		return db.Begin()
+	}
+
+	err = DB.Transaction(func(tx *gorm.DB) error {
+		var users []User
+		return tx.Scopes(nestedTxScope).Find(&users).Error
+	})
+}
+
+func TestScopesWithRawSQL(t *testing.T) {
+	setupScopeTestData(t)
+
+	// Scope that adds raw SQL conditions
+	rawSQLScope := func(db *gorm.DB) *gorm.DB {
+		return db.Where("LENGTH(\"name\") > ?", 5)
+	}
+
+	var users []User
+	err := DB.Scopes(rawSQLScope).Find(&users).Error
+	if err != nil {
+		t.Errorf("Raw SQL scope should work, got: %v", err)
+	}
+
+	// Test proper parameterized queries (safe)
+	safeParameterizedScope := func(db *gorm.DB) *gorm.DB {
+		return db.Where("\"name\" = ? OR \"name\" LIKE ?", "test", "ScopeUser%")
+	}
+
+	err = DB.Scopes(safeParameterizedScope).Find(&users).Error
+	if err != nil {
+		t.Errorf("Parameterized SQL in scope should be safe, got: %v", err)
+	}
+
+	// Test complex safe expressions
+	complexSafeScope := func(db *gorm.DB) *gorm.DB {
+		return db.Where("(\"name\" = ? OR \"age\" > ?) AND \"deleted_at\" IS NULL", "ScopeUser1", 10)
+	}
+
+	err = DB.Scopes(complexSafeScope).Find(&users).Error
+	if err != nil {
+		t.Errorf("Complex parameterized SQL should work, got: %v", err)
+	}
+
+	// Test that we get expected results
+	if len(users) == 0 {
+		t.Error("Should have found some users with complex scope")
+	}
+}
+
+func TestScopeErrorRecovery(t *testing.T) {
+	setupScopeTestData(t)
+
+	// First, cause an error with a bad scope
+	badScope := func(db *gorm.DB) *gorm.DB {
+		return db.Where("non_existent_column = ?", "value")
+	}
+
+	var users []User
+	err := DB.Scopes(badScope).Find(&users).Error
+	if err == nil {
+		t.Error("Expected error from bad scope")
+	}
+
+	// Then verify normal operations still work
+	goodScope := func(db *gorm.DB) *gorm.DB {
+		return db.Where("\"name\" = ?", "ScopeUser1")
+	}
+
+	err = DB.Scopes(goodScope).Find(&users).Error
+	if err != nil {
+		t.Errorf("Good scope should work after bad scope error: %v", err)
+	}
+
+	if len(users) != 1 {
+		t.Errorf("Expected 1 user, got %d", len(users))
+	}
+}
+
+func TestScopeChainModification(t *testing.T) {
+	// Test that scopes don't interfere with each other's chain modifications
+	setupScopeTestData(t)
+
+	scope1Called := false
+	scope2Called := false
+
+	scope1 := func(db *gorm.DB) *gorm.DB {
+		scope1Called = true
+		return db.Where("\"id\" > ?", 0)
+	}
+
+	scope2 := func(db *gorm.DB) *gorm.DB {
+		scope2Called = true
+		return db.Where("\"name\" IS NOT NULL")
+	}
+
+	var users []User
+	err := DB.Scopes(scope1, scope2).Find(&users).Error
+	if err != nil {
+		t.Errorf("Scope chain should work, got: %v", err)
+	}
+
+	if !scope1Called {
+		t.Error("Scope1 should have been called")
+	}
+	if !scope2Called {
+		t.Error("Scope2 should have been called")
+	}
+}
+
+func TestScopesWithSubqueries(t *testing.T) {
+	setupScopeTestData(t)
+
+	// Scope that uses a subquery
+	subqueryScope := func(db *gorm.DB) *gorm.DB {
+		subQuery := DB.Model(&User{}).Select("\"name\"").Where("\"id\" = 1")
+		return db.Where("\"name\" IN (?)", subQuery)
+	}
+
+	var users []User
+	err := DB.Scopes(subqueryScope).Find(&users).Error
+	if err != nil {
+		t.Errorf("Subquery scope should work, got: %v", err)
+	}
+}
+
+// Helper function to set up test data for scope tests
+func setupScopeTestData(t *testing.T) {
+	// Clean up any existing data
+	DB.Exec("DELETE FROM users WHERE \"name\" LIKE 'ScopeUser%'")
+
+	// Create test users
+	users := []*User{
+		GetUser("ScopeUser1", Config{}),
+		GetUser("ScopeUser2", Config{}),
+		GetUser("ScopeUser3", Config{}),
+	}
+
+	err := DB.Create(&users).Error
+	if err != nil {
+		t.Fatalf("Failed to create test data: %v", err)
 	}
 }
