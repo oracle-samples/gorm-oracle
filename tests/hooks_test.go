@@ -274,12 +274,14 @@ func (s Product2) BeforeCreate(tx *gorm.DB) (err error) {
 }
 
 func (s *Product2) BeforeUpdate(tx *gorm.DB) (err error) {
-	tx.Statement.Where("\"owner\" != ?", "admin")
+	// In Oracle DB, when owner is NULL, the condition "owner" != 'admin' will
+	// always returns false.
+	// Hence, we use NVL("owner", 'none') to substitute 'none' when owner is NULL.
+	tx.Statement.Where("NVL(\"owner\", 'none') != ?", "admin")
 	return
 }
 
 func TestUseDBInHooks(t *testing.T) {
-	t.Skip()
 	DB.Migrator().DropTable(&Product2{})
 	DB.AutoMigrate(&Product2{})
 
@@ -296,12 +298,12 @@ func TestUseDBInHooks(t *testing.T) {
 	}
 
 	var result Product2
-	if err := DB.First(&result, "name = ?", "Nice").Error; err != nil {
+	if err := DB.First(&result, "\"name\" = ?", "Nice").Error; err != nil {
 		t.Fatalf("Failed to query product, got error: %v", err)
 	}
 
 	var resultClone Product2
-	if err := DB.First(&resultClone, "name = ?", "Nice_clone").Error; err != nil {
+	if err := DB.First(&resultClone, "\"name\" = ?", "Nice_clone").Error; err != nil {
 		t.Fatalf("Failed to find cloned product, got error: %v", err)
 	}
 
@@ -311,7 +313,7 @@ func TestUseDBInHooks(t *testing.T) {
 
 	DB.Model(&result).Update("Price", 500)
 	var result2 Product2
-	DB.First(&result2, "name = ?", "Nice")
+	DB.First(&result2, "\"name\" = ?", "Nice")
 
 	if result2.Price != 500 {
 		t.Errorf("Failed to update product's price, expects: %v, got %v", 500, result2.Price)
@@ -323,13 +325,13 @@ func TestUseDBInHooks(t *testing.T) {
 	}
 
 	var result3 Product2
-	if err := DB.First(&result3, "name = ?", "Nice2").Error; err != nil {
+	if err := DB.First(&result3, "\"name\" = ?", "Nice2").Error; err != nil {
 		t.Fatalf("Failed to query product, got error: %v", err)
 	}
 
 	DB.Model(&result3).Update("Price", 800)
 	var result4 Product2
-	DB.First(&result4, "name = ?", "Nice2")
+	DB.First(&result4, "\"name\" = ?", "Nice2")
 
 	if result4.Price != 600 {
 		t.Errorf("Admin product's price should not be changed, expects: %v, got %v", 600, result4.Price)
