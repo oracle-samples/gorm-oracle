@@ -335,6 +335,34 @@ func OnConflictClauseBuilder(c clause.Clause, builder clause.Builder) {
 				return
 			}
 
+			// exclude primary key, default value columns from merge update clause
+			if len(onConflict.DoUpdates) > 0 {
+				hasPrimaryKey := false
+
+				for _, assignment := range onConflict.DoUpdates {
+					field := stmt.Schema.LookUpField(assignment.Column.Name)
+					if field != nil && field.PrimaryKey {
+						hasPrimaryKey = true
+						break
+					}
+				}
+
+				if hasPrimaryKey {
+					onConflict.DoUpdates = nil
+					columns := make([]string, 0, len(values.Columns)-1)
+					for _, col := range values.Columns {
+						field := stmt.Schema.LookUpField(col.Name)
+
+						if field != nil && !field.PrimaryKey && (!field.HasDefaultValue || field.DefaultValueInterface != nil ||
+							strings.EqualFold(field.DefaultValue, "NULL")) && field.AutoCreateTime == 0 {
+							columns = append(columns, col.Name)
+						}
+
+					}
+					onConflict.DoUpdates = append(onConflict.DoUpdates, clause.AssignmentColumns(columns)...)
+				}
+			}
+
 			// Build MERGE statement
 			buildMergeInClause(stmt, onConflict, values, conflictColumns)
 		}

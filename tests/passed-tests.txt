@@ -192,7 +192,7 @@ TestMigrateExistingBoolColumnPG
 #TestManyToManyWithMultiPrimaryKeys
 #TestManyToManyWithCustomizedForeignKeys
 #TestManyToManyWithCustomizedForeignKeys2
-#TestCompositePrimaryKeysAssociations
+TestCompositePrimaryKeysAssociations
 TestNamedArg
 TestNamedArgMultipleSameParamRefs
 TestNamedArgNullValues
