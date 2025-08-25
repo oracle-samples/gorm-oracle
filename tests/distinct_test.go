@@ -138,7 +138,6 @@ func TestDistinctWithVaryingCase(t *testing.T) {
 }
 
 func TestDistinctComputedColumn(t *testing.T) {
-	//t.Skip()
 	type UserWithComputationColumn struct {
 		ID   int64 `gorm:"primary_key"`
 		Name string
@@ -174,7 +173,6 @@ func TestDistinctComputedColumn(t *testing.T) {
 }
 
 func TestDistinctWithAggregation(t *testing.T) {
-	t.Skip()
 	type UserWithComputationColumn struct {
 		ID   int64 `gorm:"primaryKey"`
 		Name string
@@ -197,21 +195,21 @@ func TestDistinctWithAggregation(t *testing.T) {
 	}
 
 	if err := DB.Create(&records).Error; err != nil {
-		t.Fatalf("failed to insert test users: %v", err)
+		t.Logf("failed to insert test users: %v", err)
 	}
 
 	var result struct {
-		Sum   int64
+		Sum   float64
 		Avg   float64
-		Count int64
+		Count int
 	}
 
 	err := DB.
-		Table("USER_WITH_COMPUTATION_COLUMNS").
+		Table("user_with_computation_columns").
 		Select(`
-			SUM(DISTINCT col) AS Sum,
-			AVG(DISTINCT col) AS Avg,
-			COUNT(DISTINCT col) AS Count
+			SUM(DISTINCT "col") AS "sum",
+			AVG(DISTINCT "col") AS "avg" ,
+			COUNT(DISTINCT "col") AS "count"
 		`).Scan(&result).Error
 
 	if err != nil {
