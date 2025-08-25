@@ -138,7 +138,7 @@ func TestDistinctWithVaryingCase(t *testing.T) {
 }
 
 func TestDistinctComputedColumn(t *testing.T) {
-	t.Skip()
+	//t.Skip()
 	type UserWithComputationColumn struct {
 		ID   int64 `gorm:"primary_key"`
 		Name string
@@ -146,7 +146,7 @@ func TestDistinctComputedColumn(t *testing.T) {
 	}
 
 	if err := DB.Migrator().DropTable(&UserWithComputationColumn{}); err != nil {
-		t.Fatalf("failed to drop table: %v", err)
+		t.Logf("failed to drop table: %v", err)
 	}
 	if err := DB.AutoMigrate(&UserWithComputationColumn{}); err != nil {
 		t.Fatalf("failed to migrate table: %v", err)
@@ -163,8 +163,8 @@ func TestDistinctComputedColumn(t *testing.T) {
 
 	var computedRecords []int
 	if err := DB.
-		Table("USER_WITH_COMPUTATION_COLUMNS").
-		Select("DISTINCT col * 12 as Computed_Column").
+		Table("user_with_computation_columns").
+		Select("DISTINCT \"col\" * 12 as Computed_Column").
 		Order("Computed_Column").
 		Pluck("Computed_Column", &computedRecords).Error; err != nil {
 		t.Fatalf("failed to query distinct Computed Columns: %v", err)
