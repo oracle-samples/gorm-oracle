@@ -339,7 +339,6 @@ func TestNestedTransactionWithBlock(t *testing.T) {
 }
 
 func TestDeeplyNestedTransactionWithBlockAndWrappedCallback(t *testing.T) {
-	t.Skip()
 	transaction := func(ctx context.Context, db *gorm.DB, callback func(ctx context.Context, db *gorm.DB) error) error {
 		return db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 			return callback(ctx, tx)
@@ -354,22 +353,22 @@ func TestDeeplyNestedTransactionWithBlockAndWrappedCallback(t *testing.T) {
 	if err := transaction(context.Background(), DB, func(ctx context.Context, tx *gorm.DB) error {
 		tx.Create(&user)
 
-		if err := tx.First(&User{}, "name = ?", user.Name).Error; err != nil {
-			t.Fatalf("Should find saved record")
+		if err := tx.First(&User{}, "\"name\" = ?", user.Name).Error; err != nil {
+			t.Fatalf("Should find saved record (user)")
 		}
 
 		if err := transaction(ctx, tx, func(ctx context.Context, tx1 *gorm.DB) error {
 			tx1.Create(&user1)
 
-			if err := tx1.First(&User{}, "name = ?", user1.Name).Error; err != nil {
-				t.Fatalf("Should find saved record")
+			if err := tx1.First(&User{}, "\"name\" = ?", user1.Name).Error; err != nil {
+				t.Fatalf("Should find saved record (user1 inside tx1)")
 			}
 
 			if err := transaction(ctx, tx1, func(ctx context.Context, tx2 *gorm.DB) error {
 				tx2.Create(&user2)
 
-				if err := tx2.First(&User{}, "name = ?", user2.Name).Error; err != nil {
-					t.Fatalf("Should find saved record")
+				if err := tx2.First(&User{}, "\"name\" = ?", user2.Name).Error; err != nil {
+					t.Fatalf("Should find saved record (user2 inside tx2)")
 				}
 
 				return errors.New("inner rollback")
@@ -382,28 +381,28 @@ func TestDeeplyNestedTransactionWithBlockAndWrappedCallback(t *testing.T) {
 			t.Fatalf("nested transaction should returns error")
 		}
 
-		if err := tx.First(&User{}, "name = ?", user1.Name).Error; err == nil {
-			t.Fatalf("Should not find rollbacked record")
+		if err := tx.First(&User{}, "\"name\" = ?", user1.Name).Error; err == nil {
+			t.Fatalf("Should not find rollbacked record (user1)")
 		}
 
-		if err := tx.First(&User{}, "name = ?", user2.Name).Error; err != nil {
-			t.Fatalf("Should find saved record")
+		if err := tx.First(&User{}, "\"name\" = ?", user2.Name).Error; err == nil {
+			t.Fatalf("Should not find rollbacked record (user2)")
 		}
 		return nil
 	}); err != nil {
 		t.Fatalf("no error should return, but got %v", err)
 	}
 
-	if err := DB.First(&User{}, "name = ?", user.Name).Error; err != nil {
-		t.Fatalf("Should find saved record")
+	if err := DB.First(&User{}, "\"name\" = ?", user.Name).Error; err != nil {
+		t.Fatalf("Should find saved record (user)")
 	}
 
-	if err := DB.First(&User{}, "name = ?", user1.Name).Error; err == nil {
+	if err := DB.First(&User{}, "\"name\" = ?", user1.Name).Error; err == nil {
 		t.Fatalf("Should not find rollbacked parent record")
 	}
 
-	if err := DB.First(&User{}, "name = ?", user2.Name).Error; err != nil {
-		t.Fatalf("Should not find rollbacked nested record")
+	if err := DB.First(&User{}, "\"name\" = ?", user2.Name).Error; err == nil {
+		t.Fatalf("Should not find rollbacked record (user2)")
 	}
 }
 
