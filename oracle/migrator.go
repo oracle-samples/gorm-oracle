@@ -197,6 +197,7 @@ func (m Migrator) CreateTable(values ...interface{}) error {
 
 // ReorderModels reorder models according to constraint dependencies
 func (m Migrator) ReorderModels(values []interface{}, autoAdd bool) (results []interface{}) {
+	fmt.Printf("----entering ReorderModels, autoAdd = %t\n", autoAdd)
 	type Dependency struct {
 		*gorm.Statement
 		Depends []*schema.Schema
