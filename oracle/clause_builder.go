@@ -325,7 +325,16 @@ func OnConflictClauseBuilder(c clause.Clause, builder clause.Builder) {
 					missingColumns = append(missingColumns, conflictCol.Name)
 				}
 			}
+
 			if len(missingColumns) > 0 {
+				// primary keys with auto increment will always be missing from create values columns
+				for _, missingCol := range missingColumns {
+					field := stmt.Schema.LookUpField(missingCol)
+					if field != nil && field.PrimaryKey && field.AutoIncrement {
+						return
+					}
+				}
+
 				var selectedColumns []string
 				for col := range selectedColumnSet {
 					selectedColumns = append(selectedColumns, col)
