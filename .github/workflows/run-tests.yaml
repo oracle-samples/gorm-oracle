@@ -6,7 +6,6 @@ jobs:
   run-tests:
     runs-on: ubuntu-latest
     env:
-      DEBUG: "true"
       GORM_ORACLEDB_USER: ${{ secrets.GORM_ORACLEDB_USER }}
       GORM_ORACLEDB_PASSWORD: ${{ secrets.GORM_ORACLEDB_PASSWORD }}
       GORM_ORACLEDB_CONNECTSTRING: ${{ secrets.GORM_ORACLEDB_CONNECTSTRING }}
