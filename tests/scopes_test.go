@@ -526,7 +526,9 @@ func TestScopesWithSubqueries(t *testing.T) {
 // Helper function to set up test data for scope tests
 func setupScopeTestData(t *testing.T) {
 	// Clean up any existing data
-	DB.Exec("DELETE FROM users WHERE \"name\" LIKE 'ScopeUser%'")
+	if err := DB.Where("\"name\" LIKE ?", "ScopeUser%").Delete(&User{}).Error; err != nil {
+		t.Logf("Warning: Cleanup failed: %v", err)
+	}
 
 	// Create test users
 	users := []*User{
