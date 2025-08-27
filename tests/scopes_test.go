@@ -383,17 +383,25 @@ func TestScopesWithTransactions(t *testing.T) {
 	setupScopeTestData(t)
 
 	// Test scopes within a transaction
+	var foundUsers []User
 	err := DB.Transaction(func(tx *gorm.DB) error {
 		transactionScope := func(db *gorm.DB) *gorm.DB {
 			return db.Where("\"name\" = ?", "ScopeUser1")
 		}
 
-		var users []User
-		return tx.Scopes(transactionScope).Find(&users).Error
+		return tx.Scopes(transactionScope).Find(&foundUsers).Error
 	})
 
 	if err != nil {
 		t.Errorf("Scopes within transaction should work, got: %v", err)
+	}
+
+	// Verify the result
+	if len(foundUsers) != 1 {
+		t.Errorf("Expected 1 user in transaction scope, got %d", len(foundUsers))
+	}
+	if len(foundUsers) > 0 && foundUsers[0].Name != "ScopeUser1" {
+		t.Errorf("Expected user name 'ScopeUser1', got '%s'", foundUsers[0].Name)
 	}
 
 	// Test scope that tries to start its own transaction (nested transaction scenario)
@@ -401,10 +409,19 @@ func TestScopesWithTransactions(t *testing.T) {
 		return db.Begin()
 	}
 
+	var nestedUsers []User
 	err = DB.Transaction(func(tx *gorm.DB) error {
-		var users []User
-		return tx.Scopes(nestedTxScope).Find(&users).Error
+		return tx.Scopes(nestedTxScope).Find(&nestedUsers).Error
 	})
+
+	if err != nil {
+		t.Logf("Nested transaction scope failed as expected: %v", err)
+	} else {
+		t.Logf("Nested transaction scope succeeded unexpectedly")
+		if len(nestedUsers) == 0 {
+			t.Error("If nested transaction succeeds, should return some users")
+		}
+	}
 }
 
 func TestScopesWithRawSQL(t *testing.T) {
