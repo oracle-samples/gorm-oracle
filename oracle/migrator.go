@@ -222,6 +222,10 @@ func (m Migrator) ReorderModels(values []interface{}, autoAdd bool) (results []i
 		if err := dep.ParseWithSpecialTableName(value, m.DB.Statement.Table); err != nil {
 			m.DB.Logger.Error(context.Background(), "failed to parse value %#v, got error %v", value, err)
 		}
+
+		s := dep.Statement.Schema.Name
+		fmt.Println("----dep.Statement.Schema = " + s)
+		fmt.Printf("----parsedSchemas = [%v]\n", parsedSchemas)
 		if _, ok := parsedSchemas[dep.Statement.Schema]; ok {
 			fmt.Printf("----schema %v has been parsed already, return\n", dep.Statement.Schema)
 			return

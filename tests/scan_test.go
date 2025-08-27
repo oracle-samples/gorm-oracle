@@ -309,9 +309,7 @@ func TestScanToEmbedded(t *testing.T) {
 	} else {
 		fmt.Println("--------- successfully drop tables")
 	}
-	if true {
-		return
-	}
+	t.Fatal()
 	// if err := DB.Migrator().DropTable(&PersonAddress{}); err != nil {
 	// 	fmt.Printf("--------- %v\n", err)
 	// } else {
