@@ -62,10 +62,11 @@ import (
 )
 
 type Config struct {
-	DriverName        string
-	DataSourceName    string
-	Conn              *sql.DB
-	DefaultStringSize uint
+	DriverName           string
+	DataSourceName       string
+	Conn                 *sql.DB
+	DefaultStringSize    uint
+	SkipQuoteIdentifiers bool
 }
 
 type Dialector struct {
@@ -237,9 +238,13 @@ func (d Dialector) BindVarTo(writer clause.Writer, stmt *gorm.Statement, v inter
 
 // Manages quoting of identifiers
 func (d Dialector) QuoteTo(writer clause.Writer, str string) {
-	var builder strings.Builder
-	writeQuotedIdentifier(&builder, str)
-	writer.WriteString(builder.String())
+	out := str
+	if !d.SkipQuoteIdentifiers {
+		var builder strings.Builder
+		writeQuotedIdentifier(&builder, str)
+		out = builder.String()
+	}
+	_, _ = writer.WriteString(out)
 }
 
 var numericPlaceholder = regexp.MustCompile(`:(\d+)`)
