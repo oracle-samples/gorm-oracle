@@ -476,13 +476,13 @@ func buildUpdatePLSQL(db *gorm.DB) {
 
 	// Start PL/SQL block
 	plsqlBuilder.WriteString("DECLARE\n")
-	writeTableRecordCollectionDecl(&plsqlBuilder, stmt.Schema.DBNames, stmt.Table)
+	writeTableRecordCollectionDecl(db, &plsqlBuilder, stmt.Schema.DBNames, stmt.Table)
 	plsqlBuilder.WriteString("  l_updated_records t_records;\n")
 	plsqlBuilder.WriteString("BEGIN\n")
 
 	// Build UPDATE statement
 	plsqlBuilder.WriteString("  UPDATE ")
-	writeQuotedIdentifier(&plsqlBuilder, stmt.Table)
+	db.QuoteTo(&plsqlBuilder, stmt.Table)
 	plsqlBuilder.WriteString(" SET ")
 
 	// Add SET assignments - handle both regular values and expressions
@@ -490,7 +490,7 @@ func buildUpdatePLSQL(db *gorm.DB) {
 		if i > 0 {
 			plsqlBuilder.WriteString(", ")
 		}
-		writeQuotedIdentifier(&plsqlBuilder, assignment.Column.Name)
+		db.QuoteTo(&plsqlBuilder, assignment.Column.Name)
 		plsqlBuilder.WriteString(" = ")
 
 		// Check if the value is a clause.Expr (like gorm.Expr)
@@ -528,7 +528,7 @@ func buildUpdatePLSQL(db *gorm.DB) {
 		if i > 0 {
 			plsqlBuilder.WriteString(", ")
 		}
-		writeQuotedIdentifier(&plsqlBuilder, column)
+		db.QuoteTo(&plsqlBuilder, column)
 	}
 	plsqlBuilder.WriteString("\n  BULK COLLECT INTO l_updated_records;\n")
 
@@ -559,7 +559,7 @@ func buildUpdatePLSQL(db *gorm.DB) {
 				// Add the assignment to PL/SQL with correct parameter reference
 				plsqlBuilder.WriteString(fmt.Sprintf("  IF l_updated_records.COUNT > %d THEN\n", rowIdx))
 				plsqlBuilder.WriteString(fmt.Sprintf("    :%d := l_updated_records(%d).", paramIndex, rowIdx+1))
-				writeQuotedIdentifier(&plsqlBuilder, column)
+				db.QuoteTo(&plsqlBuilder, column)
 				plsqlBuilder.WriteString(";\n")
 				plsqlBuilder.WriteString("  END IF;\n")
 			}
