@@ -46,8 +46,7 @@ import (
 
 // Identifies the table name alias provided as
 // "\"users\" \"u\"" and "\"users\" u". Gorm already handles
-//
-//	the other formats like "users u", "users AS u" etc.
+// the other formats like "users u", "users AS u" etc.
 var tableRegexp = regexp.MustCompile(`^"(\w+)"\s+"?(\w+)"?$`)
 
 func BeforeQuery(db *gorm.DB) {
