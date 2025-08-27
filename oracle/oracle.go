@@ -102,6 +102,7 @@ func (d Dialector) Initialize(db *gorm.DB) (err error) {
 	callback.Create().Replace("gorm:create", Create)
 	callback.Delete().Replace("gorm:delete", Delete)
 	callback.Update().Replace("gorm:update", Update)
+	callback.Query().Before("gorm:query").Register("oracle:before_query", BeforeQuery)
 
 	maps.Copy(db.ClauseBuilders, OracleClauseBuilders())
 
