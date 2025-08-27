@@ -224,8 +224,11 @@ func (m Migrator) ReorderModels(values []interface{}, autoAdd bool) (results []i
 		}
 
 		s := dep.Statement.Schema.Name
-		fmt.Println("----dep.Statement.Schema = " + s)
+		fmt.Printf("----dep.Statement.Schema = %s, dep.Statement.Schema = %v\n", s, dep.Statement.Schema)
 		fmt.Printf("----parsedSchemas = [%v]\n", parsedSchemas)
+		if s == "person_addresses" {
+			fmt.Println("here")
+		}
 		if _, ok := parsedSchemas[dep.Statement.Schema]; ok {
 			fmt.Printf("----schema %v has been parsed already, return\n", dep.Statement.Schema)
 			return
@@ -249,6 +252,11 @@ func (m Migrator) ReorderModels(values []interface{}, autoAdd bool) (results []i
 				if rel.JoinTable != nil {
 					// append join value
 					defer func(rel *schema.Relationship, joinValue interface{}) {
+						if rel.Name == "Addresses" {
+							many2many := rel.Field.TagSettings["MANY2MANY"]
+							fmt.Println("many2many: " + many2many)
+						}
+
 						if !beDependedOn[rel.FieldSchema] {
 							dep.Depends = append(dep.Depends, rel.FieldSchema)
 						} else {
