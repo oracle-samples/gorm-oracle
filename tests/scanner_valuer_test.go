@@ -59,7 +59,6 @@ import (
 )
 
 func TestScannerValuer(t *testing.T) {
-	t.Skip()
 	DB.Migrator().DropTable(&ScannerValuerStruct{})
 	if err := DB.Migrator().AutoMigrate(&ScannerValuerStruct{}); err != nil {
 		t.Fatalf("no error should happen when migrate scanner, valuer struct, got error %v", err)
@@ -92,7 +91,7 @@ func TestScannerValuer(t *testing.T) {
 
 	var result ScannerValuerStruct
 
-	if err := DB.Find(&result, "id = ?", data.ID).Error; err != nil {
+	if err := DB.Find(&result, "\"id\" = ?", data.ID).Error; err != nil {
 		t.Fatalf("no error should happen when query scanner, valuer struct, but got %v", err)
 	}
 
@@ -151,7 +150,6 @@ func TestScannerValuerWithFirstOrCreate(t *testing.T) {
 }
 
 func TestInvalidValuer(t *testing.T) {
-	t.Skip()
 	DB.Migrator().DropTable(&ScannerValuerStruct{})
 	if err := DB.Migrator().AutoMigrate(&ScannerValuerStruct{}); err != nil {
 		t.Errorf("no error should happen when migrate scanner, valuer struct")
@@ -203,6 +201,24 @@ type ScannerValuerStruct struct {
 	EmptyTime        EmptyTime
 	ExampleStruct    ExampleStruct
 	ExampleStructPtr *ExampleStruct
+}
+
+func (StringsSlice) GormDataType() string { return "CLOB" }
+func (l StringsSlice) GormValue(ctx context.Context, db *gorm.DB) clause.Expr {
+	v, err := l.Value()
+	if err != nil {
+		return gorm.Expr("?", err)
+	}
+	return gorm.Expr("?", v)
+}
+
+func (StructsSlice) GormDataType() string { return "CLOB" }
+func (l StructsSlice) GormValue(ctx context.Context, db *gorm.DB) clause.Expr {
+	v, err := l.Value()
+	if err != nil {
+		return gorm.Expr("?", err)
+	}
+	return gorm.Expr("?", v)
 }
 
 type EncryptedData []byte
