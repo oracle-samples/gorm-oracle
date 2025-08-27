@@ -51,6 +51,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/godror/godror"
 	. "github.com/oracle-samples/gorm-oracle/tests/utils"
 
 	"gorm.io/gorm"
@@ -106,22 +107,24 @@ func TestScannerValuer(t *testing.T) {
 }
 
 func TestScannerValuerWithFirstOrCreate(t *testing.T) {
-	t.Skip()
 	DB.Migrator().DropTable(&ScannerValuerStruct{})
 	if err := DB.Migrator().AutoMigrate(&ScannerValuerStruct{}); err != nil {
 		t.Errorf("no error should happen when migrate scanner, valuer struct")
 	}
 
-	data := ScannerValuerStruct{
-		Name:             sql.NullString{String: "name", Valid: true},
-		Gender:           &sql.NullString{String: "M", Valid: true},
-		Age:              sql.NullInt64{Int64: 18, Valid: true},
+	cond := ScannerValuerStruct{
+		Name:   sql.NullString{String: "name", Valid: true},
+		Gender: &sql.NullString{String: "M", Valid: true},
+		Age:    sql.NullInt64{Int64: 18, Valid: true},
+	}
+
+	attrs := ScannerValuerStruct{
 		ExampleStruct:    ExampleStruct{"name", "value1"},
 		ExampleStructPtr: &ExampleStruct{"name", "value2"},
 	}
 
 	var result ScannerValuerStruct
-	tx := DB.Where(data).FirstOrCreate(&result)
+	tx := DB.Where(cond).Attrs(attrs).FirstOrCreate(&result)
 
 	if tx.RowsAffected != 1 {
 		t.Errorf("RowsAffected should be 1 after create some record")
@@ -131,9 +134,9 @@ func TestScannerValuerWithFirstOrCreate(t *testing.T) {
 		t.Errorf("Should not raise any error, but got %v", tx.Error)
 	}
 
-	tests.AssertObjEqual(t, result, data, "Name", "Gender", "Age")
+	tests.AssertObjEqual(t, result, cond, "Name", "Gender", "Age")
 
-	if err := DB.Where(data).Assign(ScannerValuerStruct{Age: sql.NullInt64{Int64: 18, Valid: true}}).FirstOrCreate(&result).Error; err != nil {
+	if err := DB.Where(cond).Assign(ScannerValuerStruct{Age: sql.NullInt64{Int64: 18, Valid: true}}).FirstOrCreate(&result).Error; err != nil {
 		t.Errorf("Should not raise any error, but got %v", err)
 	}
 
@@ -251,17 +254,44 @@ func (data EncryptedData) Value() (driver.Value, error) {
 
 type Num int64
 
-func (i *Num) Scan(src interface{}) error {
-	switch s := src.(type) {
-	case []byte:
-		n, _ := strconv.Atoi(string(s))
-		*i = Num(n)
-	case int64:
-		*i = Num(s)
-	default:
-		return errors.New("Cannot scan NamedInt from " + reflect.ValueOf(src).String())
+func (n *Num) Scan(val interface{}) error {
+	if val == nil {
+		*n = 0
+		return nil
 	}
-	return nil
+
+	switch x := val.(type) {
+	case int64:
+		*n = Num(x)
+		return nil
+
+	case godror.Number:
+		i, err := strconv.ParseInt(string(x), 10, 64)
+		if err != nil {
+			return fmt.Errorf("Num.Scan: cannot parse godror.Number %q: %w", string(x), err)
+		}
+		*n = Num(i)
+		return nil
+
+	case string:
+		i, err := strconv.ParseInt(x, 10, 64)
+		if err != nil {
+			return fmt.Errorf("Num.Scan: cannot parse string %q: %w", x, err)
+		}
+		*n = Num(i)
+		return nil
+
+	case []byte:
+		i, err := strconv.ParseInt(string(x), 10, 64)
+		if err != nil {
+			return fmt.Errorf("Num.Scan: cannot parse []byte %q: %w", string(x), err)
+		}
+		*n = Num(i)
+		return nil
+
+	default:
+		return fmt.Errorf("Num.Scan: unsupported type %T", val)
+	}
 }
 
 type StringsSlice []string
