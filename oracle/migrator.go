@@ -253,13 +253,13 @@ func (m Migrator) ReorderModels(values []interface{}, autoAdd bool) (results []i
 					if rel.Name == "Addresses" {
 						fmt.Printf("rel.JoinTable.Name: %s, rel.JoinTable.Table: %s\n", rel.JoinTable.Name, rel.JoinTable.Table)
 						many2many := rel.Field.TagSettings["MANY2MANY"]
-						fmt.Println("many2many: " + many2many)
+						fmt.Println("many2many1: " + many2many)
 					}
 					// append join value
 					defer func(rel *schema.Relationship, joinValue interface{}) {
 						if rel.Name == "Addresses" {
 							many2many := rel.Field.TagSettings["MANY2MANY"]
-							fmt.Println("many2many: " + many2many)
+							fmt.Println("many2many2: " + many2many)
 						}
 
 						if !beDependedOn[rel.FieldSchema] {
