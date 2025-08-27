@@ -250,6 +250,9 @@ func (m Migrator) ReorderModels(values []interface{}, autoAdd bool) (results []i
 				}
 
 				if rel.JoinTable != nil {
+					if rel.Name == "Addresses" {
+						fmt.Printf("rel.JoinTable.Name: %s, rel.JoinTable.Table: %s\n", rel.JoinTable.Name, rel.JoinTable.Table)
+					}
 					// append join value
 					defer func(rel *schema.Relationship, joinValue interface{}) {
 						if rel.Name == "Addresses" {
