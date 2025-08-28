@@ -267,9 +267,11 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 		valuesColumnMap[strings.ToUpper(column.Name)] = true
 	}
 
+	// Filter conflict columns to remove non unique columns
 	var filteredConflictColumns []clause.Column
 	for _, conflictCol := range conflictColumns {
-		if valuesColumnMap[strings.ToUpper(conflictCol.Name)] {
+		field := stmt.Schema.LookUpField(conflictCol.Name)
+		if valuesColumnMap[strings.ToUpper(conflictCol.Name)] && (field.Unique || field.AutoIncrement) {
 			filteredConflictColumns = append(filteredConflictColumns, conflictCol)
 		}
 	}
@@ -336,6 +338,7 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 
 	// Build ON clause using conflict columns
 	plsqlBuilder.WriteString("    ON (")
+
 	for idx, conflictCol := range conflictColumns {
 		if idx > 0 {
 			plsqlBuilder.WriteString(" AND ")
@@ -425,7 +428,7 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 		}
 		plsqlBuilder.WriteString("    WHEN MATCHED THEN UPDATE SET t.")
 		writeQuotedIdentifier(&plsqlBuilder, noopCol)
-		plsqlBuilder.WriteString(" = t.")
+		plsqlBuilder.WriteString(" = s.")
 		writeQuotedIdentifier(&plsqlBuilder, noopCol)
 		plsqlBuilder.WriteString("\n")
 	}
