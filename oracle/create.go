@@ -271,7 +271,7 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 	var filteredConflictColumns []clause.Column
 	for _, conflictCol := range conflictColumns {
 		field := stmt.Schema.LookUpField(conflictCol.Name)
-		if valuesColumnMap[strings.ToUpper(conflictCol.Name)] && field.Unique {
+		if valuesColumnMap[strings.ToUpper(conflictCol.Name)] && (field.Unique || field.AutoIncrement) {
 			filteredConflictColumns = append(filteredConflictColumns, conflictCol)
 		}
 	}
