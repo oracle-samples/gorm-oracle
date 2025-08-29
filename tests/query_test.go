@@ -51,6 +51,7 @@ import (
 
 	"time"
 
+	"github.com/godror/godror"
 	. "github.com/oracle-samples/gorm-oracle/tests/utils"
 
 	"gorm.io/gorm"
@@ -59,7 +60,6 @@ import (
 )
 
 func TestFind(t *testing.T) {
-	t.Skip()
 	users := []User{
 		*GetUser("find", Config{}),
 		*GetUser("find", Config{}),
@@ -114,8 +114,10 @@ func TestFind(t *testing.T) {
 							t.Errorf("invalid data type for %v, got %#v", dbName, first[dbName])
 						}
 					case "Age":
-						if _, ok := first[dbName].(uint); !ok {
-							t.Errorf("invalid data type for %v, got %#v", dbName, first[dbName])
+						val := fmt.Sprintf("%v", first[dbName])
+						expected := fmt.Sprint(users[0].Age)
+						if val != expected {
+							t.Errorf("expected %v, got %v", expected, val)
 						}
 					case "Birthday":
 						if _, ok := first[dbName].(*time.Time); !ok {
@@ -146,8 +148,10 @@ func TestFind(t *testing.T) {
 							t.Errorf("invalid data type for %v, got %v %#v", dbName, resultType, first[dbName])
 						}
 					case "Age":
-						if !strings.Contains(resultType, "int") {
-							t.Errorf("invalid data type for %v, got %v %#v", dbName, resultType, first[dbName])
+						val := fmt.Sprintf("%v", first[dbName])
+						expected := fmt.Sprint(users[0].Age)
+						if val != expected {
+							t.Errorf("expected %v, got %v", expected, val)
 						}
 					case "Birthday":
 						if !strings.Contains(resultType, "Time") {
@@ -194,8 +198,10 @@ func TestFind(t *testing.T) {
 									t.Errorf("invalid data type for %v, got %#v", dbName, allMap[idx][dbName])
 								}
 							case "Age":
-								if _, ok := allMap[idx][dbName].(uint); !ok {
-									t.Errorf("invalid data type for %v, got %#v", dbName, allMap[idx][dbName])
+								val := fmt.Sprintf("%v", allMap[idx][dbName])
+								expected := fmt.Sprint(users[0].Age)
+								if val != expected {
+									t.Errorf("expected %v, got %v", expected, val)
 								}
 							case "Birthday":
 								if _, ok := allMap[idx][dbName].(*time.Time); !ok {
@@ -230,8 +236,10 @@ func TestFind(t *testing.T) {
 									t.Errorf("invalid data type for %v, got %v %#v", dbName, resultType, allMap[idx][dbName])
 								}
 							case "Age":
-								if !strings.Contains(resultType, "int") {
-									t.Errorf("invalid data type for %v, got %v %#v", dbName, resultType, allMap[idx][dbName])
+								val := fmt.Sprintf("%v", allMap[idx][dbName])
+								expected := fmt.Sprint(users[0].Age)
+								if val != expected {
+									t.Errorf("expected %v, got %v", expected, val)
 								}
 							case "Birthday":
 								if !strings.Contains(resultType, "Time") {
@@ -714,13 +722,23 @@ func (v Int64) Value() (driver.Value, error) {
 }
 
 func (v *Int64) Scan(val interface{}) error {
-	y := val.(int64)
-	*v = Int64(y + 1)
-	return nil
+	switch x := val.(type) {
+	case int64:
+		*v = Int64(x + 1)
+		return nil
+	case godror.Number:
+		i, err := strconv.ParseInt(string(x), 10, 64)
+		if err != nil {
+			return fmt.Errorf("Int64.Scan: cannot parse godror.Number %q: %w", string(x), err)
+		}
+		*v = Int64(i + 1)
+		return nil
+	default:
+		return fmt.Errorf("Int64.Scan: unsupported type %T", val)
+	}
 }
 
 func TestPluck(t *testing.T) {
-	t.Skip()
 	users := []*User{
 		GetUser("pluck-user1", Config{}),
 		GetUser("pluck-user2", Config{}),
@@ -730,12 +748,12 @@ func TestPluck(t *testing.T) {
 	DB.Create(&users)
 
 	var names []string
-	if err := DB.Model(User{}).Where("name like ?", "pluck-user%").Order("name").Pluck("name", &names).Error; err != nil {
+	if err := DB.Model(User{}).Where("\"name\" like ?", "pluck-user%").Order("\"name\"").Pluck("name", &names).Error; err != nil {
 		t.Errorf("got error when pluck name: %v", err)
 	}
 
 	var names2 []string
-	if err := DB.Model(User{}).Where("name like ?", "pluck-user%").Order("name desc").Pluck("name", &names2).Error; err != nil {
+	if err := DB.Model(User{}).Where("\"name\" like ?", "pluck-user%").Order("\"name\" desc").Pluck("name", &names2).Error; err != nil {
 		t.Errorf("got error when pluck name: %v", err)
 	}
 
@@ -743,12 +761,12 @@ func TestPluck(t *testing.T) {
 	tests.AssertEqual(t, names, names2)
 
 	var ids []int
-	if err := DB.Model(User{}).Where("name like ?", "pluck-user%").Pluck("id", &ids).Error; err != nil {
+	if err := DB.Model(User{}).Where("\"name\" like ?", "pluck-user%").Pluck("id", &ids).Error; err != nil {
 		t.Errorf("got error when pluck id: %v", err)
 	}
 
 	var ids2 []Int64
-	if err := DB.Model(User{}).Where("name like ?", "pluck-user%").Pluck("id", &ids2).Error; err != nil {
+	if err := DB.Model(User{}).Where("\"name\" like ?", "pluck-user%").Pluck("id", &ids2).Error; err != nil {
 		t.Errorf("got error when pluck id: %v", err)
 	}
 
@@ -771,7 +789,7 @@ func TestPluck(t *testing.T) {
 	}
 
 	var times []time.Time
-	if err := DB.Model(User{}).Where("name like ?", "pluck-user%").Pluck("created_at", &times).Error; err != nil {
+	if err := DB.Model(User{}).Where("\"name\" like ?", "pluck-user%").Pluck("created_at", &times).Error; err != nil {
 		t.Errorf("got error when pluck time: %v", err)
 	}
 
@@ -780,7 +798,7 @@ func TestPluck(t *testing.T) {
 	}
 
 	var ptrtimes []*time.Time
-	if err := DB.Model(User{}).Where("name like ?", "pluck-user%").Pluck("created_at", &ptrtimes).Error; err != nil {
+	if err := DB.Model(User{}).Where("\"name\" like ?", "pluck-user%").Pluck("created_at", &ptrtimes).Error; err != nil {
 		t.Errorf("got error when pluck time: %v", err)
 	}
 
@@ -789,7 +807,7 @@ func TestPluck(t *testing.T) {
 	}
 
 	var nulltimes []sql.NullTime
-	if err := DB.Model(User{}).Where("name like ?", "pluck-user%").Pluck("created_at", &nulltimes).Error; err != nil {
+	if err := DB.Model(User{}).Where("\"name\" like ?", "pluck-user%").Pluck("created_at", &nulltimes).Error; err != nil {
 		t.Errorf("got error when pluck time: %v", err)
 	}
 
@@ -941,16 +959,15 @@ func TestPluckWithSelect(t *testing.T) {
 }
 
 func TestSelectWithVariables(t *testing.T) {
-	t.Skip()
 	DB.Save(&User{Name: "select_with_variables"})
 
-	rows, _ := DB.Table("users").Where("name = ?", "select_with_variables").Select("? as fake", gorm.Expr("name")).Rows()
+	rows, _ := DB.Table("users").Where("\"name\" = ?", "select_with_variables").Select("? as fake", gorm.Expr("\"name\"")).Rows()
 
 	if !rows.Next() {
 		t.Errorf("Should have returned at least one row")
 	} else {
 		columns, _ := rows.Columns()
-		tests.AssertEqual(t, columns, []string{"fake"})
+		tests.AssertEqual(t, columns, []string{"FAKE"})
 	}
 
 	rows.Close()
@@ -1662,5 +1679,37 @@ func TestNumberPrecision(t *testing.T) {
 	}
 	if result.BigNumber != record.BigNumber {
 		t.Errorf("Big number mismatch: expected %d, got %d", record.BigNumber, result.BigNumber)
+	}
+}
+
+func TestLargeResultSet(t *testing.T) {
+	var results []struct {
+		RowNum int    `gorm:"column:ROW_NUM"`
+		Value  string `gorm:"column:VALUE"`
+	}
+
+	query := `
+		SELECT LEVEL as row_num, 'row_' || LEVEL as value 
+		FROM dual 
+		CONNECT BY LEVEL <= 1000
+	`
+
+	err := DB.Raw(query).Scan(&results).Error
+	if err != nil {
+		t.Errorf("Failed to execute large result set query: %v", err)
+		return
+	}
+
+	if len(results) != 1000 {
+		t.Errorf("Expected 1000 rows, got %d", len(results))
+		return
+	}
+
+	// Verify first and last rows
+	if results[0].RowNum != 1 || results[0].Value != "row_1" {
+		t.Errorf("First row incorrect: %+v", results[0])
+	}
+	if results[999].RowNum != 1000 || results[999].Value != "row_1000" {
+		t.Errorf("Last row incorrect: %+v", results[999])
 	}
 }
