@@ -130,6 +130,9 @@ func TestRows(t *testing.T) {
 	if err != nil {
 		t.Errorf("No error should happen, got %v", err)
 	}
+	if rows != nil {
+		defer rows.Close()
+	}
 
 	count := 0
 	for rows.Next() {
@@ -147,6 +150,10 @@ func TestRows(t *testing.T) {
 	if err != nil {
 		t.Errorf("No error should happen, got %v", err)
 	}
+	if rows != nil {
+		defer rows.Close()
+	}
+
 	count = 0
 	var age uint
 	for rows.Next() {
@@ -163,6 +170,10 @@ func TestRows(t *testing.T) {
 	if err != nil {
 		t.Errorf("No error should happen, got %v", err)
 	}
+	if rows != nil {
+		defer rows.Close()
+	}
+
 	count = 0
 	for rows.Next() {
 		count++
@@ -200,6 +211,10 @@ func TestRaw(t *testing.T) {
 	}
 
 	rows, _ := DB.Raw("select \"name\", \"age\" from \"users\" where \"name\" = ?", user3.Name).Rows()
+	if rows != nil {
+		defer rows.Close()
+	}
+
 	count := 0
 	for rows.Next() {
 		count++
@@ -243,11 +258,12 @@ func TestRowsWithGroup(t *testing.T) {
 
 	rows, err := DB.Select("\"name\", count(*) as \"total\"").Table("users").Group("name").Having("\"name\" IN ?", []string{users[0].Name, users[1].Name}).Rows()
 	if err != nil {
-
 		t.Fatalf("got error %v", err)
 	}
+	if rows != nil {
+		defer rows.Close()
+	}
 
-	defer rows.Close()
 	for rows.Next() {
 		var name string
 		var total int64
@@ -264,7 +280,10 @@ func TestRowsWithGroup(t *testing.T) {
 	if err2 != nil {
 		t.Fatalf("got error in group by name: %v", err2)
 	}
-	defer rows2.Close()
+	if rows2 != nil {
+		defer rows2.Close()
+	}
+
 	var groupCounts2 = map[string]int64{}
 	for rows2.Next() {
 		var name string
@@ -286,7 +305,10 @@ func TestRowsWithGroup(t *testing.T) {
 	if err3 != nil {
 		t.Fatalf("got error in group by name: %v", err3)
 	}
-	defer rows3.Close()
+	if rows3 != nil {
+		defer rows3.Close()
+	}
+
 	var groupCounts3 = map[string]int64{}
 	for rows3.Next() {
 		var name string
@@ -304,7 +326,10 @@ func TestRowsWithGroup(t *testing.T) {
 	if err4 != nil {
 		t.Fatalf("got error in group by age: %v", err4)
 	}
-	defer rows4.Close()
+	if rows4 != nil {
+		defer rows4.Close()
+	}
+
 	var groupCounts4 = map[int]int64{}
 	for rows4.Next() {
 		var age int
@@ -328,7 +353,10 @@ func TestRowsWithGroup(t *testing.T) {
 	if err5 != nil {
 		t.Fatalf("got error in group by name with having count > 1: %v", err5)
 	}
-	defer rows5.Close()
+	if rows5 != nil {
+		defer rows5.Close()
+	}
+
 	for rows5.Next() {
 		var name string
 		var total int64
