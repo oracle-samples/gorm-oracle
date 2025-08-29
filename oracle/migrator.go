@@ -251,6 +251,7 @@ func (m Migrator) ReorderModels(values []interface{}, autoAdd bool) (results []i
 
 				if rel.JoinTable != nil {
 					if rel.Name == "Addresses" {
+						fmt.Printf("rel.JoinTable.ModelType.Name: %s\n", rel.JoinTable.ModelType.Name())
 						fmt.Printf("rel.JoinTable.Name: %s, rel.JoinTable.Table: %s\n", rel.JoinTable.Name, rel.JoinTable.Table)
 						many2many := rel.Field.TagSettings["MANY2MANY"]
 						fmt.Println("many2many1: " + many2many)
@@ -258,6 +259,8 @@ func (m Migrator) ReorderModels(values []interface{}, autoAdd bool) (results []i
 					// append join value
 					defer func(rel *schema.Relationship, joinValue interface{}) {
 						if rel.Name == "Addresses" {
+							fmt.Printf("rel.JoinTable.ModelType.Name: %s\n", rel.JoinTable.ModelType.Name())
+							fmt.Printf("rel.JoinTable.Name: %s, rel.JoinTable.Table: %s\n", rel.JoinTable.Name, rel.JoinTable.Table)
 							many2many := rel.Field.TagSettings["MANY2MANY"]
 							fmt.Println("many2many2: " + many2many)
 						}
