@@ -725,7 +725,7 @@ func (v *Int64) Scan(val interface{}) error {
 	switch x := val.(type) {
 	case int64:
 		*v = Int64(x + 1)
-	return nil
+		return nil
 	case godror.Number:
 		i, err := strconv.ParseInt(string(x), 10, 64)
 		if err != nil {
