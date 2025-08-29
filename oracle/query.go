@@ -36,58 +36,32 @@
 ** SOFTWARE.
  */
 
-package tests
+package oracle
 
 import (
-	"testing"
-
-	. "github.com/oracle-samples/gorm-oracle/tests/utils"
-
 	"gorm.io/gorm"
+	"regexp"
+	"strings"
 )
 
-func TestUpdateMany2ManyAssociations(t *testing.T) {
-	user := *GetUser("update-many2many", Config{})
+// Identifies the table name alias provided as
+// "\"users\" \"u\"" and "\"users\" u". Gorm already handles
+// the other formats like "users u", "users AS u" etc.
+var tableRegexp = regexp.MustCompile(`^"(\w+)"\s+"?(\w+)"?$`)
 
-	if err := DB.Create(&user).Error; err != nil {
-		t.Fatalf("errors happened when create: %v", err)
+func BeforeQuery(db *gorm.DB) {
+	if db == nil || db.Statement == nil || db.Statement.TableExpr == nil {
+		return
 	}
-
-	user.Languages = []Language{{Code: "zh-CN", Name: "Chinese"}, {Code: "en", Name: "English"}}
-	for _, lang := range user.Languages {
-		DB.Create(&lang)
+	name := db.Statement.TableExpr.SQL
+	if strings.Contains(name, " ") || strings.Contains(name, "`") {
+		if results := tableRegexp.FindStringSubmatch(name); len(results) == 3 {
+			if results[2] != "" {
+				db.Statement.Table = results[2]
+			} else {
+				db.Statement.Table = results[1]
+			}
+		}
 	}
-	user.Friends = []*User{{Name: "friend-1"}, {Name: "friend-2"}}
-
-	if err := DB.Save(&user).Error; err != nil {
-		t.Fatalf("errors happened when update: %v", err)
-	}
-
-	var user2 User
-	DB.Preload("Languages").Preload("Friends").Find(&user2, "\"id\" = ?", user.ID)
-	CheckUserSkipUpdatedAt(t, user2, user)
-
-	for idx := range user.Friends {
-		user.Friends[idx].Name += "new"
-	}
-
-	for idx := range user.Languages {
-		user.Languages[idx].Name += "new"
-	}
-
-	if err := DB.Save(&user).Error; err != nil {
-		t.Fatalf("errors happened when update: %v", err)
-	}
-
-	var user3 User
-	DB.Preload("Languages").Preload("Friends").Find(&user3, "\"id\" = ?", user.ID)
-	CheckUserSkipUpdatedAt(t, user2, user3)
-
-	if err := DB.Session(&gorm.Session{FullSaveAssociations: true}).Save(&user).Error; err != nil {
-		t.Fatalf("errors happened when update: %v", err)
-	}
-
-	var user4 User
-	DB.Preload("Languages").Preload("Friends").Find(&user4, "\"id\" = ?", user.ID)
-	CheckUserSkipUpdatedAt(t, user4, user)
+	return
 }

@@ -176,6 +176,8 @@ func validateCreateData(stmt *gorm.Statement) error {
 
 // Build PL/SQL block for bulk INSERT/MERGE with RETURNING
 func buildBulkInsertPLSQL(db *gorm.DB, createValues clause.Values) {
+	sanitizeCreateValuesForBulkArrays(db.Statement, &createValues)
+
 	stmt := db.Statement
 	schema := stmt.Schema
 
@@ -217,7 +219,6 @@ func buildBulkInsertPLSQL(db *gorm.DB, createValues clause.Values) {
 		conflictColumns := onConflict.Columns
 		if len(conflictColumns) == 0 {
 			if len(schema.PrimaryFields) == 0 {
-				db.AddError(fmt.Errorf("OnConflict requires either explicit columns or primary key fields"))
 				return
 			}
 			for _, primaryField := range schema.PrimaryFields {
@@ -238,6 +239,8 @@ func buildBulkInsertPLSQL(db *gorm.DB, createValues clause.Values) {
 
 // Build PL/SQL block for bulk MERGE with RETURNING (OnConflict case)
 func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClause clause.Clause) {
+	sanitizeCreateValuesForBulkArrays(db.Statement, &createValues)
+
 	stmt := db.Statement
 	schema := stmt.Schema
 
@@ -251,7 +254,6 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 	conflictColumns := onConflict.Columns
 	if len(conflictColumns) == 0 {
 		if schema == nil || len(schema.PrimaryFields) == 0 {
-			db.AddError(fmt.Errorf("OnConflict requires either explicit columns or primary key fields"))
 			return
 		}
 		for _, primaryField := range schema.PrimaryFields {
@@ -265,9 +267,11 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 		valuesColumnMap[strings.ToUpper(column.Name)] = true
 	}
 
+	// Filter conflict columns to remove non unique columns
 	var filteredConflictColumns []clause.Column
 	for _, conflictCol := range conflictColumns {
-		if valuesColumnMap[strings.ToUpper(conflictCol.Name)] {
+		field := stmt.Schema.LookUpField(conflictCol.Name)
+		if valuesColumnMap[strings.ToUpper(conflictCol.Name)] && (field.Unique || field.AutoIncrement) {
 			filteredConflictColumns = append(filteredConflictColumns, conflictCol)
 		}
 	}
@@ -285,9 +289,7 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 
 	// Start PL/SQL block
 	plsqlBuilder.WriteString("DECLARE\n")
-	plsqlBuilder.WriteString("  TYPE t_records IS TABLE OF ")
-	writeQuotedIdentifier(&plsqlBuilder, stmt.Table)
-	plsqlBuilder.WriteString("%ROWTYPE;\n")
+	writeTableRecordCollectionDecl(&plsqlBuilder, stmt.Schema.DBNames, stmt.Table)
 	plsqlBuilder.WriteString("  l_affected_records t_records;\n")
 
 	// Create array types and variables for each column
@@ -336,6 +338,7 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 
 	// Build ON clause using conflict columns
 	plsqlBuilder.WriteString("    ON (")
+
 	for idx, conflictCol := range conflictColumns {
 		if idx > 0 {
 			plsqlBuilder.WriteString(" AND ")
@@ -408,6 +411,25 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 				updateCount++
 			}
 		}
+		plsqlBuilder.WriteString("\n")
+	} else {
+		onCols := map[string]struct{}{}
+		for _, c := range conflictColumns {
+			onCols[strings.ToUpper(c.Name)] = struct{}{}
+		}
+
+		// Picking the first non-ON column from the INSERT/MERGE columns
+		var noopCol string
+		for _, c := range createValues.Columns {
+			if _, inOn := onCols[strings.ToUpper(c.Name)]; !inOn {
+				noopCol = c.Name
+				break
+			}
+		}
+		plsqlBuilder.WriteString("    WHEN MATCHED THEN UPDATE SET t.")
+		writeQuotedIdentifier(&plsqlBuilder, noopCol)
+		plsqlBuilder.WriteString(" = s.")
+		writeQuotedIdentifier(&plsqlBuilder, noopCol)
 		plsqlBuilder.WriteString("\n")
 	}
 
@@ -526,9 +548,7 @@ func buildBulkInsertOnlyPLSQL(db *gorm.DB, createValues clause.Values) {
 
 	// Start PL/SQL block
 	plsqlBuilder.WriteString("DECLARE\n")
-	plsqlBuilder.WriteString("  TYPE t_records IS TABLE OF ")
-	writeQuotedIdentifier(&plsqlBuilder, stmt.Table)
-	plsqlBuilder.WriteString("%ROWTYPE;\n")
+	writeTableRecordCollectionDecl(&plsqlBuilder, stmt.Schema.DBNames, stmt.Table)
 	plsqlBuilder.WriteString("  l_inserted_records t_records;\n")
 
 	// Create array types and variables for each column
@@ -791,19 +811,6 @@ func handleSingleRowReturning(db *gorm.DB) {
 	}
 }
 
-// Simplified RETURNING clause addition for single row operations
-func addReturningClause(db *gorm.DB, fields []*schema.Field) {
-	if len(fields) == 0 {
-		return
-	}
-
-	columns := make([]clause.Column, len(fields))
-	for idx, field := range fields {
-		columns[idx] = clause.Column{Name: field.DBName}
-	}
-	db.Statement.AddClauseIfNotExists(clause.Returning{Columns: columns})
-}
-
 // Handle bulk RETURNING results for PL/SQL operations
 func getBulkReturningValues(db *gorm.DB, rowCount int) {
 	if db.Statement.Schema == nil {
@@ -920,6 +927,37 @@ func handleLastInsertId(db *gorm.DB, result sql.Result) {
 	case reflect.Struct:
 		if _, isZero := pkField.ValueOf(stmt.Context, stmt.ReflectValue); isZero {
 			db.AddError(pkField.Set(stmt.Context, stmt.ReflectValue, insertID))
+		}
+	}
+}
+
+// This replaces expressions (clause.Expr) in bulk insert values
+// with appropriate NULL placeholders based on the column's data type. This ensures that
+// PL/SQL array binding remains consistent and avoids unsupported expressions during
+// FORALL bulk operations.
+func sanitizeCreateValuesForBulkArrays(stmt *gorm.Statement, cv *clause.Values) {
+	for r := range cv.Values {
+		for c, col := range cv.Columns {
+			v := cv.Values[r][c]
+			switch v.(type) {
+			case clause.Expr:
+				if f := findFieldByDBName(stmt.Schema, col.Name); f != nil {
+					switch f.DataType {
+					case schema.Int, schema.Uint:
+						cv.Values[r][c] = sql.NullInt64{}
+					case schema.Float:
+						cv.Values[r][c] = sql.NullFloat64{}
+					case schema.String:
+						cv.Values[r][c] = sql.NullString{}
+					case schema.Time:
+						cv.Values[r][c] = sql.NullTime{}
+					default:
+						cv.Values[r][c] = nil
+					}
+				} else {
+					cv.Values[r][c] = nil
+				}
+			}
 		}
 	}
 }

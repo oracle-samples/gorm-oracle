@@ -42,6 +42,7 @@ import (
 	"fmt"
 	"testing"
 
+	"gorm.io/gorm"
 	. "github.com/oracle-samples/gorm-oracle/tests/utils"
 )
 
@@ -118,5 +119,115 @@ func BenchmarkDelete(b *testing.B) {
 		user.ID = 0
 		DB.Create(&user)
 		DB.Delete(&user)
+	}
+}
+
+func BenchmarkCreateInBatches(b *testing.B) {
+	users := make([]User, 100)
+	for i := 0; i < len(users); i++ {
+		users[i] = *GetUser(fmt.Sprintf("batch-%d", i), Config{})
+	}
+
+	b.ResetTimer()
+	for x := 0; x < b.N; x++ {
+		DB.CreateInBatches(users, 20)
+	}
+}
+
+func BenchmarkFirst(b *testing.B) {
+	user := *GetUser("first", Config{})
+	DB.Create(&user)
+
+	var u User
+	b.ResetTimer()
+	for x := 0; x < b.N; x++ {
+		DB.First(&u, user.ID)
+	}
+}
+
+func BenchmarkWhere(b *testing.B) {
+	user := *GetUser("where", Config{})
+	DB.Create(&user)
+
+	var u User
+	b.ResetTimer()
+	for x := 0; x < b.N; x++ {
+		DB.Where("name = ?", user.Name).First(&u)
+	}
+}
+
+func BenchmarkCount(b *testing.B) {
+	for i := 0; i < 1000; i++ {
+		user := *GetUser(fmt.Sprintf("count-%d", i), Config{})
+		DB.Create(&user)
+	}
+
+	var count int64
+	b.ResetTimer()
+	for x := 0; x < b.N; x++ {
+		DB.Model(&User{}).Count(&count)
+	}
+}
+
+func BenchmarkTransaction(b *testing.B) {
+	for x := 0; x < b.N; x++ {
+		DB.Transaction(func(tx *gorm.DB) error {
+			user := *GetUser(fmt.Sprintf("tx-%d", x), Config{})
+			return tx.Create(&user).Error
+		})
+	}
+}
+
+func BenchmarkJoin(b *testing.B) {
+	user := *GetUser("join-user", Config{})
+	DB.Create(&user)
+
+	type Profile struct {
+		ID     uint
+		UserID uint
+		Bio    string
+	}
+	DB.AutoMigrate(&Profile{})
+	DB.Create(&Profile{UserID: user.ID, Bio: "benchmark profile"})
+
+	var result struct {
+		User
+		Profile
+	}
+
+	b.ResetTimer()
+	for x := 0; x < b.N; x++ {
+		DB.Table("users").
+			Select("users.id, users.name, profiles.bio").
+			Joins("left join profiles on profiles.user_id = users.id").
+			Where("users.id = ?", user.ID).
+			Scan(&result)
+	}
+}
+
+func BenchmarkPagination(b *testing.B) {
+	DB.Exec("delete from users")
+	for i := 0; i < 10000; i++ {
+		user := *GetUser(fmt.Sprintf("page-%d", i), Config{})
+		DB.Create(&user)
+	}
+
+	var users []User
+	b.ResetTimer()
+	for x := 0; x < b.N; x++ {
+		DB.Limit(50).Offset(200).Find(&users)
+	}
+}
+
+func BenchmarkBulkDelete(b *testing.B) {
+	DB.Exec("delete from users")
+	for i := 0; i < 5000; i++ {
+		user := *GetUser(fmt.Sprintf("bulk-%d", i), Config{})
+		DB.Create(&user)
+	}
+
+	b.ResetTimer()
+	for x := 0; x < b.N; x++ {
+		DB.Where("id < ?", 2500).Delete(&User{})
 	}
 }

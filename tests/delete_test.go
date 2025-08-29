@@ -248,7 +248,6 @@ func TestDeleteSliceWithAssociations(t *testing.T) {
 
 // only sqlite, postgres, sqlserver support returning
 func TestSoftDeleteReturning(t *testing.T) {
-	t.Skip()
 	users := []*User{
 		GetUser("delete-returning-1", Config{}),
 		GetUser("delete-returning-2", Config{}),
@@ -257,13 +256,13 @@ func TestSoftDeleteReturning(t *testing.T) {
 	DB.Create(&users)
 
 	var results []User
-	DB.Where("name IN ?", []string{users[0].Name, users[1].Name}).Clauses(clause.Returning{}).Delete(&results)
+	DB.Where("\"name\" IN ?", []string{users[0].Name, users[1].Name}).Clauses(clause.Returning{}).Delete(&results)
 	if len(results) != 2 {
 		t.Errorf("failed to return delete data, got %v", results)
 	}
 
 	var count int64
-	DB.Model(&User{}).Where("name IN ?", []string{users[0].Name, users[1].Name, users[2].Name}).Count(&count)
+	DB.Model(&User{}).Where("\"name\" IN ?", []string{users[0].Name, users[1].Name, users[2].Name}).Count(&count)
 	if count != 1 {
 		t.Errorf("failed to delete data, current count %v", count)
 	}
