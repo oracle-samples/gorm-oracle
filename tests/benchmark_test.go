@@ -43,7 +43,7 @@ import (
 	"testing"
 
 	. "github.com/oracle-samples/gorm-oracle/tests/utils"
-	
+	"gorm.io/gorm"
 )
 
 func BenchmarkCreate(b *testing.B) {
