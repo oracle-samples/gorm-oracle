@@ -181,7 +181,6 @@ func TestCreateFromMap(t *testing.T) {
 }
 
 func TestCreateWithAssociations(t *testing.T) {
-	t.Skip()
 	user := *GetUser("create_with_associations", Config{
 		Account:   true,
 		Pets:      2,
@@ -200,7 +199,7 @@ func TestCreateWithAssociations(t *testing.T) {
 	CheckUser(t, user, user)
 
 	var user2 User
-	DB.Preload("Account").Preload("Pets").Preload("Toys").Preload("Company").Preload("Manager").Preload("Team").Preload("Languages").Preload("Friends").Find(&user2, "id = ?", user.ID)
+	DB.Preload("Account").Preload("Pets").Preload("Toys").Preload("Company").Preload("Manager").Preload("Team").Preload("Languages").Preload("Friends").Find(&user2, "\"id\" = ?", user.ID)
 	CheckUser(t, user2, user)
 }
 
@@ -265,7 +264,6 @@ func TestBulkCreatePtrDataWithAssociations(t *testing.T) {
 }
 
 func TestPolymorphicHasOne(t *testing.T) {
-	t.Skip()
 	t.Run("Struct", func(t *testing.T) {
 		pet := Pet{
 			Name: "PolymorphicHasOne",
@@ -279,7 +277,7 @@ func TestPolymorphicHasOne(t *testing.T) {
 		CheckPet(t, pet, pet)
 
 		var pet2 Pet
-		DB.Preload("Toy").Find(&pet2, "id = ?", pet.ID)
+		DB.Preload("Toy").Find(&pet2, "\"id\" = ?", pet.ID)
 		CheckPet(t, pet2, pet)
 	})
 
