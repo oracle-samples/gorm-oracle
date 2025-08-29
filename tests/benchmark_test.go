@@ -42,8 +42,8 @@ import (
 	"fmt"
 	"testing"
 
-	. "github.com/oracle-samples/gorm-oracle/tests/utils"
 	"gorm.io/gorm"
+	. "github.com/oracle-samples/gorm-oracle/tests/utils"
 )
 
 func BenchmarkCreate(b *testing.B) {
