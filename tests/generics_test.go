@@ -377,7 +377,7 @@ func TestGenericsJoins(t *testing.T) {
 		t.Fatalf("Joins expected %s, got %+v", u.Name, result)
 	}
 
-	// TODO: Temporarily disale due to issue with As("t")
+	// TODO: Temporarily disabled due to issue with As("t")
 	// Raw Subquery JOIN + WHERE
 	/*result, err = db.Joins(clause.LeftJoin.AssociationFrom("Company", gorm.G[Company](DB)).As("t"),
 		func(db gorm.JoinBuilder, joinTable clause.Table, curTable clause.Table) error {
