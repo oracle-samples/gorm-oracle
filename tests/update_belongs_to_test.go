@@ -96,3 +96,99 @@ func TestUpdateBelongsTo(t *testing.T) {
 	}
 	CheckUserSkipUpdatedAt(t, user, user5)
 }
+
+func TestUpdateBelongsToWithReturning(t *testing.T) {
+	user := *GetUser("update-belongs-to-returning", Config{})
+
+	// Test that RETURNING clauses work properly when updating with associations
+	if err := DB.Create(&user).Error; err != nil {
+		t.Fatalf("errors happened when create: %v", err)
+	}
+
+	originalUpdatedAt := user.UpdatedAt
+	user.Company = Company{Name: "returning-test-company"}
+	user.Manager = &User{Name: "returning-test-manager"}
+
+	// Save and verify that UpdatedAt was properly returned from db
+	if err := DB.Save(&user).Error; err != nil {
+		t.Fatalf("errors happened when update with returning: %v", err)
+	}
+
+	// Verify RETURNING clause populated the UpdatedAt field
+	if !user.UpdatedAt.After(originalUpdatedAt) {
+		t.Errorf("expected UpdatedAt to be updated via RETURNING clause")
+	}
+
+	// Verify the associations were created properly
+	var result User
+	if err := DB.Preload("Company").Preload("Manager").First(&result, user.ID).Error; err != nil {
+		t.Fatalf("failed to load user with associations: %v", err)
+	}
+
+	if result.Company.Name != "returning-test-company" {
+		t.Errorf("expected company name to be saved correctly")
+	}
+	if result.Manager.Name != "returning-test-manager" {
+		t.Errorf("expected manager name to be saved correctly")
+	}
+}
+
+func TestUpdateBelongsToWithNullValues(t *testing.T) {
+	user := *GetUser("update-belongs-to-null", Config{})
+
+	// Create user with associations
+	user.Company = Company{Name: "initial-company"}
+	user.Manager = &User{Name: "initial-manager"}
+
+	if err := DB.Create(&user).Error; err != nil {
+		t.Fatalf("errors happened when create: %v", err)
+	}
+
+	// Verify associations were created
+	if user.CompanyID == nil {
+		t.Fatalf("expected CompanyID to be set after create")
+	}
+	if user.ManagerID == nil {
+		t.Fatalf("expected ManagerID to be set after create")
+	}
+
+	// Test setting foreign keys to NULL - clear both the foreign keys AND the association objects
+	user.CompanyID = nil     // Clear foreign key
+	user.ManagerID = nil     // Clear foreign key
+	user.Company = Company{} // Clear association object (zero value)
+	user.Manager = nil       // Clear association pointer
+
+	if err := DB.Model(&user).Updates(map[string]interface{}{
+		"company_id": nil,
+		"manager_id": nil,
+	}).Error; err != nil {
+		t.Fatalf("errors happened when setting associations to null: %v", err)
+	}
+
+	var result User
+	if err := DB.First(&result, user.ID).Error; err != nil {
+		t.Fatalf("failed to load user: %v", err)
+	}
+
+	// Verify foreign keys are properly NULL
+	if result.CompanyID != nil {
+		t.Errorf("expected CompanyID to be NULL, got %v", *result.CompanyID)
+	}
+	if result.ManagerID != nil {
+		t.Errorf("expected ManagerID to be NULL, got %v", *result.ManagerID)
+	}
+
+	// Try to load with preload to ensure NULL handling works
+	var resultWithPreload User
+	if err := DB.Preload("Company").Preload("Manager").First(&resultWithPreload, user.ID).Error; err != nil {
+		t.Fatalf("failed to load user with preload: %v", err)
+	}
+
+	// When foreign keys are NULL, preloaded associations should be zero values
+	if resultWithPreload.Company.ID != 0 {
+		t.Errorf("expected Company to be zero value when foreign key is NULL")
+	}
+	if resultWithPreload.Manager != nil {
+		t.Errorf("expected Manager to be nil when foreign key is NULL")
+	}
+}
