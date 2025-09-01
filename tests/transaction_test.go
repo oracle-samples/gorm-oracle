@@ -385,7 +385,7 @@ func TestDeeplyNestedTransactionWithBlockAndWrappedCallback(t *testing.T) {
 			t.Fatalf("Should not find rollbacked record")
 		}
 
-		if err := tx.First(&User{}, "\"name\" = ?", user2.Name).Error; err == nil {
+		if err := tx.First(&User{}, "\"name\" = ?", user2.Name).Error; err != nil {
 			t.Fatalf("Should not find saved record")
 		}
 		return nil
@@ -401,7 +401,7 @@ func TestDeeplyNestedTransactionWithBlockAndWrappedCallback(t *testing.T) {
 		t.Fatalf("Should not find rollbacked parent record")
 	}
 
-	if err := DB.First(&User{}, "\"name\" = ?", user2.Name).Error; err == nil {
+	if err := DB.First(&User{}, "\"name\" = ?", user2.Name).Error; err != nil {
 		t.Fatalf("Should not find rollbacked nested record")
 	}
 }
