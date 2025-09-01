@@ -386,7 +386,7 @@ func TestDeeplyNestedTransactionWithBlockAndWrappedCallback(t *testing.T) {
 		}
 
 		if err := tx.First(&User{}, "\"name\" = ?", user2.Name).Error; err != nil {
-			t.Fatalf("Should not find saved record")
+			t.Fatalf("Should find saved record")
 		}
 		return nil
 	}); err != nil {
