@@ -480,3 +480,184 @@ func TestGORMValuer(t *testing.T) {
 		t.Errorf("generated vars is not equal, got %v", stmt.Vars)
 	}
 }
+
+func TestEncryptedDataScanValue(t *testing.T) {
+	var ed EncryptedData
+
+	if err := ed.Scan([]byte("***mypassword")); err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+	if string(ed) != "mypassword" {
+		t.Errorf("expected 'mypassword', got %s", string(ed))
+	}
+
+	if err := ed.Scan("***otherpass"); err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+	if string(ed) != "otherpass" {
+		t.Errorf("expected 'otherpass', got %s", string(ed))
+	}
+
+	if err := ed.Scan([]byte("no")); err == nil {
+		t.Errorf("expected error for too short input")
+	}
+
+	val, err := EncryptedData("mypassword").Value()
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+	if string(val.([]byte)) != "***mypassword" {
+		t.Errorf("expected '***mypassword', got %s", string(val.([]byte)))
+	}
+
+	_, err = EncryptedData("xpass").Value()
+	if err == nil {
+		t.Errorf("expected error when starting with 'x'")
+	}
+}
+
+func TestNumScan(t *testing.T) {
+	var n Num
+
+	if err := n.Scan(int64(42)); err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+	if n != 42 {
+		t.Errorf("expected 42, got %d", n)
+	}
+
+	if err := n.Scan("99"); err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+	if n != 99 {
+		t.Errorf("expected 99, got %d", n)
+	}
+
+	if err := n.Scan([]byte("123")); err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+	if n != 123 {
+		t.Errorf("expected 123, got %d", n)
+	}
+
+	if err := n.Scan(godror.Number("456")); err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+	if n != 456 {
+		t.Errorf("expected 456, got %d", n)
+	}
+
+	if err := n.Scan(nil); err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+	if n != 0 {
+		t.Errorf("expected 0 after nil scan, got %d", n)
+	}
+
+	if err := n.Scan(3.14); err == nil {
+		t.Errorf("expected error for unsupported type")
+	}
+}
+
+func TestStringsSliceScanValue(t *testing.T) {
+	original := StringsSlice{"a", "b"}
+	val, err := original.Value()
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+
+	var parsed StringsSlice
+	if err := parsed.Scan(val.(string)); err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+	if len(parsed) != 2 || parsed[0] != "a" || parsed[1] != "b" {
+		t.Errorf("unexpected parsed result: %#v", parsed)
+	}
+
+	if err := parsed.Scan(123); err == nil {
+		t.Errorf("expected error for unsupported type")
+	}
+}
+
+func TestStructsSliceScanValue(t *testing.T) {
+	original := StructsSlice{
+		{Name: "n1", Val: "v1"},
+		{Name: "n2", Val: "v2"},
+	}
+	val, err := original.Value()
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+
+	var parsed StructsSlice
+	if err := parsed.Scan(val.(string)); err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+	if len(parsed) != 2 || parsed[0].Name != "n1" || parsed[1].Val != "v2" {
+		t.Errorf("unexpected parsed result: %#v", parsed)
+	}
+}
+
+func TestExampleStructScanValue(t *testing.T) {
+	orig := ExampleStruct{Name: "foo", Val: "bar"}
+	val, err := orig.Value()
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+
+	var parsed ExampleStruct
+	if err := parsed.Scan(val.([]byte)); err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+	if parsed.Val != "bar" {
+		t.Errorf("expected Val 'bar', got %s", parsed.Val)
+	}
+
+	if err := parsed.Scan(123); err == nil {
+		t.Errorf("expected error for unsupported type")
+	}
+}
+
+func TestRoleScanValue(t *testing.T) {
+	var r Role
+	if err := r.Scan([]byte("admin")); err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+	if !r.IsAdmin() {
+		t.Errorf("expected role to be admin")
+	}
+
+	if err := r.Scan("user"); err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+	if r.IsAdmin() {
+		t.Errorf("expected role to be not admin")
+	}
+
+	val, err := r.Value()
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+	if val != "user" {
+		t.Errorf("expected 'user', got %v", val)
+	}
+}
+
+func TestEmptyTimeScanValue(t *testing.T) {
+	var et EmptyTime
+	now := time.Now()
+	if err := et.Scan(now); err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+	if !et.Time.Equal(now) {
+		t.Errorf("expected %v, got %v", now, et.Time)
+	}
+
+	val, err := et.Value()
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+	if _, ok := val.(time.Time); !ok {
+		t.Errorf("expected time.Time, got %T", val)
+	}
+}
