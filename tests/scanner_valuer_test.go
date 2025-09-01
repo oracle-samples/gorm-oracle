@@ -50,6 +50,7 @@ import (
 	"strconv"
 	"testing"
 	"time"
+	"math"
 
 	"github.com/godror/godror"
 	. "github.com/oracle-samples/gorm-oracle/tests/utils"
@@ -557,6 +558,72 @@ func TestNumScan(t *testing.T) {
 	if err := n.Scan(3.14); err == nil {
 		t.Errorf("expected error for unsupported type")
 	}
+
+	if err := n.Scan(int64(0)); err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+	if n != 0 {
+		t.Errorf("expected 0, got %d", n)
+	}
+
+	if err := n.Scan(int64(-123)); err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+	if n != -123 {
+		t.Errorf("expected -123, got %d", n)
+	}
+
+	large := int64(math.MaxInt64)
+	if err := n.Scan(large); err != nil {
+		t.Errorf("expected no error for large int, got %v", err)
+	}
+	if n != Num(large) {
+		t.Errorf("expected %d, got %d", large, n)
+	}
+
+	small := int64(math.MinInt64)
+	if err := n.Scan(small); err != nil {
+		t.Errorf("expected no error for small int, got %v", err)
+	}
+	if n != Num(small) {
+		t.Errorf("expected %d, got %d", small, n)
+	}
+
+	if err := n.Scan("   77  "); err == nil {
+    	t.Errorf("expected error for spaced string")
+	}
+
+	if err := n.Scan(""); err == nil {
+		t.Errorf("expected error for empty string")
+	}
+
+	if err := n.Scan([]byte("")); err == nil {
+		t.Errorf("expected error for empty byte slice")
+	}
+
+	if err := n.Scan("not-a-number"); err == nil {
+		t.Errorf("expected error for invalid string")
+	}
+
+	if err := n.Scan(godror.Number("abc")); err == nil {
+		t.Errorf("expected error for invalid godror.Number")
+	}
+
+	if err := n.Scan(uint64(123)); err == nil {
+		t.Errorf("expected error for unsupported uint64 type")
+	}
+
+	if err := n.Scan("9223372036854775808"); err == nil {
+    	t.Errorf("expected error for overflow string")
+	}
+
+	if err := n.Scan(`"42"`); err == nil {
+    	t.Errorf("expected error for quoted JSON string")
+	}
+
+	if err := n.Scan(true); err == nil {
+    	t.Errorf("expected error for bool input")
+	}
 }
 
 func TestStringsSliceScanValue(t *testing.T) {
@@ -659,5 +726,64 @@ func TestEmptyTimeScanValue(t *testing.T) {
 	}
 	if _, ok := val.(time.Time); !ok {
 		t.Errorf("expected time.Time, got %T", val)
+	}
+}
+
+func TestStringsSliceEmptySlice(t *testing.T) {
+	empty := StringsSlice{}
+	val, err := empty.Value()
+	if err != nil {
+		t.Errorf("expected no error for empty slice, got %v", err)
+	}
+
+	var parsed StringsSlice
+	if err := parsed.Scan(val.(string)); err != nil {
+		t.Errorf("expected no error scanning empty slice, got %v", err)
+	}
+	if len(parsed) != 0 {
+		t.Errorf("expected empty slice, got %#v", parsed)
+	}
+}
+
+func TestStringsSliceNilSlice(t *testing.T) {
+	var nilSlice StringsSlice
+	val, err := nilSlice.Value()
+	if err != nil {
+		t.Errorf("expected no error for nil slice, got %v", err)
+	}
+	if val.(string) != "null" && val.(string) != "[]" {
+		t.Errorf("expected JSON null or [], got %v", val)
+	}
+}
+
+func TestStringsSliceSpecialCharacters(t *testing.T) {
+	special := StringsSlice{"a,b", "c\nd", "e\"f"}
+	val, err := special.Value()
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+
+	var parsed StringsSlice
+	if err := parsed.Scan(val.(string)); err != nil {
+		t.Errorf("expected no error scanning special chars, got %v", err)
+	}
+	if parsed[0] != "a,b" || parsed[1] != "c\nd" || parsed[2] != "e\"f" {
+		t.Errorf("unexpected parsed result with special chars: %#v", parsed)
+	}
+}
+
+func TestStringsSliceInvalidJSON(t *testing.T) {
+	var parsed StringsSlice
+	err := parsed.Scan("{bad json}")
+	if err == nil {
+		t.Errorf("expected error for malformed JSON, got nil")
+	}
+}
+
+func TestStringsSliceWrongType(t *testing.T) {
+	slice := StringsSlice{"x"}
+	err := slice.Scan(123)
+	if err == nil {
+		t.Errorf("expected error for wrong type, got nil")
 	}
 }
