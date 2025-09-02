@@ -97,3 +97,117 @@ func TestNonStdPrimaryKeyAndDefaultValues(t *testing.T) {
 		t.Errorf("Update a filed to blank with a default value should occur. But got %v\n", animal.Name)
 	}
 }
+
+func TestPrimaryKeyAutoIncrement(t *testing.T) {
+	DB.Migrator().DropTable(&Animal{})
+	if err := DB.AutoMigrate(&Animal{}); err != nil {
+		t.Fatalf("migration failed: %v", err)
+	}
+
+	a1 := Animal{Name: "A1"}
+	a2 := Animal{Name: "A2"}
+	DB.Create(&a1)
+	DB.Create(&a2)
+
+	if a1.Counter == 0 || a2.Counter == 0 {
+		t.Errorf("primary key Counter should be set, got %d and %d", a1.Counter, a2.Counter)
+	}
+	if a2.Counter <= a1.Counter {
+		t.Errorf("Counter should auto-increment, got %d then %d", a1.Counter, a2.Counter)
+	}
+}
+
+func TestReservedKeywordColumn(t *testing.T) {
+	DB.Migrator().DropTable(&Animal{})
+	DB.AutoMigrate(&Animal{})
+
+	animal := Animal{From: "a nice place"}
+	DB.Create(&animal)
+
+	var fetched Animal
+	if err := DB.Where("\"from\" = ?", "a nice place").First(&fetched).Error; err != nil {
+		t.Errorf("query with reserved keyword failed: %v", err)
+	}
+	if fetched.From != "a nice place" {
+		t.Errorf("expected From='a nice place', got %v", fetched.From)
+	}
+
+	var badFetched Animal
+	err := DB.Where("from = ?", "a nice place").First(&badFetched).Error
+	if err == nil {
+		t.Errorf("expected error when querying without quotes on reserved keyword, but got none")
+	}
+}
+
+func timePrecisionCheck(t1, t2 time.Time, tolerance time.Duration) bool {
+	return t1.Sub(t2) < tolerance && t2.Sub(t1) < tolerance
+}
+
+func TestPointerFieldNullability(t *testing.T) {
+	DB.Migrator().DropTable(&Animal{})
+	DB.AutoMigrate(&Animal{})
+
+	animal1 := Animal{Name: "NoAge"}
+	DB.Create(&animal1)
+
+	var fetched1 Animal
+	DB.First(&fetched1, animal1.Counter)
+	if fetched1.Age != nil {
+		t.Errorf("expected Age=nil, got %v", fetched1.Age)
+	}
+
+	now := time.Now()
+	animal2 := Animal{Name: "WithAge", Age: &now}
+	DB.Create(&animal2)
+
+	var fetched2 Animal
+	DB.First(&fetched2, animal2.Counter)
+	if fetched2.Age == nil {
+		t.Errorf("expected Age to be set, got nil")
+	} else if !timePrecisionCheck(*fetched2.Age, now, time.Microsecond) {
+		t.Errorf("expected Age≈%v, got %v", now, *fetched2.Age)
+	}
+}
+
+func TestUnexportedFieldNotMigrated(t *testing.T) {
+	DB.Migrator().DropTable(&Animal{})
+	DB.AutoMigrate(&Animal{})
+
+	cols, _ := DB.Migrator().ColumnTypes(&Animal{})
+	for _, c := range cols {
+		if c.Name() == "unexported" {
+			t.Errorf("unexported field should not be a DB column")
+		}
+	}
+}
+
+func TestBatchInsertDefaults(t *testing.T) {
+	DB.Migrator().DropTable(&Animal{})
+	DB.AutoMigrate(&Animal{})
+
+	animals := []Animal{{From: "x"}, {From: "y"}}
+	DB.Create(&animals)
+
+	for _, a := range animals {
+		if a.Counter == 0 {
+			t.Errorf("Counter should be set for batch insert, got 0")
+		}
+		if a.Name != "galeone" {
+			t.Errorf("Name should default to 'galeone', got %v", a.Name)
+		}
+	}
+}
+
+func TestUpdatedAtChangesOnUpdate(t *testing.T) {
+	DB.Migrator().DropTable(&Animal{})
+	DB.AutoMigrate(&Animal{})
+
+	animal := Animal{Name: "Ferdinand"}
+	DB.Create(&animal)
+	updatedAt1 := animal.UpdatedAt
+
+	DB.Model(&animal).Update("name", "Francis")
+	if updatedAt1.Format(time.RFC3339Nano) == animal.UpdatedAt.Format(time.RFC3339Nano) {
+		t.Errorf("UpdatedAt should be updated")
+	}
+}
