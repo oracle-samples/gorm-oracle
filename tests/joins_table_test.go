@@ -154,7 +154,6 @@ func TestOverrideJoinTable(t *testing.T) {
 }
 
 func TestOverrideJoinTableInvalidAssociation(t *testing.T) {
-	DB.Migrator().DropTable(&Person{}, &Address{}, &PersonAddress{})
 	if err := DB.SetupJoinTable(&Person{}, "Addresses", &PersonAddress{}); err != nil {
 		t.Fatalf("Failed to setup join table for person, got error %v", err)
 	}
@@ -172,7 +171,6 @@ func TestOverrideJoinTableInvalidAssociation(t *testing.T) {
 }
 
 func TestOverrideJoinTableClearWithoutAssociations(t *testing.T) {
-	DB.Migrator().DropTable(&Person{}, &Address{}, &PersonAddress{})
 	if err := DB.SetupJoinTable(&Person{}, "Addresses", &PersonAddress{}); err != nil {
 		t.Fatalf("Failed to setup join table for person, got error %v", err)
 	}
@@ -193,7 +191,6 @@ func TestOverrideJoinTableClearWithoutAssociations(t *testing.T) {
 }
 
 func TestOverrideJoinTableDeleteNonExistentAssociation(t *testing.T) {
-	DB.Migrator().DropTable(&Person{}, &Address{}, &PersonAddress{})
 	if err := DB.SetupJoinTable(&Person{}, "Addresses", &PersonAddress{}); err != nil {
 		t.Fatalf("Failed to setup join table for person, got error %v", err)
 	}

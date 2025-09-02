@@ -10,21 +10,9 @@
 # 2. Run the script ./run_tests.sh
 
 # Check for required Oracle environment variables
-missing_vars=()
-for var in GORM_ORACLEDB_USER GORM_ORACLEDB_PASSWORD GORM_ORACLEDB_CONNECTSTRING GORM_ORACLEDB_LIBDIR; do
-    if [ -z "${!var}" ]; then
-        missing_vars+=("$var")
-    fi
-done
-if [ ${#missing_vars[@]} -ne 0 ]; then
-    echo "Error: The following environment variables must be set to run the tests: ${missing_vars[*]}"
-    echo "Example:"
-    echo "  export GORM_ORACLEDB_USER=your_user"
-    echo "  export GORM_ORACLEDB_PASSWORD=your_password"
-    echo "  export GORM_ORACLEDB_CONNECTSTRING=your_connect_string"
-    echo "  export GORM_ORACLEDB_LIBDIR=your_lib_dir"
-    exit 1
-fi
+export GORM_DSN='user="system" password="manager" \
+connectString="phoenix808593.dev3sub4phx.databasede3phx.oraclevcn.com:1661/cdb1_pdb1.regress.rdbms.dev.us.oracle.com" \
+libDir="/home/hkhasnis/projects/pkgs/23IC"'
 
 # Check if passed-tests.txt exists
 if [ ! -f "passed-tests.txt" ]; then

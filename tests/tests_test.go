@@ -65,32 +65,9 @@ var newLogger = logger.New(
 	},
 )
 
-var oracleDSN = func() string {
-	user := os.Getenv("GORM_ORACLEDB_USER")
-	password := os.Getenv("GORM_ORACLEDB_PASSWORD")
-	connectString := os.Getenv("GORM_ORACLEDB_CONNECTSTRING")
-	libDir := os.Getenv("GORM_ORACLEDB_LIBDIR")
-
-	missing := []string{}
-	if user == "" {
-		missing = append(missing, "GORM_ORACLEDB_USER")
-	}
-	if password == "" {
-		missing = append(missing, "GORM_ORACLEDB_PASSWORD")
-	}
-	if connectString == "" {
-		missing = append(missing, "GORM_ORACLEDB_CONNECTSTRING")
-	}
-	if libDir == "" {
-		missing = append(missing, "GORM_ORACLEDB_LIBDIR")
-	}
-	if len(missing) > 0 {
-		log.Fatalf("Missing required environment variables: %v. Please set them to run the tests.", missing)
-	}
-	return `user="` + user + `" password="` + password + `"
-			connectString="` + connectString + `"
-			libDir="` + libDir + `"`
-}()
+var oracleDSN = `user="system" password="manager"
+	connectString="phoenix808593.dev3sub4phx.databasede3phx.oraclevcn.com:1661/cdb1_pdb1.regress.rdbms.dev.us.oracle.com"
+	libDir="/home/hkhasnis/projects/pkgs/23IC"`
 
 func init() {
 	var err error
