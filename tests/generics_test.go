@@ -134,16 +134,25 @@ func TestGenericsCreateInBatches(t *testing.T) {
 	}
 
 	found, err := gorm.G[User](DB).Raw("SELECT * FROM \"users\" WHERE \"name\" LIKE ?", "GenericsCreateInBatches%").Find(ctx)
+	if err != nil {
+		t.Fatalf("Raw Find failed: %v", err)
+	}
 	if len(found) != len(batch) {
 		t.Errorf("expected %d from Raw Find, got %d", len(batch), len(found))
 	}
 
 	found, err = gorm.G[User](DB).Where("\"name\" like ?", "GenericsCreateInBatches%").Limit(2).Find(ctx)
+	if err != nil {
+		t.Fatalf("Raw Find failed: %v", err)
+	}
 	if len(found) != 2 {
 		t.Errorf("expected %d from Raw Find, got %d", 2, len(found))
 	}
 
 	found, err = gorm.G[User](DB).Where("\"name\" like ?", "GenericsCreateInBatches%").Offset(2).Limit(2).Find(ctx)
+	if err != nil {
+		t.Fatalf("Raw Find failed: %v", err)
+	}
 	if len(found) != 1 {
 		t.Errorf("expected %d from Raw Find, got %d", 1, len(found))
 	}
@@ -168,7 +177,9 @@ func TestGenericsExecAndUpdate(t *testing.T) {
 
 	name += "Update"
 	rows, err := gorm.G[User](DB).Where("\"id\" = ?", u.ID).Update(ctx, "name", name)
-	if rows != 1 {
+	if err != nil {
+		t.Fatalf("Update failed: %v", err)
+	} else if rows != 1 {
 		t.Fatalf("failed to get affected rows, got %d, should be %d", rows, 1)
 	}
 
@@ -180,7 +191,9 @@ func TestGenericsExecAndUpdate(t *testing.T) {
 	}
 
 	rows, err = gorm.G[User](DB).Where("\"id\" = ?", u.ID).Updates(ctx, User{Name: "GenericsExecUpdates", Age: 18})
-	if rows != 1 {
+	if err != nil {
+		t.Fatalf("Updates failed: %v", err)
+	} else if rows != 1 {
 		t.Fatalf("failed to get affected rows, got %d, should be %d", rows, 1)
 	}
 
@@ -251,6 +264,37 @@ func TestGenericsDelete(t *testing.T) {
 	if err != gorm.ErrRecordNotFound {
 		t.Fatalf("User after delete failed: %v", err)
 	}
+
+	u2 := User{Name: "GenericsDeleteCond"}
+	if err := gorm.G[User](DB).Create(ctx, &u2); err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+	rows, err = gorm.G[User](DB).Where("\"name\" = ?", "GenericsDeleteCond").Delete(ctx)
+	if err != nil {
+		t.Fatalf("Conditional delete failed: %v", err)
+	}
+	if rows != 1 {
+		t.Fatalf("Conditional delete failed, err=%v, rows=%d", err, rows)
+	}
+	_, err = gorm.G[User](DB).Where("\"id\" = ?", u2.ID).First(ctx)
+	if err != gorm.ErrRecordNotFound {
+		t.Errorf("Expected deleted record to be gone, got: %v", err)
+	}
+
+	users := []User{
+		{Name: "GenericsBatchDel1"},
+		{Name: "GenericsBatchDel2"},
+	}
+	if err := gorm.G[User](DB).CreateInBatches(ctx, &users, 2); err != nil {
+		t.Fatalf("Batch create for delete failed: %v", err)
+	}
+	rows, err = gorm.G[User](DB).Where("\"name\" LIKE ?", "GenericsBatchDel%").Delete(ctx)
+	if err != nil {
+		t.Fatalf("Batch delete failed: %v", err)
+	}
+	if rows != 2 {
+		t.Errorf("batch delete expected 2 rows, got %d", rows)
+	}
 }
 
 func TestGenericsFindInBatches(t *testing.T) {
@@ -301,20 +345,23 @@ func TestGenericsScopes(t *testing.T) {
 	results, err := gorm.G[User](DB).Scopes(filterName1).Find(ctx)
 	if err != nil {
 		t.Fatalf("Scopes failed: %v", err)
-	}
-	if len(results) != 1 || results[0].Name != "GenericsScopes1" {
+	} else if len(results) != 1 || results[0].Name != "GenericsScopes1" {
 		t.Fatalf("Scopes expected 1, got %d", len(results))
 	}
 
 	notResult, err := gorm.G[User](DB).Where("\"name\" like ?", "GenericsScopes%").Not("\"name\" = ?", "GenericsScopes1").Order("\"name\"").Find(ctx)
-	if len(notResult) != 2 {
+	if err != nil {
+		t.Fatalf("Not failed: %v", err)
+	} else if len(notResult) != 2 {
 		t.Fatalf("expected 2 results, got %d", len(notResult))
 	} else if notResult[0].Name != "GenericsScopes2" || notResult[1].Name != "GenericsScopes3" {
 		t.Fatalf("expected names 'GenericsScopes2' and 'GenericsScopes3', got %s and %s", notResult[0].Name, notResult[1].Name)
 	}
 
 	orResult, err := gorm.G[User](DB).Or("\"name\" = ?", "GenericsScopes1").Or("\"name\" = ?", "GenericsScopes2").Order("\"name\"").Find(ctx)
-	if len(orResult) != 2 {
+	if err != nil {
+		t.Fatalf("Or failed: %v", err)
+	} else if len(orResult) != 2 {
 		t.Fatalf("expected 2 results, got %d", len(notResult))
 	} else if orResult[0].Name != "GenericsScopes1" || orResult[1].Name != "GenericsScopes2" {
 		t.Fatalf("expected names 'GenericsScopes2' and 'GenericsScopes3', got %s and %s", orResult[0].Name, orResult[1].Name)
@@ -554,6 +601,9 @@ func TestGenericsPreloads(t *testing.T) {
 		return nil
 	}).Where("\"name\" in ?", names).Find(ctx)
 
+	if err != nil {
+		t.Fatalf("Preload failed: %v", err)
+	}
 	for _, result := range results {
 		if result.Name == u.Name {
 			if len(result.Pets) != len(u.Pets) {
@@ -577,6 +627,9 @@ func TestGenericsPreloads(t *testing.T) {
 		return nil
 	}).Where("\"name\" in ?", names).Find(ctx)
 
+	if err != nil {
+		t.Fatalf("Preload failed: %v", err)
+	}
 	for _, result := range results {
 		if result.Name == u.Name {
 			if len(result.Pets) != len(u.Pets) {
@@ -608,6 +661,9 @@ func TestGenericsPreloads(t *testing.T) {
 		return nil
 	}).Where("\"name\" in ?", names).Find(ctx)
 
+	if err != nil {
+		t.Fatalf("Preload failed: %v", err)
+	}
 	for _, result := range results {
 		if result.Name == u.Name {
 			if len(result.Pets) != len(u.Pets) {
@@ -868,6 +924,9 @@ func TestGenericsWithTransaction(t *testing.T) {
 
 	users := []User{{Name: "TestGenericsTransaction", Age: 18}, {Name: "TestGenericsTransaction2", Age: 18}}
 	err := gorm.G[User](tx).CreateInBatches(ctx, &users, 2)
+	if err != nil {
+		t.Fatalf("CreateInBatches failed: %v", err)
+	}
 
 	count, err := gorm.G[User](tx).Where("\"name\" like ?", "TestGenericsTransaction%").Count(ctx, "*")
 	if err != nil {
@@ -897,7 +956,95 @@ func TestGenericsToSQL(t *testing.T) {
 		return tx
 	})
 
-	if !regexp.MustCompile("SELECT \\* FROM .users..* 10").MatchString(sql) {
+	if !regexp.MustCompile(`SELECT \* FROM .users..* 10`).MatchString(sql) {
 		t.Errorf("ToSQL: got wrong sql with Generics API %v", sql)
+	}
+}
+
+func TestGenericsCountOmitSelect(t *testing.T) {
+	ctx := context.Background()
+	users := []User{{Name: "GenericsCount1", Age: 5}, {Name: "GenericsCount2", Age: 7}}
+	err := gorm.G[User](DB).CreateInBatches(ctx, &users, 2)
+	if err != nil {
+		t.Fatalf("CreateInBatches failed: %v", err)
+	}
+	count, err := gorm.G[User](DB).Omit("age").Where("\"name\" LIKE ?", "GenericsCount%").Count(ctx, "*")
+	if err != nil {
+		t.Fatalf("Count failed: %v", err)
+	}
+	if count != 2 {
+		t.Errorf("Count with Omit: expected 2, got %d", count)
+	}
+}
+
+func TestGenericsSelectAndOmitFind(t *testing.T) {
+	ctx := context.Background()
+	u := User{Name: "GenericsSelectOmit", Age: 30}
+	err := gorm.G[User](DB).Create(ctx, &u)
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+	result, err := gorm.G[User](DB).Select("id").Omit("age").Where("\"name\" = ?", u.Name).First(ctx)
+	if err != nil {
+		t.Fatalf("Select and Omit Find failed: %v", err)
+	}
+	if result.ID != u.ID || result.Name != "" || result.Age != 0 {
+		t.Errorf("SelectAndOmitFind expects partial zero values, got: %+v", result)
+	}
+}
+
+func TestGenericsSelectWithPreloadAssociations(t *testing.T) {
+	ctx := context.Background()
+	user := User{Name: "SelectPreloadCombo", Age: 40, Company: Company{Name: "ComboCompany"}}
+	for i := 1; i <= 2; i++ {
+		user.Pets = append(user.Pets, &Pet{Name: fmt.Sprintf("Pet-%d", i)})
+	}
+	if err := gorm.G[User](DB).Create(ctx, &user); err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+	result, err := gorm.G[User](DB).Select("id", "name", "company_id").Preload("Company", nil).Preload("Pets", nil).Where("\"name\" = ?", user.Name).First(ctx)
+	if err != nil {
+		t.Fatalf("Select+Preload First failed: %v", err)
+	}
+	if result.ID == 0 || result.Name == "" {
+		t.Errorf("Expected user id/name; got: %+v", result)
+	}
+	if result.Age != 0 {
+		t.Errorf("Expected omitted Age=0, got %d", result.Age)
+	}
+	if result.Company.Name != user.Company.Name {
+		t.Errorf("Expected company %+v, got %+v", user.Company, result.Company)
+	}
+	if len(result.Pets) != len(user.Pets) {
+		t.Errorf("Expected %d pets, got %d", len(user.Pets), len(result.Pets))
+	}
+}
+
+func TestGenericsTransactionRollbackOnPreloadError(t *testing.T) {
+	ctx := context.Background()
+	tx := DB.Begin()
+	if tx.Error != nil {
+		t.Fatalf("Failed to begin transaction: %v", tx.Error)
+	}
+	user := User{Name: "TxRollbackPreload", Age: 25, Company: Company{Name: "TxCompany"}}
+	if err := gorm.G[User](tx).Create(ctx, &user); err != nil {
+		_ = tx.Rollback()
+		t.Fatalf("Failed to create user in tx: %v", err)
+	}
+	var gotErr error
+	_, gotErr = gorm.G[User](tx).
+		Preload("Company", func(db gorm.PreloadBuilder) error { return fmt.Errorf("bad preload") }).
+		Where("\"name\" = ?", user.Name).
+		First(ctx)
+	errRollback := tx.Rollback().Error
+	if gotErr == nil {
+		t.Errorf("Expected preload error, got nil")
+	}
+	if errRollback != nil {
+		t.Fatalf("Failed to rollback on Preload error: %v", errRollback)
+	}
+	_, err := gorm.G[User](DB).Where("\"name\" = ?", user.Name).First(ctx)
+	if err == nil {
+		t.Errorf("Expected no user after rollback, but found one")
 	}
 }
