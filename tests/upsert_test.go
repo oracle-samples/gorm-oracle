@@ -287,7 +287,6 @@ func TestFindOrInitialize(t *testing.T) {
 }
 
 func TestFindOrCreate(t *testing.T) {
-	t.Skip()
 	var user1, user2, user3, user4, user5, user6, user7, user8 User
 	if err := DB.Where(&User{Name: "find or create", Age: 33}).FirstOrCreate(&user1).Error; err != nil {
 		t.Errorf("no error should happen when FirstOrInit, but got %v", err)
