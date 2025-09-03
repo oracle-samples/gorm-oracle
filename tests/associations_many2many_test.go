@@ -461,3 +461,159 @@ func TestMany2ManyDuplicateBelongsToAssociation(t *testing.T) {
 	tests.AssertEqual(t, nil, err)
 	tests.AssertEqual(t, user2, findUser2)
 }
+
+func TestMany2ManyEmptyAssociations(t *testing.T) {
+	user := User{Name: "TestEmptyAssociations"}
+
+	// Create user with no associations
+	if err := DB.Create(&user).Error; err != nil {
+		t.Fatalf("errors happened when create user: %v", err)
+	}
+
+	var languages []Language
+	if err := DB.Model(&user).Association("Languages").Find(&languages); err != nil {
+		t.Errorf("Error finding empty associations: %v", err)
+	}
+
+	if len(languages) != 0 {
+		t.Errorf("Expected 0 languages, got %d", len(languages))
+	}
+
+	count := DB.Model(&user).Association("Languages").Count()
+	if count != 0 {
+		t.Errorf("Expected count 0 for empty association, got %d", count)
+	}
+
+	if err := DB.Model(&user).Association("Languages").Clear(); err != nil {
+		t.Errorf("Error clearing empty association: %v", err)
+	}
+
+	if err := DB.Model(&user).Association("Languages").Delete(&Language{}); err != nil {
+		t.Errorf("Error deleting from empty association: %v", err)
+	}
+}
+
+func TestMany2ManyAssociationCountValidation(t *testing.T) {
+	user := *GetUser("count-validation", Config{Languages: 3})
+
+	if err := DB.Create(&user).Error; err != nil {
+		t.Fatalf("errors happened when create: %v", err)
+	}
+
+	// Initial count check
+	initialCount := DB.Model(&user).Association("Languages").Count()
+	if initialCount != 3 {
+		t.Fatalf("Expected initial count 3, got %d", initialCount)
+	}
+
+	newLanguages := []Language{
+		{Code: "count-test-1", Name: "Count Test 1"},
+		{Code: "count-test-2", Name: "Count Test 2"},
+	}
+	DB.Create(&newLanguages)
+
+	if err := DB.Model(&user).Association("Languages").Append(&newLanguages); err != nil {
+		t.Fatalf("Error appending languages: %v", err)
+	}
+
+	// Check count after append
+	countAfterAppend := DB.Model(&user).Association("Languages").Count()
+	if countAfterAppend != 5 {
+		t.Errorf("Expected count 5 after append, got %d", countAfterAppend)
+	}
+
+	replaceLanguage := Language{Code: "count-replace", Name: "Count Replace"}
+	DB.Create(&replaceLanguage)
+
+	if err := DB.Model(&user).Association("Languages").Replace(&replaceLanguage); err != nil {
+		t.Fatalf("Error replacing languages: %v", err)
+	}
+
+	// Check count after replace
+	countAfterReplace := DB.Model(&user).Association("Languages").Count()
+	if countAfterReplace != 1 {
+		t.Errorf("Expected count 1 after replace, got %d", countAfterReplace)
+	}
+
+	// Verify actual data matches count
+	var actualLanguages []Language
+	DB.Model(&user).Association("Languages").Find(&actualLanguages)
+	if len(actualLanguages) != int(countAfterReplace) {
+		t.Errorf("Count mismatch: Count() returned %d but Find() returned %d languages",
+			countAfterReplace, len(actualLanguages))
+	}
+}
+
+func TestMany2ManyConstraintViolations(t *testing.T) {
+	user := *GetUser("constraint-test", Config{Languages: 1})
+
+	if err := DB.Create(&user).Error; err != nil {
+		t.Fatalf("errors happened when create: %v", err)
+	}
+
+	existingLanguage := user.Languages[0]
+
+	// append the same language again
+	if err := DB.Model(&user).Association("Languages").Append(&existingLanguage); err != nil {
+		t.Logf("Appending duplicate language resulted in: %v", err)
+	}
+
+	// Verify count is still correct
+	count := DB.Model(&user).Association("Languages").Count()
+	if count > 1 {
+		t.Errorf("Expected count 1 after duplicate append, got %d", count)
+	}
+
+	tempLanguage := Language{Code: "temp-invalid", Name: "Temp Invalid"}
+	if err := DB.Create(&tempLanguage).Error; err != nil {
+		t.Logf("Could not create temp language for FK test: %v", err)
+		return
+	}
+
+	// append, then delete the language record to create inconsistency
+	if err := DB.Model(&user).Association("Languages").Append(&tempLanguage); err != nil {
+		t.Logf("Could not append temp language: %v", err)
+	}
+
+	// Delete the language record directly
+	DB.Unscoped().Delete(&tempLanguage)
+
+	// access associations after deleting referenced record
+	var languages []Language
+	if err := DB.Model(&user).Association("Languages").Find(&languages); err != nil {
+		t.Logf("Finding associations after FK deletion resulted in: %v", err)
+	}
+
+	var manyLanguages []Language
+	for i := 0; i < 10; i++ {
+		manyLanguages = append(manyLanguages, Language{
+			Code: fmt.Sprintf("mass-test-%d", i),
+			Name: fmt.Sprintf("Mass Test %d", i),
+		})
+	}
+
+	// Create the languages first
+	if err := DB.Create(&manyLanguages).Error; err != nil {
+		t.Logf("Creating many languages failed: %v", err)
+		return
+	}
+
+	// append all at once
+	if err := DB.Model(&user).Association("Languages").Append(&manyLanguages); err != nil {
+		t.Logf("Mass append operation resulted in: %v", err)
+	}
+
+	// Verify the operation completed
+	finalCount := DB.Model(&user).Association("Languages").Count()
+	t.Logf("Final language count after mass operation: %d", finalCount)
+
+	if err := DB.Model(&user).Association("Languages").Clear(); err != nil {
+		t.Errorf("Error clearing associations after mass operation: %v", err)
+	}
+
+	// Verify clear worked
+	countAfterClear := DB.Model(&user).Association("Languages").Count()
+	if countAfterClear != 0 {
+		t.Errorf("Expected count 0 after clear, got %d", countAfterClear)
+	}
+}
