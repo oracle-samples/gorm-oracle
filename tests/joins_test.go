@@ -516,3 +516,90 @@ func TestJoinsPreload_Issue7013_NoEntries(t *testing.T) {
 
 	tests.AssertEqual(t, len(entries), 0)
 }
+
+type JoinCompany struct {
+    ID   int64  `gorm:"column:id;primaryKey"`
+    Name string `gorm:"column:name"`
+}
+
+type JoinUser struct {
+    ID        int64       `gorm:"column:id;primaryKey"`
+    Name      string      `gorm:"column:name"`
+    CompanyID int64       `gorm:"column:company_id"`
+    Company   JoinCompany `gorm:"foreignKey:CompanyID"`
+}
+
+func TestJoinWithOrderLimit(t *testing.T) {
+    _ = DB.Migrator().DropTable(&JoinUser{}, &JoinCompany{})
+    if err := DB.Migrator().CreateTable(&JoinCompany{}, &JoinUser{}); err != nil {
+        t.Fatalf("failed to create tables: %v", err)
+    }
+
+    company := JoinCompany{Name: "TestCompany"}
+    if err := DB.Create(&company).Error; err != nil {
+        t.Fatalf("failed to insert company: %v", err)
+    }
+
+    users := []JoinUser{
+        {Name: "order-limit-1", CompanyID: company.ID},
+        {Name: "order-limit-2", CompanyID: company.ID},
+    }
+    if err := DB.Create(&users).Error; err != nil {
+        t.Fatalf("failed to insert users: %v", err)
+    }
+
+    var result []JoinUser
+    err := DB.
+        Joins("Company").
+        Order("\"join_users\".\"id\" DESC").
+        Limit(1).
+        Find(&result).Error
+
+    if err != nil {
+        t.Fatalf("unexpected error: %v", err)
+    }
+    if len(result) != 1 {
+        t.Errorf("expected 1 result with limit, got %d", len(result))
+    }
+}
+
+func TestJoinOnNilDB(t *testing.T) {
+    var users []JoinUser
+    var nilDB *gorm.DB
+
+    defer func() {
+        if r := recover(); r == nil {
+            t.Errorf("expected panic when calling Joins on nil DB, got none")
+        }
+    }()
+
+    nilDB.Joins("Company").Find(&users)
+}
+
+func TestJoinNonExistentRelation(t *testing.T) {
+	var user JoinUser
+	err := DB.Joins("NonExistentRelation").First(&user).Error
+	if err == nil {
+		t.Errorf("expected error when joining on non-existent relation, got nil")
+	}
+}
+
+func TestJoinAmbiguousColumnError(t *testing.T) {
+	var result []JoinUser
+	err := DB.Table("join_users").
+		Select("id"). // ambiguous since multiple tables have id
+		Joins("join companies on companies.id = join_users.company_id").
+		Scan(&result).Error
+
+	if err == nil {
+		t.Errorf("expected error for ambiguous column selection, got nil")
+	}
+}
+
+func TestJoinInvalidSQL(t *testing.T) {
+	var users []JoinUser
+	err := DB.Joins("LEFT JOIN invalid_table ON").Find(&users).Error
+	if err == nil {
+		t.Errorf("expected SQL error for invalid join, got nil")
+	}
+}
