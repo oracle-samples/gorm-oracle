@@ -558,7 +558,7 @@ func TestMany2ManyConstraintViolations(t *testing.T) {
 		t.Logf("Appending duplicate language resulted in: %v", err)
 	}
 
-	// Verify count is still correct
+	// Verify count is still correct after duplicate append attempt
 	count := DB.Model(&user).Association("Languages").Count()
 	if count > 1 {
 		t.Errorf("Expected count 1 after duplicate append, got %d", count)
@@ -584,6 +584,10 @@ func TestMany2ManyConstraintViolations(t *testing.T) {
 		t.Logf("Finding associations after FK deletion resulted in: %v", err)
 	}
 
+	// Get count before mass operation for verification
+	countBeforeMass := DB.Model(&user).Association("Languages").Count()
+	t.Logf("Language count before mass operation: %d", countBeforeMass)
+
 	var manyLanguages []Language
 	for i := 0; i < 10; i++ {
 		manyLanguages = append(manyLanguages, Language{
@@ -603,9 +607,25 @@ func TestMany2ManyConstraintViolations(t *testing.T) {
 		t.Logf("Mass append operation resulted in: %v", err)
 	}
 
-	// Verify the operation completed
+	// Verify the operation completed with proper count validation
 	finalCount := DB.Model(&user).Association("Languages").Count()
-	t.Logf("Final language count after mass operation: %d", finalCount)
+	// Should have at least the previous count + 10 new languages
+	expectedMinCount := countBeforeMass + 10
+
+	t.Logf("Final language count after mass operation: %d (expected at least %d)", finalCount, expectedMinCount)
+
+	if finalCount < expectedMinCount {
+		t.Errorf("Expected at least %d languages after mass append, got %d", expectedMinCount, finalCount)
+	}
+
+	var actualLanguages []Language
+	if err := DB.Model(&user).Association("Languages").Find(&actualLanguages); err == nil {
+		actualCount := len(actualLanguages)
+		if actualCount != int(finalCount) {
+			t.Errorf("Count mismatch: Count() returned %d but Find() returned %d languages",
+				finalCount, actualCount)
+		}
+	}
 
 	if err := DB.Model(&user).Association("Languages").Clear(); err != nil {
 		t.Errorf("Error clearing associations after mass operation: %v", err)
