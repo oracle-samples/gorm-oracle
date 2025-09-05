@@ -169,10 +169,6 @@ func convertValue(val interface{}) interface{} {
 		val = v.Interface()
 	}
 
-	if v.Kind() == reflect.Ptr && v.IsNil() {
-		return nil
-	}
-
 	switch v := val.(type) {
 	case bool:
 		if v {
