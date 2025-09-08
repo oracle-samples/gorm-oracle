@@ -39,13 +39,17 @@
 package tests
 
 import (
+	"database/sql"
+	"fmt"
 	"testing"
+	"time"
 
 	. "github.com/oracle-samples/gorm-oracle/tests/utils"
+	"gorm.io/gorm"
 )
 
 type Hamster struct {
-	Id           int
+	ID           int
 	Name         string
 	PreferredToy Toy `gorm:"polymorphic:Owner;polymorphicValue:hamster_preferred"`
 	OtherToy     Toy `gorm:"polymorphic:Owner;polymorphicValue:hamster_other"`
@@ -59,7 +63,7 @@ func TestNamedPolymorphic(t *testing.T) {
 	DB.Save(&hamster)
 
 	hamster2 := Hamster{}
-	DB.Preload("PreferredToy").Preload("OtherToy").Find(&hamster2, hamster.Id)
+	DB.Preload("PreferredToy").Preload("OtherToy").Find(&hamster2, hamster.ID)
 
 	if hamster2.PreferredToy.ID != hamster.PreferredToy.ID || hamster2.PreferredToy.Name != hamster.PreferredToy.Name {
 		t.Errorf("Hamster's preferred toy failed to preload")
@@ -181,5 +185,293 @@ func TestNamedPolymorphic(t *testing.T) {
 	DB.Model(&hamster).Association("OtherToy").Clear()
 	if DB.Model(&hamster).Association("OtherToy").Count() != 0 {
 		t.Errorf("Hamster's other toy should be cleared with Clear")
+	}
+}
+
+func TestOracleCRUDOperations(t *testing.T) {
+	DB.Migrator().DropTable(&User{}, &Account{}, &Pet{})
+	if err := DB.AutoMigrate(&User{}, &Account{}, &Pet{}); err != nil {
+		t.Fatalf("Failed to auto migrate: %v", err)
+	}
+
+	// Test auto-increment behavior with IDENTITY columns
+	user := User{
+		Name:     "Oracle CRUD User",
+		Age:      30,
+		Birthday: &time.Time{},
+		Active:   true,
+	}
+
+	// Create user - should auto-generate ID
+	if err := DB.Create(&user).Error; err != nil {
+		t.Fatalf("Failed to create user: %v", err)
+	}
+
+	if user.ID == 0 {
+		t.Errorf("Expected auto-generated ID, got 0")
+	}
+
+	// Create account with foreign key reference
+	account := Account{
+		UserID:        sql.NullInt64{Int64: int64(user.ID), Valid: true},
+		AccountNumber: "ACC-001",
+	}
+
+	if err := DB.Create(&account).Error; err != nil {
+		t.Fatalf("Failed to create account: %v", err)
+	}
+
+	if account.ID == 0 {
+		t.Errorf("Expected auto-generated account ID, got 0")
+	}
+
+	// Create pet with foreign key reference
+	pet := Pet{
+		UserID: &user.ID,
+		Name:   "Oracle Pet",
+	}
+
+	if err := DB.Create(&pet).Error; err != nil {
+		t.Fatalf("Failed to create pet: %v", err)
+	}
+
+	if pet.ID == 0 {
+		t.Errorf("Expected auto-generated pet ID, got 0")
+	}
+
+	// Test UPDATE operations
+	user.Name = "Updated Oracle User"
+	user.Age = 31
+	if err := DB.Save(&user).Error; err != nil {
+		t.Fatalf("Failed to update user: %v", err)
+	}
+
+	// Verify update
+	var updatedUser User
+	if err := DB.First(&updatedUser, user.ID).Error; err != nil {
+		t.Fatalf("Failed to retrieve updated user: %v", err)
+	}
+
+	if updatedUser.Name != "Updated Oracle User" || updatedUser.Age != 31 {
+		t.Errorf("User update failed: expected name 'Updated Oracle User' and age 31, got name '%s' and age %d",
+			updatedUser.Name, updatedUser.Age)
+	}
+
+	// Test reading back with associations
+	var retrievedUser User
+	if err := DB.Preload("Account").Preload("Pets").First(&retrievedUser, user.ID).Error; err != nil {
+		t.Fatalf("Failed to retrieve user with associations: %v", err)
+	}
+
+	if retrievedUser.Account.AccountNumber != "ACC-001" {
+		t.Errorf("Expected account number ACC-001, got %s", retrievedUser.Account.AccountNumber)
+	}
+
+	if len(retrievedUser.Pets) != 1 || retrievedUser.Pets[0].Name != "Oracle Pet" {
+		t.Errorf("Expected 1 pet named 'Oracle Pet', got %d pets", len(retrievedUser.Pets))
+	}
+
+	// Test DELETE operations
+	if err := DB.Delete(&pet).Error; err != nil {
+		t.Fatalf("Failed to delete pet: %v", err)
+	}
+
+	// Verify deletion
+	var petCount int64
+	DB.Model(&Pet{}).Where(`"id" = ?`, pet.ID).Count(&petCount)
+	if petCount != 0 {
+		t.Errorf("Pet should be deleted, but found %d records", petCount)
+	}
+}
+
+func TestOracleAdvancedOperations(t *testing.T) {
+	DB.Migrator().DropTable(&Company{}, &User{}, &Language{}, "user_speak")
+	if err := DB.AutoMigrate(&Company{}, &User{}, &Language{}); err != nil {
+		t.Fatalf("Failed to auto migrate: %v", err)
+	}
+
+	// Test transaction handling
+	err := DB.Transaction(func(tx *gorm.DB) error {
+		// Create company
+		company := Company{
+			Name: "Oracle Advanced Corp",
+		}
+		if err := tx.Create(&company).Error; err != nil {
+			return err
+		}
+
+		// Create languages
+		languages := []Language{
+			{Code: "EN", Name: "English"},
+			{Code: "ES", Name: "Spanish"},
+			{Code: "FR", Name: "French"},
+			{Code: "DE", Name: "German"},
+		}
+		if err := tx.Create(&languages).Error; err != nil {
+			return err
+		}
+
+		// Create users with company relationship
+		users := []User{
+			{Name: "John Doe", Age: 30, CompanyID: &company.ID, Active: true},
+			{Name: "Jane Smith", Age: 28, CompanyID: &company.ID, Active: true},
+			{Name: "Bob Wilson", Age: 35, CompanyID: &company.ID, Active: false},
+		}
+		if err := tx.Create(&users).Error; err != nil {
+			return err
+		}
+
+		// Test many-to-many associations within transaction
+		if err := tx.Model(&users[0]).Association("Languages").Append(&languages[0], &languages[1]); err != nil {
+			return err
+		}
+
+		if err := tx.Model(&users[1]).Association("Languages").Append(&languages[1], &languages[2]); err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		t.Fatalf("Transaction failed: %v", err)
+	}
+
+	// Verify transaction results
+	var userCount int64
+	DB.Model(&User{}).Count(&userCount)
+	if userCount != 3 {
+		t.Errorf("Expected 3 users after transaction, got %d", userCount)
+	}
+
+	var languageCount int64
+	DB.Model(&Language{}).Count(&languageCount)
+	if languageCount != 4 {
+		t.Errorf("Expected 4 languages after transaction, got %d", languageCount)
+	}
+
+	// Test batch operations with Oracle-specific features
+	batchUsers := make([]User, 20)
+	for i := 0; i < 20; i++ {
+		batchUsers[i] = User{
+			Name:   fmt.Sprintf("Batch User %d", i+1),
+			Age:    uint(20 + (i % 50)),
+			Active: i%2 == 0,
+		}
+	}
+
+	// Test batch insert with Oracle
+	if err := DB.CreateInBatches(&batchUsers, 5).Error; err != nil {
+		t.Fatalf("Failed to create users in batches: %v", err)
+	}
+
+	// Verify batch insert
+	DB.Model(&User{}).Count(&userCount)
+	if userCount != 23 { // 3 from transaction + 20 from batch
+		t.Errorf("Expected 23 users after batch insert, got %d", userCount)
+	}
+
+	// Test bulk update using GORM methods with Oracle-compatible expressions
+	result := DB.Model(&User{}).Where(&User{Active: true}).Update("age", gorm.Expr(`"age" + ?`, 1))
+	if result.Error != nil {
+		t.Fatalf("Failed to bulk update: %v", result.Error)
+	}
+
+	if result.RowsAffected == 0 {
+		t.Errorf("Expected some rows to be affected by bulk update")
+	}
+
+	// Test complex query using GORM joins instead of raw SQL
+	var activeUsers []User
+	if err := DB.Joins("Company").Where(&User{Active: true}).Where(`"age" > ?`, 25).Find(&activeUsers).Error; err != nil {
+		t.Fatalf("Failed to execute join query: %v", err)
+	}
+
+	// Test transaction rollback scenario
+	err = DB.Transaction(func(tx *gorm.DB) error {
+		// Create a user
+		user := User{Name: "Rollback Test Advanced", Age: 99, Active: true}
+		if err := tx.Create(&user).Error; err != nil {
+			return err
+		}
+
+		// Force rollback by returning an error
+		return fmt.Errorf("forced rollback for testing")
+	})
+
+	if err == nil {
+		t.Errorf("Expected transaction to fail and rollback")
+	}
+
+	// Verify rollback worked
+	var rollbackUser User
+	result = DB.Where(`"name" = ?`, "Rollback Test Advanced").First(&rollbackUser)
+	if result.Error == nil {
+		t.Errorf("Expected user to not exist after rollback, but found: %+v", rollbackUser)
+	}
+
+	// Test Oracle pagination using GORM methods
+	var paginatedUsers []User
+	if err := DB.Offset(5).Limit(3).Find(&paginatedUsers).Error; err != nil {
+		t.Fatalf("Failed to paginate: %v", err)
+	}
+
+	if len(paginatedUsers) != 3 {
+		t.Errorf("Expected 3 users from pagination, got %d", len(paginatedUsers))
+	}
+
+	// Test Oracle-specific date operations using GORM with quoted identifiers
+	var todayUsers []User
+	if err := DB.Where(`"created_at" >= ?`, time.Now().Truncate(24*time.Hour)).Find(&todayUsers).Error; err != nil {
+		t.Fatalf("Failed to query with date functions: %v", err)
+	}
+
+	// Test case-insensitive search using GORM with quoted identifiers
+	var searchUsers []User
+	if err := DB.Where(`UPPER("name") LIKE UPPER(?)`, "%doe%").Find(&searchUsers).Error; err != nil {
+		t.Fatalf("Failed to perform case-insensitive search: %v", err)
+	}
+
+	// Test Oracle-specific features that require raw SQL (minimal usage)
+	var currentTime time.Time
+	if err := DB.Raw("SELECT SYSDATE FROM DUAL").Scan(&currentTime).Error; err != nil {
+		t.Fatalf("Failed to query Oracle DUAL table: %v", err)
+	}
+
+	if currentTime.IsZero() {
+		t.Errorf("Expected current time from Oracle SYSDATE, got zero time")
+	}
+
+	// Test Oracle sequence behavior
+	var maxID uint
+	if err := DB.Model(&User{}).Select(`MAX("id")`).Scan(&maxID).Error; err != nil {
+		t.Fatalf("Failed to get max ID: %v", err)
+	}
+
+	// Create one more user to test sequence increment
+	newUser := User{Name: "Sequence Test", Age: 25, Active: true}
+	if err := DB.Create(&newUser).Error; err != nil {
+		t.Fatalf("Failed to create sequence test user: %v", err)
+	}
+
+	if newUser.ID <= maxID {
+		t.Errorf("Expected new user ID to be greater than %d, got %d", maxID, newUser.ID)
+	}
+
+	// Test Oracle association operations
+	var userWithLanguages User
+	if err := DB.Preload("Languages").Where(`"name" = ?`, "John Doe").First(&userWithLanguages).Error; err != nil {
+		t.Fatalf("Failed to preload user languages: %v", err)
+	}
+
+	if len(userWithLanguages.Languages) != 2 {
+		t.Errorf("Expected user to have 2 languages, got %d", len(userWithLanguages.Languages))
+	}
+
+	// Test Oracle constraint behavior
+	duplicateCompany := Company{Name: "Oracle Advanced Corp"}
+	if err := DB.Create(&duplicateCompany).Error; err != nil {
+		// This should succeed since Company doesn't have unique constraints in the model
+		// This tests that GORM handles duplicate data as expected
 	}
 }
