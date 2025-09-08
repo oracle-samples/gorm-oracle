@@ -5,6 +5,7 @@ go 1.24.4
 require gorm.io/gorm v1.30.0
 
 require (
+	github.com/godror/godror v0.49.3-0.20250906170529-3508331278dd
 	github.com/oracle-samples/gorm-oracle v0.0.1
 	github.com/stretchr/testify v1.10.0
 )
@@ -13,7 +14,6 @@ require (
 	github.com/VictoriaMetrics/easyproto v0.1.4 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/go-logfmt/logfmt v0.6.0 // indirect
-	github.com/godror/godror v0.49.0 // indirect
 	github.com/godror/knownpb v0.3.0 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
@@ -28,3 +28,5 @@ require (
 )
 
 replace github.com/oracle-samples/gorm-oracle => ../
+
+// replace github.com/godror/godror => /Users/tinglwang/vscodeWorkspace/godror
