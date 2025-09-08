@@ -57,8 +57,6 @@ import (
 	"gorm.io/gorm/migrator"
 	"gorm.io/gorm/schema"
 	"gorm.io/gorm/utils"
-
-	_ "github.com/godror/godror"
 )
 
 const DefaultDriverName string = "godror"

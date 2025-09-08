@@ -28,3 +28,5 @@ require (
 )
 
 replace github.com/oracle-samples/gorm-oracle => ../
+
+// replace github.com/godror/godror => /Users/tinglwang/vscodeWorkspace/godror
