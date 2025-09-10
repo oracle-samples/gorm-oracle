@@ -1721,3 +1721,59 @@ func TestAutoMigrateDecimal(t *testing.T) {
 		decimalColumnsTest[MigrateDecimalColumn, MigrateDecimalColumn2](t, expectedSql)
 	}
 }
+
+func TestMigrateOnUpdateConstraint(t *testing.T) {
+	type Owner struct {
+		ID   int
+		Name string
+	}
+
+	type Pen struct {
+		gorm.Model
+		OwnerID int
+		Owner   Owner `gorm:"constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
+	}
+
+	DB.Migrator().DropTable(&Pen{}, &Owner{})
+
+	// Verify the trigger is created using CreateTable()
+	if err := DB.Migrator().CreateTable(&Owner{}, &Pen{}); err != nil {
+		t.Fatalf("Failed to create table, got error: %v", err)
+	}
+
+	triggerName := "fk_trigger_owners_id_pens_owner_id"
+
+	var count int
+	DB.Raw("SELECT count(*) FROM user_triggers where trigger_name = ?", triggerName).Scan(&count)
+	if count != 1 {
+		t.Errorf("Should find the trigger %s", triggerName)
+	}
+
+	// Verify the trigger is created using CreateConstraint()
+	constraintName := "fk_pens_owner"
+	if err := DB.Migrator().DropConstraint(&Pen{}, constraintName); err != nil {
+		t.Errorf("failed to drop constraint %v, got error %v", constraintName, err)
+	}
+
+	if err := DB.Migrator().CreateConstraint(&Pen{}, constraintName); err != nil {
+		t.Errorf("failed to create constraint %v, got error %v", constraintName, err)
+	}
+
+	DB.Raw("SELECT count(*) FROM user_triggers where trigger_name = ?", triggerName).Scan(&count)
+	if count != 1 {
+		t.Errorf("Should find the trigger %s", triggerName)
+	}
+
+	// Verify the trigger works
+	user := Pen{Owner: Owner{ID: 1, Name: "John"}}
+	DB.Create(&user)
+
+	DB.Model(user.Owner).Update("id", 100)
+
+	var user2 Pen
+	if err := DB.First(&user2, "\"id\" = ?", user.ID).Error; err != nil {
+		panic(fmt.Errorf("failed to find member, got error: %v", err))
+	} else if user2.OwnerID != 100 {
+		panic(fmt.Errorf("company id is not equal: expects: %v, got: %v", 100, user2.OwnerID))
+	}
+}

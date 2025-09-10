@@ -145,6 +145,17 @@ func (m Migrator) CreateTable(values ...interface{}) error {
 					}
 					if constraint := rel.ParseConstraint(); constraint != nil {
 						if constraint.Schema == stmt.Schema {
+							// Oracle doesn’t support OnUpdate on foreign keys.
+							// Use a trigger instead to propagate the update to the child table instead.
+							if len(constraint.References) > 0 && constraint.OnUpdate != "" {
+								constraint.OnUpdate = ""
+								defer func(tx *gorm.DB, table string, constraint *schema.Constraint) {
+									if err == nil {
+										err = m.createUpadateCascadeTrigger(tx, constraint)
+									}
+								}(tx, stmt.Table, constraint)
+							}
+
 							// If the same set of foreign keys already references the parent column,
 							// remove duplicates to avoid ORA-02274: duplicate referential constraint specifications
 							var foreignKeys []string
@@ -399,6 +410,32 @@ func (m Migrator) ColumnTypes(value interface{}) ([]gorm.ColumnType, error) {
 	return columnTypes, execErr
 }
 
+// CreateConstraint creates constraint based on the given 'value' and 'name'
+func (m Migrator) CreateConstraint(value interface{}, name string) error {
+	return m.RunWithValue(value, func(stmt *gorm.Statement) error {
+		constraint, table := m.GuessConstraintInterfaceAndTable(stmt, name)
+		if constraint != nil {
+			if c, ok := constraint.(*schema.Constraint); ok {
+				// Oracle doesn’t support OnUpdate on foreign keys.
+				// Use a trigger instead to propagate the update to the child table instead.
+				if len(c.References) > 0 && c.OnUpdate != "" {
+					c.OnUpdate = ""
+					constraint = c
+					m.createUpadateCascadeTrigger(m.DB, c)
+				}
+			}
+
+			vars := []interface{}{clause.Table{Name: table}}
+			if stmt.TableExpr != nil {
+				vars[0] = stmt.TableExpr
+			}
+			sql, values := constraint.Build()
+			return m.DB.Exec("ALTER TABLE ? ADD "+sql, append(vars, values...)...).Error
+		}
+		return nil
+	})
+}
+
 // HasConstraint checks whether the table for the given `value` contains the specified constraint `name`
 func (m Migrator) HasConstraint(value interface{}, name string) bool {
 	var count int64
@@ -416,6 +453,33 @@ func (m Migrator) HasConstraint(value interface{}, name string) bool {
 	})
 
 	return count > 0
+}
+
+// DropConstraint drops constraint based on the given 'value' and 'name'
+func (m Migrator) DropConstraint(value interface{}, name string) error {
+	if err := m.RunWithValue(value, func(stmt *gorm.Statement) error {
+
+		constraint, _ := m.GuessConstraintInterfaceAndTable(stmt, name)
+
+		if c, ok := constraint.(*schema.Constraint); ok && c != nil {
+			if len(c.References) > 0 && c.OnUpdate != "" {
+				for i, fk := range c.ForeignKeys {
+					triggerName := m.FkTriggerName(
+						c.ReferenceSchema.Table,
+						c.References[i].DBName,
+						c.Schema.Table,
+						fk.DBName,
+					)
+					return m.DB.Exec("DROP TRIGGER ?", clause.Column{Name: triggerName}).Error
+				}
+			}
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	return m.Migrator.DropConstraint(value, name)
 }
 
 // DropIndex drops the index with the specified `name` from the table associated with `value`
@@ -568,4 +632,66 @@ func (m Migrator) buildOracleDefaultFromInterface(value interface{}) string {
 func (m Migrator) isNumeric(s string) bool {
 	_, err := strconv.ParseFloat(s, 64)
 	return err == nil
+}
+
+func (m Migrator) FkTriggerName(refTable string, refField string, table string, field string) string {
+	return fmt.Sprintf("fk_trigger_%s_%s_%s_%s", refTable, refField, table, field)
+}
+
+// Creates a trigger to cascade the update to the child table
+func (m Migrator) createUpadateCascadeTrigger(tx *gorm.DB, constraint *schema.Constraint) error {
+	for i, fk := range constraint.ForeignKeys {
+		var (
+			tmpBuilder   strings.Builder
+			plsqlBuilder strings.Builder
+			parentTable  string = constraint.ReferenceSchema.Table
+			parentField  string = constraint.References[i].DBName
+			table        string = constraint.Schema.Table
+			field        string = fk.DBName
+
+			triggerName string = m.FkTriggerName(parentTable, parentField, table, field)
+
+			quotedParentTable string
+			quotedParentField string
+			quotedTable       string
+			quotedField       string
+			quotedTriggerName string
+		)
+
+		// Initialize quoted variables according to the driver’s quoting rules
+		writeQuotedIdentifier(&tmpBuilder, parentTable)
+		quotedParentTable = tmpBuilder.String()
+		tmpBuilder.Reset()
+
+		writeQuotedIdentifier(&tmpBuilder, parentField)
+		quotedParentField = tmpBuilder.String()
+		tmpBuilder.Reset()
+
+		writeQuotedIdentifier(&tmpBuilder, table)
+		quotedTable = tmpBuilder.String()
+		tmpBuilder.Reset()
+
+		writeQuotedIdentifier(&tmpBuilder, field)
+		quotedField = tmpBuilder.String()
+		tmpBuilder.Reset()
+
+		writeQuotedIdentifier(&tmpBuilder, triggerName)
+		quotedTriggerName = tmpBuilder.String()
+		tmpBuilder.Reset()
+
+		// Start PL/SQL block
+		plsqlBuilder.WriteString("CREATE OR REPLACE TRIGGER " + quotedTriggerName + "\n")
+		plsqlBuilder.WriteString("AFTER UPDATE OF " + quotedParentField + " ON " + quotedParentTable + "\n")
+		plsqlBuilder.WriteString("FOR EACH ROW\n")
+		plsqlBuilder.WriteString("BEGIN\n")
+		plsqlBuilder.WriteString("  UPDATE " + quotedTable + "\n")
+		plsqlBuilder.WriteString("  SET " + quotedField + " = :NEW." + quotedParentField + "\n")
+		plsqlBuilder.WriteString("  WHERE " + quotedField + " = :OLD." + quotedParentField)
+		plsqlBuilder.WriteString(";\n")
+		plsqlBuilder.WriteString("END;")
+		if err := tx.Exec(plsqlBuilder.String()).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
