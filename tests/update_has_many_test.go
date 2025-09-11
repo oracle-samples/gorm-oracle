@@ -120,3 +120,51 @@ func TestUpdateHasManyAssociations(t *testing.T) {
 		CheckUserSkipUpdatedAt(t, user4, user)
 	})
 }
+
+func TestHasManyWithReturning(t *testing.T) {
+	user := *GetUser("returning-has-many", Config{})
+
+	if err := DB.Create(&user).Error; err != nil {
+		t.Fatalf("failed to create user: %v", err)
+	}
+
+	initialPets := []*Pet{
+		{Name: "returning-pet1"},
+		{Name: "returning-pet2"},
+	}
+
+	user.Pets = initialPets
+
+	// This should trigger RETURNING clauses for the new pets
+	if err := DB.Session(&gorm.Session{FullSaveAssociations: true}).Save(&user).Error; err != nil {
+		t.Fatalf("failed to save user with pets: %v", err)
+	}
+
+	// Verify RETURNING populated IDs and timestamps for pets
+	for _, pet := range user.Pets {
+		if pet.ID == 0 {
+			t.Errorf("pet ID should be populated via RETURNING clause")
+		}
+		if pet.CreatedAt.IsZero() {
+			t.Errorf("pet CreatedAt should be populated via RETURNING clause")
+		}
+		if pet.UserID == nil || *pet.UserID != user.ID {
+			t.Errorf("pet UserID should be set correctly")
+		}
+	}
+
+	// try updating existing pets with RETURNING
+	for _, pet := range user.Pets {
+		originalUpdatedAt := pet.UpdatedAt
+		pet.Name += "-updated"
+
+		if err := DB.Save(pet).Error; err != nil {
+			t.Fatalf("failed to update pet: %v", err)
+		}
+
+		// Verify RETURNING updated the UpdatedAt timestamp
+		if !pet.UpdatedAt.After(originalUpdatedAt) {
+			t.Errorf("pet UpdatedAt should be updated via RETURNING clause")
+		}
+	}
+}

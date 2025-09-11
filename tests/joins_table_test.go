@@ -152,3 +152,57 @@ func TestOverrideJoinTable(t *testing.T) {
 		t.Errorf("person's addresses expects 2, got %v", count)
 	}
 }
+
+func TestOverrideJoinTableInvalidAssociation(t *testing.T) {
+	if err := DB.SetupJoinTable(&Person{}, "Addresses", &PersonAddress{}); err != nil {
+		t.Fatalf("Failed to setup join table for person, got error %v", err)
+	}
+	if err := DB.AutoMigrate(&Person{}, &Address{}); err != nil {
+		t.Fatalf("Failed to migrate, got %v", err)
+	}
+
+	person := Person{Name: "invalid-assoc"}
+	DB.Create(&person)
+
+	err := DB.Model(&person).Association("NonExistent").Find(&[]Address{})
+	if err == nil {
+		t.Fatalf("Expected error when accessing non-existent association, got nil")
+	}
+}
+
+func TestOverrideJoinTableClearWithoutAssociations(t *testing.T) {
+	if err := DB.SetupJoinTable(&Person{}, "Addresses", &PersonAddress{}); err != nil {
+		t.Fatalf("Failed to setup join table for person, got error %v", err)
+	}
+	if err := DB.AutoMigrate(&Person{}, &Address{}); err != nil {
+		t.Fatalf("Failed to migrate, got %v", err)
+	}
+
+	person := Person{Name: "no-assoc"}
+	DB.Create(&person)
+
+	if err := DB.Model(&person).Association("Addresses").Clear(); err != nil {
+		t.Fatalf("Expected no error clearing empty associations, got %v", err)
+	}
+
+	if count := DB.Model(&person).Association("Addresses").Count(); count != 0 {
+		t.Fatalf("Expected 0 associations, got %v", count)
+	}
+}
+
+func TestOverrideJoinTableDeleteNonExistentAssociation(t *testing.T) {
+	if err := DB.SetupJoinTable(&Person{}, "Addresses", &PersonAddress{}); err != nil {
+		t.Fatalf("Failed to setup join table for person, got error %v", err)
+	}
+	if err := DB.AutoMigrate(&Person{}, &Address{}); err != nil {
+		t.Fatalf("Failed to migrate, got %v", err)
+	}
+
+	address := Address{Name: "non-existent"}
+	person := Person{Name: "test-delete"}
+	DB.Create(&person)
+
+	if err := DB.Model(&person).Association("Addresses").Delete(&address); err != nil {
+		t.Fatalf("Expected no error when deleting non-existent association, got %v", err)
+	}
+}

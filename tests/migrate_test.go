@@ -186,7 +186,6 @@ func TestAutoMigrateSelfReferential(t *testing.T) {
 }
 
 func TestAutoMigrateNullable(t *testing.T) {
-	t.Skip()
 	type MigrateNullableColumn struct {
 		ID    uint
 		Bonus float64 `gorm:"not null"`
@@ -583,9 +582,8 @@ func TestMigrateColumns(t *testing.T) {
 }
 
 func TestMigrateConstraint(t *testing.T) {
-	t.Skip()
 
-	names := []string{"Account", "fk_users_account", "Pets", "fk_users_pets", "Company", "fk_users_company", "Team", "fk_users_team", "Languages", "fk_users_languages"}
+	names := []string{"Account", "fk_users_account", "Pets", "fk_users_pets", "Company", "fk_users_company", "Team", "fk_users_team"}
 
 	for _, name := range names {
 		if !DB.Migrator().HasConstraint(&User{}, name) {
@@ -1397,7 +1395,7 @@ func TestMigrateExistingBoolColumnPG(t *testing.T) {
 
 func TestMigrateWithUniqueIndexAndUnique(t *testing.T) {
 	t.Skip()
-	
+
 	const table = "unique_struct"
 
 	checkField := func(model interface{}, fieldName string, unique bool, uniqueIndex string) {

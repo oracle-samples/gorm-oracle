@@ -325,7 +325,16 @@ func OnConflictClauseBuilder(c clause.Clause, builder clause.Builder) {
 					missingColumns = append(missingColumns, conflictCol.Name)
 				}
 			}
+
 			if len(missingColumns) > 0 {
+				// primary keys with auto increment will always be missing from create values columns
+				for _, missingCol := range missingColumns {
+					field := stmt.Schema.LookUpField(missingCol)
+					if field != nil && field.PrimaryKey && field.AutoIncrement {
+						return
+					}
+				}
+
 				var selectedColumns []string
 				for col := range selectedColumnSet {
 					selectedColumns = append(selectedColumns, col)
@@ -333,6 +342,34 @@ func OnConflictClauseBuilder(c clause.Clause, builder clause.Builder) {
 				stmt.AddError(fmt.Errorf("conflict columns %v are not present in the VALUES clause. Available columns: %v",
 					missingColumns, selectedColumns))
 				return
+			}
+
+			// exclude primary key, default value columns from merge update clause
+			if len(onConflict.DoUpdates) > 0 {
+				hasPrimaryKey := false
+
+				for _, assignment := range onConflict.DoUpdates {
+					field := stmt.Schema.LookUpField(assignment.Column.Name)
+					if field != nil && field.PrimaryKey {
+						hasPrimaryKey = true
+						break
+					}
+				}
+
+				if hasPrimaryKey {
+					onConflict.DoUpdates = nil
+					columns := make([]string, 0, len(values.Columns)-1)
+					for _, col := range values.Columns {
+						field := stmt.Schema.LookUpField(col.Name)
+
+						if field != nil && !field.PrimaryKey && (!field.HasDefaultValue || field.DefaultValueInterface != nil ||
+							strings.EqualFold(field.DefaultValue, "NULL")) && field.AutoCreateTime == 0 {
+							columns = append(columns, col.Name)
+						}
+
+					}
+					onConflict.DoUpdates = append(onConflict.DoUpdates, clause.AssignmentColumns(columns)...)
+				}
 			}
 
 			// Build MERGE statement

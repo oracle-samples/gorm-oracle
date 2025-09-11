@@ -303,7 +303,13 @@ func TestScanRowsNullValuesScanToFieldDefault(t *testing.T) {
 }
 
 func TestScanToEmbedded(t *testing.T) {
-	t.Skip()
+	// TODO: Fix the issue that PersonAddress is skipped when dropping the tables together with Person and Address
+	DB.Migrator().DropTable(&PersonAddress{})
+	DB.Migrator().DropTable(&Person{}, &Address{}, &PersonAddress{})
+	if err := DB.AutoMigrate(&Person{}, &Address{}, &PersonAddress{}); err != nil {
+		t.Fatalf("Failed to migrate, got %v", err)
+	}
+
 	person1 := Person{Name: "person 1"}
 	person2 := Person{Name: "person 2"}
 	DB.Save(&person1).Save(&person2)

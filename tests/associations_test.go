@@ -367,8 +367,8 @@ func TestAssociationEmptyQueryClause(t *testing.T) {
 		Organizations []Organization `gorm:"many2many:region_orgs;"`
 	}
 	type RegionOrg struct {
-		RegionId       uint
-		OrganizationId uint
+		RegionID       uint
+		OrganizationID uint
 		Empty          myType
 	}
 	if err := DB.SetupJoinTable(&Region{}, "Organizations", &RegionOrg{}); err != nil {
@@ -393,4 +393,155 @@ func TestAssociationEmptyQueryClause(t *testing.T) {
 	} else {
 		tests.AssertEqual(t, len(orgs), 0)
 	}
+}
+
+func TestBasicBelongsToAssociation(t *testing.T) {
+	// Test basic BelongsTo association operations
+	user := GetUser("TestBelongsTo", Config{Company: true})
+
+	if err := DB.Create(&user).Error; err != nil {
+		t.Fatalf("Failed to create user with company: %v", err)
+	}
+
+	// finding the association
+	var foundUser User
+	if err := DB.Preload("Company").First(&foundUser, "\"id\" = ?", user.ID).Error; err != nil {
+		t.Fatalf("Failed to find user with company: %v", err)
+	}
+
+	if foundUser.Company.ID != user.Company.ID {
+		t.Fatalf("Company ID mismatch: expected %d, got %d", user.Company.ID, foundUser.Company.ID)
+	}
+
+	// association count
+	AssertAssociationCount(t, user, "Company", 1, "after creation")
+
+	// replacing association
+	newCompany := Company{Name: "New Test Company"}
+	if err := DB.Create(&newCompany).Error; err != nil {
+		t.Fatalf("Failed to create new company: %v", err)
+	}
+
+	if err := DB.Model(&user).Association("Company").Replace(&newCompany); err != nil {
+		t.Fatalf("Failed to replace company association: %v", err)
+	}
+
+	var updatedUser User
+	if err := DB.Preload("Company").First(&updatedUser, "\"id\" = ?", user.ID).Error; err != nil {
+		t.Fatalf("Failed to find updated user: %v", err)
+	}
+
+	if updatedUser.Company.ID != newCompany.ID {
+		t.Fatalf("Company was not replaced: expected %d, got %d", newCompany.ID, updatedUser.Company.ID)
+	}
+}
+
+func TestBasicHasManyAssociation(t *testing.T) {
+	// Test basic HasMany association operations
+	user := GetUser("TestHasMany", Config{Pets: 3})
+
+	if err := DB.Create(&user).Error; err != nil {
+		t.Fatalf("Failed to create user with pets: %v", err)
+	}
+
+	// association count
+	AssertAssociationCount(t, user, "Pets", 3, "after creation")
+
+	// finding pets
+	var pets []Pet
+	if err := DB.Model(&user).Association("Pets").Find(&pets); err != nil {
+		t.Fatalf("Failed to find pets: %v", err)
+	}
+
+	if len(pets) != 3 {
+		t.Fatalf("Expected 3 pets, got %d", len(pets))
+	}
+
+	// appending new pet
+	newPet := Pet{Name: "Additional Pet", UserID: &user.ID}
+	if err := DB.Model(&user).Association("Pets").Append(&newPet); err != nil {
+		t.Fatalf("Failed to append pet: %v", err)
+	}
+
+	AssertAssociationCount(t, user, "Pets", 4, "after append")
+
+	// deleting one pet from association
+	if err := DB.Model(&user).Association("Pets").Delete(&pets[0]); err != nil {
+		t.Fatalf("Failed to delete pet from association: %v", err)
+	}
+
+	AssertAssociationCount(t, user, "Pets", 3, "after delete")
+}
+
+func TestBasicManyToManyAssociation(t *testing.T) {
+	// Test basic ManyToMany association operations
+	user := GetUser("TestManyToMany", Config{Languages: 2})
+
+	if err := DB.Create(&user).Error; err != nil {
+		t.Fatalf("Failed to create user with languages: %v", err)
+	}
+
+	// association count
+	AssertAssociationCount(t, user, "Languages", 2, "after creation")
+
+	// finding languages
+	var languages []Language
+	if err := DB.Model(&user).Association("Languages").Find(&languages); err != nil {
+		t.Fatalf("Failed to find languages: %v", err)
+	}
+
+	if len(languages) != 2 {
+		t.Fatalf("Expected 2 languages, got %d", len(languages))
+	}
+
+	// appending new language
+	newLanguage := Language{Code: "FR", Name: "French"}
+	if err := DB.Create(&newLanguage).Error; err != nil {
+		t.Fatalf("Failed to create new language: %v", err)
+	}
+
+	if err := DB.Model(&user).Association("Languages").Append(&newLanguage); err != nil {
+		t.Fatalf("Failed to append language: %v", err)
+	}
+
+	AssertAssociationCount(t, user, "Languages", 3, "after append")
+
+	// replacing all languages
+	replaceLanguages := []Language{
+		{Code: "DE", Name: "German"},
+		{Code: "IT", Name: "Italian"},
+	}
+
+	for i := range replaceLanguages {
+		if err := DB.Create(&replaceLanguages[i]).Error; err != nil {
+			t.Fatalf("Failed to create replacement language: %v", err)
+		}
+	}
+
+	if err := DB.Model(&user).Association("Languages").Replace(replaceLanguages); err != nil {
+		t.Fatalf("Failed to replace languages: %v", err)
+	}
+
+	AssertAssociationCount(t, user, "Languages", 2, "after replace")
+
+	var finalLanguages []Language
+	if err := DB.Model(&user).Association("Languages").Find(&finalLanguages); err != nil {
+		t.Fatalf("Failed to find final languages: %v", err)
+	}
+
+	languageCodes := make(map[string]bool)
+	for _, lang := range finalLanguages {
+		languageCodes[lang.Code] = true
+	}
+
+	if !languageCodes["DE"] || !languageCodes["IT"] {
+		t.Fatal("Languages were not replaced correctly")
+	}
+
+	// clearing all associations
+	if err := DB.Model(&user).Association("Languages").Clear(); err != nil {
+		t.Fatalf("Failed to clear languages: %v", err)
+	}
+
+	AssertAssociationCount(t, user, "Languages", 0, "after clear")
 }
