@@ -148,12 +148,14 @@ func (m Migrator) CreateTable(values ...interface{}) error {
 							// Oracle doesn’t support OnUpdate on foreign keys.
 							// Use a trigger instead to propagate the update to the child table instead.
 							if len(constraint.References) > 0 && constraint.OnUpdate != "" {
-								constraint.OnUpdate = ""
-								defer func(tx *gorm.DB, table string, constraint *schema.Constraint) {
+								defer func(tx *gorm.DB, table string, constraint *schema.Constraint, onUpdate string) {
 									if err == nil {
+										// retore the OnUpdate value
+										constraint.OnUpdate = onUpdate
 										err = m.createUpadateCascadeTrigger(tx, constraint)
 									}
-								}(tx, stmt.Table, constraint)
+								}(tx, stmt.Table, constraint, constraint.OnUpdate)
+								constraint.OnUpdate = ""
 							}
 
 							// If the same set of foreign keys already references the parent column,
@@ -419,9 +421,9 @@ func (m Migrator) CreateConstraint(value interface{}, name string) error {
 				// Oracle doesn’t support OnUpdate on foreign keys.
 				// Use a trigger instead to propagate the update to the child table instead.
 				if len(c.References) > 0 && c.OnUpdate != "" {
+					m.createUpadateCascadeTrigger(m.DB, c)
 					c.OnUpdate = ""
 					constraint = c
-					m.createUpadateCascadeTrigger(m.DB, c)
 				}
 			}
 
@@ -640,58 +642,57 @@ func (m Migrator) FkTriggerName(refTable string, refField string, table string, 
 
 // Creates a trigger to cascade the update to the child table
 func (m Migrator) createUpadateCascadeTrigger(tx *gorm.DB, constraint *schema.Constraint) error {
+	onUpdate := strings.TrimSpace(strings.ToLower(constraint.OnUpdate))
+	if onUpdate != "cascade" && onUpdate != "set null" && onUpdate != "set default" {
+		return nil
+	}
+
+	parentTable := constraint.ReferenceSchema.Table
+	quotedParentTable := QuoteIdentifier(parentTable)
+	table := constraint.Schema.Table
+	quotedTable := QuoteIdentifier(table)
+
 	for i, fk := range constraint.ForeignKeys {
-		var (
-			tmpBuilder   strings.Builder
-			plsqlBuilder strings.Builder
-			parentTable  string = constraint.ReferenceSchema.Table
-			parentField  string = constraint.References[i].DBName
-			table        string = constraint.Schema.Table
-			field        string = fk.DBName
+		parentField := constraint.References[i].DBName
+		quotedParentField := QuoteIdentifier(parentField)
+		field := fk.DBName
+		quotedField := QuoteIdentifier(field)
+		triggerName := m.FkTriggerName(parentTable, parentField, table, field)
+		quotedTriggerName := QuoteIdentifier(triggerName)
 
-			triggerName string = m.FkTriggerName(parentTable, parentField, table, field)
+		var updateValue string
+		switch onUpdate {
+		case "cascade":
+			updateValue = ":NEW." + quotedParentField
+		case "set null":
+			updateValue = "NULL"
+		case "set default":
+			updateValue = "DEFAULT"
+		}
 
-			quotedParentTable string
-			quotedParentField string
-			quotedTable       string
-			quotedField       string
-			quotedTriggerName string
+		plsql := fmt.Sprintf(
+			`CREATE OR REPLACE TRIGGER %s
+AFTER UPDATE OF %s ON %s
+FOR EACH ROW
+BEGIN
+  UPDATE %s
+  SET %s = %s
+  WHERE %s = :OLD.%s;
+END;`,
+			quotedTriggerName,
+			quotedParentField,
+			quotedParentTable,
+			quotedTable,
+			quotedField,
+			updateValue,
+			quotedField,
+			quotedParentField,
 		)
 
-		// Initialize quoted variables according to the driver’s quoting rules
-		writeQuotedIdentifier(&tmpBuilder, parentTable)
-		quotedParentTable = tmpBuilder.String()
-		tmpBuilder.Reset()
-
-		writeQuotedIdentifier(&tmpBuilder, parentField)
-		quotedParentField = tmpBuilder.String()
-		tmpBuilder.Reset()
-
-		writeQuotedIdentifier(&tmpBuilder, table)
-		quotedTable = tmpBuilder.String()
-		tmpBuilder.Reset()
-
-		writeQuotedIdentifier(&tmpBuilder, field)
-		quotedField = tmpBuilder.String()
-		tmpBuilder.Reset()
-
-		writeQuotedIdentifier(&tmpBuilder, triggerName)
-		quotedTriggerName = tmpBuilder.String()
-		tmpBuilder.Reset()
-
-		// Start PL/SQL block
-		plsqlBuilder.WriteString("CREATE OR REPLACE TRIGGER " + quotedTriggerName + "\n")
-		plsqlBuilder.WriteString("AFTER UPDATE OF " + quotedParentField + " ON " + quotedParentTable + "\n")
-		plsqlBuilder.WriteString("FOR EACH ROW\n")
-		plsqlBuilder.WriteString("BEGIN\n")
-		plsqlBuilder.WriteString("  UPDATE " + quotedTable + "\n")
-		plsqlBuilder.WriteString("  SET " + quotedField + " = :NEW." + quotedParentField + "\n")
-		plsqlBuilder.WriteString("  WHERE " + quotedField + " = :OLD." + quotedParentField)
-		plsqlBuilder.WriteString(";\n")
-		plsqlBuilder.WriteString("END;")
-		if err := tx.Exec(plsqlBuilder.String()).Error; err != nil {
+		if err := tx.Exec(plsql).Error; err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
