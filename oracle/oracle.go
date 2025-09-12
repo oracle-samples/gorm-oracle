@@ -62,10 +62,11 @@ import (
 )
 
 type Config struct {
-	DriverName        string
-	DataSourceName    string
-	Conn              *sql.DB
-	DefaultStringSize uint
+	DriverName           string
+	DataSourceName       string
+	Conn                 *sql.DB
+	DefaultStringSize    uint
+	SkipQuoteIdentifiers bool
 }
 
 type Dialector struct {
@@ -103,6 +104,18 @@ func (d Dialector) Initialize(db *gorm.DB) (err error) {
 	callback.Delete().Replace("gorm:delete", Delete)
 	callback.Update().Replace("gorm:update", Update)
 	callback.Query().Before("gorm:query").Register("oracle:before_query", BeforeQuery)
+
+	if d.SkipQuoteIdentifiers {
+		// When identifiers are not quoted, columns are returned by Oracle in uppercase.
+		// Fields in the models may be lower case for compatibility with other databases.
+		// Match them up with the fields using the column mapping.
+		oracleCaseHandler := "oracle:case_handler"
+		if callback.Query().Get(oracleCaseHandler) == nil {
+			if err := callback.Query().Before("gorm:query").Register(oracleCaseHandler, MismatchedCaseHandler); err != nil {
+				return err
+			}
+		}
+	}
 
 	maps.Copy(db.ClauseBuilders, OracleClauseBuilders())
 
@@ -237,9 +250,13 @@ func (d Dialector) BindVarTo(writer clause.Writer, stmt *gorm.Statement, v inter
 
 // Manages quoting of identifiers
 func (d Dialector) QuoteTo(writer clause.Writer, str string) {
-	var builder strings.Builder
-	writeQuotedIdentifier(&builder, str)
-	writer.WriteString(builder.String())
+	out := str
+	if !d.SkipQuoteIdentifiers {
+		var builder strings.Builder
+		writeQuotedIdentifier(&builder, str)
+		out = builder.String()
+	}
+	_, _ = writer.WriteString(out)
 }
 
 var numericPlaceholder = regexp.MustCompile(`:(\d+)`)

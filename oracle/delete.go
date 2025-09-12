@@ -255,13 +255,13 @@ func buildBulkDeletePLSQL(db *gorm.DB) {
 
 	// Start PL/SQL block
 	plsqlBuilder.WriteString("DECLARE\n")
-	writeTableRecordCollectionDecl(&plsqlBuilder, stmt.Schema.DBNames, stmt.Table)
+	writeTableRecordCollectionDecl(db, &plsqlBuilder, stmt.Schema.DBNames, stmt.Table)
 	plsqlBuilder.WriteString("  l_deleted_records t_records;\n")
 	plsqlBuilder.WriteString("BEGIN\n")
 
 	// Build DELETE statement
 	plsqlBuilder.WriteString("  DELETE FROM ")
-	writeQuotedIdentifier(&plsqlBuilder, stmt.Table)
+	db.QuoteTo(&plsqlBuilder, stmt.Table)
 
 	// Add WHERE clause if it exists
 	if whereClause, hasWhere := stmt.Clauses["WHERE"]; hasWhere {
@@ -278,7 +278,7 @@ func buildBulkDeletePLSQL(db *gorm.DB) {
 		if i > 0 {
 			plsqlBuilder.WriteString(", ")
 		}
-		writeQuotedIdentifier(&plsqlBuilder, column)
+		db.QuoteTo(&plsqlBuilder, column)
 
 	}
 	plsqlBuilder.WriteString("\n  BULK COLLECT INTO l_deleted_records;\n")
@@ -297,7 +297,7 @@ func buildBulkDeletePLSQL(db *gorm.DB) {
 
 				plsqlBuilder.WriteString(fmt.Sprintf("  IF l_deleted_records.COUNT > %d THEN\n", rowIdx))
 				plsqlBuilder.WriteString(fmt.Sprintf("    :%d := l_deleted_records(%d).", outParamIndex+1, rowIdx+1))
-				writeQuotedIdentifier(&plsqlBuilder, column)
+				db.QuoteTo(&plsqlBuilder, column)
 				plsqlBuilder.WriteString(";\n")
 				plsqlBuilder.WriteString("  END IF;\n")
 				outParamIndex++
@@ -324,9 +324,9 @@ func buildWhereClause(db *gorm.DB, plsqlBuilder *strings.Builder, expressions []
 		case clause.Eq:
 			// Write the column name
 			if columnName, ok := e.Column.(string); ok {
-				writeQuotedIdentifier(plsqlBuilder, columnName)
+				db.QuoteTo(plsqlBuilder, columnName)
 			} else if columnExpr, ok := e.Column.(clause.Column); ok {
-				writeQuotedIdentifier(plsqlBuilder, columnExpr.Name)
+				db.QuoteTo(plsqlBuilder, columnExpr.Name)
 			} else {
 				plsqlBuilder.WriteString(fmt.Sprintf("%v", e.Column))
 			}
@@ -342,9 +342,9 @@ func buildWhereClause(db *gorm.DB, plsqlBuilder *strings.Builder, expressions []
 
 		case clause.IN:
 			if columnName, ok := e.Column.(string); ok {
-				writeQuotedIdentifier(plsqlBuilder, columnName)
+				db.QuoteTo(plsqlBuilder, columnName)
 			} else if columnExpr, ok := e.Column.(clause.Column); ok {
-				writeQuotedIdentifier(plsqlBuilder, columnExpr.Name)
+				db.QuoteTo(plsqlBuilder, columnExpr.Name)
 			} else {
 				plsqlBuilder.WriteString(fmt.Sprintf("%v", e.Column))
 			}
