@@ -424,6 +424,12 @@ func writeQuotedIdentifier(builder *strings.Builder, identifier string) {
 	builder.WriteByte('"')
 }
 
+func QuoteIdentifier(identifier string) string {
+	var builder strings.Builder
+	writeQuotedIdentifier(&builder, identifier)
+	return builder.String()
+}
+
 // writeTableRecordCollectionDecl writes the PL/SQL declarations needed to
 // define a custom record type and a collection of that record type,
 // based on the schema of the given table.

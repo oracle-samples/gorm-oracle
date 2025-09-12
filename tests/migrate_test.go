@@ -1721,3 +1721,107 @@ func TestAutoMigrateDecimal(t *testing.T) {
 		decimalColumnsTest[MigrateDecimalColumn, MigrateDecimalColumn2](t, expectedSql)
 	}
 }
+
+func TestMigrateOnUpdateConstraint(t *testing.T) {
+	type Owner struct {
+		ID   int
+		Name string
+	}
+
+	type Pen1 struct {
+		gorm.Model
+		OwnerID int
+		Owner   Owner `gorm:"constraint:OnUpdate:CASCADE;"`
+	}
+
+	type Pen2 struct {
+		gorm.Model
+		OwnerID int   `gorm:"default: 18"`
+		Owner   Owner `gorm:"constraint:OnUpdate:SET DEFAULT;"`
+	}
+
+	type Pen3 struct {
+		gorm.Model
+		OwnerID int
+		Owner   Owner `gorm:"constraint:OnUpdate:SET NULL;"`
+	}
+
+	DB.Migrator().DropTable(&Owner{}, &Pen1{}, &Pen2{}, &Pen3{})
+
+	// Test 1: Verify the trigger is created using CreateTable()
+	if err := DB.Migrator().CreateTable(&Owner{}, &Pen1{}, &Pen2{}, &Pen3{}); err != nil {
+		t.Fatalf("Failed to create table, got error: %v", err)
+	}
+
+	triggerNames := []string{
+		"fk_trigger_owners_id_pen1_owner_id",
+		"fk_trigger_owners_id_pen2_owner_id",
+		"fk_trigger_owners_id_pen3_owner_id",
+	}
+
+	for _, triggerName := range triggerNames {
+		var count int
+		DB.Raw("SELECT count(*) FROM user_triggers where trigger_name = ?", triggerName).Scan(&count)
+		if count != 1 {
+			t.Errorf("Should find the trigger %s", triggerName)
+		}
+	}
+
+	// Test 2: Verify the trigger is created using CreateConstraint()
+	penStructs := []interface{}{&Pen1{}, &Pen2{}, &Pen3{}}
+	constraintNames := []string{"fk_pen1_owner", "fk_pen2_owner", "fk_pen3_owner"}
+	for i := range 3 {
+		if err := DB.Migrator().DropConstraint(penStructs[i], constraintNames[i]); err != nil {
+			t.Errorf("failed to drop constraint %v, got error %v", constraintNames[i], err)
+		}
+
+		if err := DB.Migrator().CreateConstraint(penStructs[i], constraintNames[i]); err != nil {
+			t.Errorf("failed to create constraint %v, got error %v", constraintNames[i], err)
+		}
+
+		var count int
+		DB.Raw("SELECT count(*) FROM user_triggers where trigger_name = ?", triggerNames[i]).Scan(&count)
+		if count != 1 {
+			t.Errorf("Should find the trigger %s", triggerNames[i])
+		}
+	}
+
+	// Test 3: Verify each trigger work
+	pen1 := Pen1{Owner: Owner{ID: 1, Name: "John"}}
+	DB.Create(&pen1)
+	DB.Model(pen1.Owner).Update("id", 100)
+
+	var updatedPen1 Pen1
+	if err := DB.First(&updatedPen1, "\"id\" = ?", pen1.ID).Error; err != nil {
+		panic(fmt.Errorf("failed to find member, got error: %v", err))
+	} else if updatedPen1.OwnerID != 100 {
+		panic(fmt.Errorf("company id is not equal: expects: %v, got: %v", 100, updatedPen1.OwnerID))
+	}
+
+	pen2 := Pen2{Owner: Owner{ID: 2, Name: "Mary"}}
+	DB.Create(&pen2)
+	// When the ID in the owners table is updated, the primary key in pen2 (owner_id column)
+	// is set to its default value (18). To avoid violating the foreign key constraint in pen2,
+	// we need to insert this record into the owners table in advance.
+	owner := Owner{ID: 18, Name: "MaryBackup"}
+	DB.Create(&owner)
+	DB.Model(pen2.Owner).Update("id", 200)
+
+	var updatedPen2 Pen2
+	if err := DB.First(&updatedPen2, "\"id\" = ?", pen2.ID).Error; err != nil {
+		panic(fmt.Errorf("failed to find member, got error: %v", err))
+	} else if updatedPen2.OwnerID != 18 {
+		panic(fmt.Errorf("company id is not equal: expects: %v, got: %v", 18, updatedPen2.OwnerID))
+	}
+
+	pen3 := Pen3{Owner: Owner{ID: 3, Name: "Jane"}}
+	DB.Create(&pen3)
+	DB.Model(pen3.Owner).Update("id", 300)
+
+	var updatedPen3 Pen3
+	if err := DB.First(&updatedPen3, "\"id\" = ?", pen3.ID).Error; err != nil {
+		panic(fmt.Errorf("failed to find member, got error: %v", err))
+	} else if updatedPen3.OwnerID != 0 {
+		panic(fmt.Errorf("company id is not equal: expects: %v, got: %v", 0, updatedPen3.OwnerID))
+	}
+}
