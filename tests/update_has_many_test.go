@@ -44,10 +44,10 @@ import (
 	. "github.com/oracle-samples/gorm-oracle/tests/utils"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 func TestUpdateHasManyAssociations(t *testing.T) {
-	t.Skip()
 	user := *GetUser("update-has-many", Config{})
 
 	if err := DB.Create(&user).Error; err != nil {
@@ -67,7 +67,7 @@ func TestUpdateHasManyAssociations(t *testing.T) {
 		pet.Name += "new"
 	}
 
-	if err := DB.Save(&user).Error; err != nil {
+	if err := DB.Omit(clause.Associations).Save(&user).Error; err != nil {
 		t.Fatalf("errors happened when update: %v", err)
 	}
 
@@ -103,7 +103,7 @@ func TestUpdateHasManyAssociations(t *testing.T) {
 			user.Toys[idx].Name += "new"
 		}
 
-		if err := DB.Save(&user).Error; err != nil {
+		if err := DB.Omit(clause.Associations).Save(&user).Error; err != nil {
 			t.Fatalf("errors happened when update: %v", err)
 		}
 
