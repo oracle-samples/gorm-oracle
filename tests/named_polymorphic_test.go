@@ -188,7 +188,7 @@ func TestNamedPolymorphic(t *testing.T) {
 	}
 }
 
-func TestOracleCRUDOperations(t *testing.T) {
+func TestCRUDOperations(t *testing.T) {
 	DB.Migrator().DropTable(&User{}, &Account{}, &Pet{})
 	if err := DB.AutoMigrate(&User{}, &Account{}, &Pet{}); err != nil {
 		t.Fatalf("Failed to auto migrate: %v", err)
@@ -284,7 +284,7 @@ func TestOracleCRUDOperations(t *testing.T) {
 	}
 }
 
-func TestOracleAdvancedOperations(t *testing.T) {
+func TestAdvancedOperations(t *testing.T) {
 	DB.Migrator().DropTable(&Company{}, &User{}, &Language{}, "user_speak")
 	if err := DB.AutoMigrate(&Company{}, &User{}, &Language{}); err != nil {
 		t.Fatalf("Failed to auto migrate: %v", err)
@@ -410,7 +410,7 @@ func TestOracleAdvancedOperations(t *testing.T) {
 		t.Errorf("Expected user to not exist after rollback, but found: %+v", rollbackUser)
 	}
 
-	// Test Oracle pagination using GORM methods
+	// Test pagination using GORM methods
 	var paginatedUsers []User
 	if err := DB.Offset(5).Limit(3).Find(&paginatedUsers).Error; err != nil {
 		t.Fatalf("Failed to paginate: %v", err)
@@ -420,7 +420,7 @@ func TestOracleAdvancedOperations(t *testing.T) {
 		t.Errorf("Expected 3 users from pagination, got %d", len(paginatedUsers))
 	}
 
-	// Test Oracle-specific date operations using GORM with quoted identifiers
+	// Test-specific date operations using GORM with quoted identifiers
 	var todayUsers []User
 	if err := DB.Where(`"created_at" >= ?`, time.Now().Truncate(24*time.Hour)).Find(&todayUsers).Error; err != nil {
 		t.Fatalf("Failed to query with date functions: %v", err)
@@ -432,7 +432,7 @@ func TestOracleAdvancedOperations(t *testing.T) {
 		t.Fatalf("Failed to perform case-insensitive search: %v", err)
 	}
 
-	// Test Oracle-specific features that require raw SQL (minimal usage)
+	// Test-specific features that require raw SQL (minimal usage)
 	var currentTime time.Time
 	if err := DB.Raw("SELECT SYSDATE FROM DUAL").Scan(&currentTime).Error; err != nil {
 		t.Fatalf("Failed to query Oracle DUAL table: %v", err)
@@ -442,7 +442,7 @@ func TestOracleAdvancedOperations(t *testing.T) {
 		t.Errorf("Expected current time from Oracle SYSDATE, got zero time")
 	}
 
-	// Test Oracle sequence behavior
+	// Test sequence behavior
 	var maxID uint
 	if err := DB.Model(&User{}).Select(`MAX("id")`).Scan(&maxID).Error; err != nil {
 		t.Fatalf("Failed to get max ID: %v", err)
@@ -458,7 +458,7 @@ func TestOracleAdvancedOperations(t *testing.T) {
 		t.Errorf("Expected new user ID to be greater than %d, got %d", maxID, newUser.ID)
 	}
 
-	// Test Oracle association operations
+	// Test association operations
 	var userWithLanguages User
 	if err := DB.Preload("Languages").Where(`"name" = ?`, "John Doe").First(&userWithLanguages).Error; err != nil {
 		t.Fatalf("Failed to preload user languages: %v", err)
@@ -468,10 +468,15 @@ func TestOracleAdvancedOperations(t *testing.T) {
 		t.Errorf("Expected user to have 2 languages, got %d", len(userWithLanguages.Languages))
 	}
 
-	// Test Oracle constraint behavior
+	// Test constraint behavior
 	duplicateCompany := Company{Name: "Oracle Advanced Corp"}
-	if err := DB.Create(&duplicateCompany).Error; err != nil {
-		// This should succeed since Company doesn't have unique constraints in the model
-		// This tests that GORM handles duplicate data as expected
+	err = DB.Create(&duplicateCompany).Error
+	if err != nil {
+		t.Fatalf("Failed to create duplicate company: %v", err)
+	}
+	var companyCount int64
+	DB.Model(&Company{}).Where(`"name" = ?`, "Oracle Advanced Corp").Count(&companyCount)
+	if companyCount < 2 {
+		t.Errorf("Expected at least 2 companies named 'Oracle Advanced Corp', got %d", companyCount)
 	}
 }

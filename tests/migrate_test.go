@@ -1837,7 +1837,6 @@ func TestOracleDataTypes(t *testing.T) {
 	}
 }
 
-// This is failing
 func TestOracleNullHandling(t *testing.T) {
 	if DB.Dialector.Name() != "oracle" {
 		return
