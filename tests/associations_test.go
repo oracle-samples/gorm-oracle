@@ -112,7 +112,6 @@ func TestAssociationNotNullClear(t *testing.T) {
 }
 
 func TestForeignKeyConstraints(t *testing.T) {
-	t.Skip()
 	type Profile struct {
 		ID       uint
 		Name     string
@@ -121,7 +120,7 @@ func TestForeignKeyConstraints(t *testing.T) {
 
 	type Member struct {
 		ID      uint
-		Refer   uint `gorm:"uniqueIndex"`
+		Refer   uint `gorm:"unique"`
 		Name    string
 		Profile Profile `gorm:"Constraint:OnUpdate:CASCADE,OnDelete:CASCADE;FOREIGNKEY:MemberID;References:Refer"`
 	}
@@ -168,11 +167,10 @@ func TestForeignKeyConstraints(t *testing.T) {
 }
 
 func TestForeignKeyConstraintsBelongsTo(t *testing.T) {
-	t.Skip()
 	type Profile struct {
 		ID    uint
 		Name  string
-		Refer uint `gorm:"uniqueIndex"`
+		Refer uint `gorm:"unique"`
 	}
 
 	type Member struct {
