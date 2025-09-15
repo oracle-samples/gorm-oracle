@@ -368,3 +368,87 @@ func TestCompositePrimaryKeysAssociations(t *testing.T) {
 
 	tests.AssertEqual(t, book, result)
 }
+
+func TestCompositePrimaryKeyMigration(t *testing.T) {
+	if name := DB.Dialector.Name(); name == "sqlite" || name == "sqlserver" {
+		t.Skip("skip sqlite, sqlserver due to it doesn't support multiple primary keys with auto increment")
+	}
+
+	if name := DB.Dialector.Name(); name == "postgres" || name == "oracle" {
+		stmt := gorm.Statement{DB: DB}
+		stmt.Parse(&Blog{})
+		stmt.Schema.LookUpField("ID").Unique = true
+		stmt.Parse(&Tag{})
+		stmt.Schema.LookUpField("ID").Unique = true
+	}
+
+	DB.Migrator().DropTable(&Blog{}, &Tag{}, "blog_tags", "locale_blog_tags", "shared_blog_tags")
+	if err := DB.AutoMigrate(&Blog{}, &Tag{}); err != nil {
+		t.Fatalf("Failed to auto migrate, got error: %v", err)
+	}
+}
+
+func TestCompositePrimaryKeyDeletion(t *testing.T) {
+	if name := DB.Dialector.Name(); name == "sqlite" || name == "sqlserver" {
+		t.Skip("skip sqlite, sqlserver due to it doesn't support multiple primary keys with auto increment")
+	}
+
+	if name := DB.Dialector.Name(); name == "postgres" || name == "oracle" {
+		stmt := gorm.Statement{DB: DB}
+		stmt.Parse(&Blog{})
+		stmt.Schema.LookUpField("ID").Unique = true
+		stmt.Parse(&Tag{})
+		stmt.Schema.LookUpField("ID").Unique = true
+	}
+
+	DB.Migrator().DropTable(&Blog{}, &Tag{})
+	if err := DB.AutoMigrate(&Blog{}, &Tag{}); err != nil {
+		t.Fatalf("Failed to auto migrate, got error: %v", err)
+	}
+
+	// Create test data with composite primary keys
+	blog := Blog{ID: 1, Locale: "en", Subject: "Test Subject", Body: "Test Body"}
+	tag := Tag{ID: 1, Locale: "en", Value: "Test Tag"}
+
+	if err := DB.Create(&blog).Error; err != nil {
+		t.Fatalf("Failed to create blog: %v", err)
+	}
+
+	if err := DB.Create(&tag).Error; err != nil {
+		t.Fatalf("Failed to create tag: %v", err)
+	}
+
+	// Test deletion
+	if err := DB.Delete(&blog).Error; err != nil {
+		t.Fatalf("Failed to delete blog: %v", err)
+	}
+
+	if err := DB.Delete(&tag).Error; err != nil {
+		t.Fatalf("Failed to delete tag: %v", err)
+	}
+}
+
+func TestCompositePrimaryKeyConstraints(t *testing.T) {
+	if name := DB.Dialector.Name(); name == "sqlite" || name == "sqlserver" {
+		t.Skip("skip sqlite, sqlserver due to it doesn't support multiple primary keys with auto increment")
+	}
+
+	if name := DB.Dialector.Name(); name == "postgres" || name == "oracle" {
+		stmt := gorm.Statement{DB: DB}
+		stmt.Parse(&Blog{})
+		stmt.Schema.LookUpField("ID").Unique = true
+		stmt.Parse(&Tag{})
+		stmt.Schema.LookUpField("ID").Unique = true
+	}
+
+	DB.Migrator().DropTable(&Blog{}, &Tag{}, "blog_tags", "locale_blog_tags", "shared_blog_tags")
+	if err := DB.AutoMigrate(&Blog{}, &Tag{}); err != nil {
+		t.Fatalf("Failed to auto migrate, got error: %v", err)
+	}
+
+	// Test with explicit unique constraints for Oracle compatibility
+	if DB.Dialector.Name() == "oracle" {
+		DB.Exec("ALTER TABLE blogs ADD CONSTRAINT uk_blogs_id UNIQUE (id)")
+		DB.Exec("ALTER TABLE tags ADD CONSTRAINT uk_tags_id UNIQUE (id)")
+	}
+}
