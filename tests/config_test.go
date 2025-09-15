@@ -4,6 +4,7 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/oracle-samples/gorm-oracle/oracle"
 	"gorm.io/gorm"
 )
 
@@ -17,9 +18,9 @@ func (s Student) TableName() string {
 }
 
 func TestSkipQuoteIdentifiers(t *testing.T) {
-	db, err := openTestDBWithOptions(true, &gorm.Config{
-		Logger: newLogger,
-	})
+	db, err := openTestDBWithOptions(
+		&oracle.Config{SkipQuoteIdentifiers: true},
+		&gorm.Config{Logger: newLogger})
 	if err != nil {
 		t.Fatalf("failed to connect database, got error %v", err)
 	}
