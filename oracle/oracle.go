@@ -61,6 +61,8 @@ import (
 	_ "github.com/godror/godror"
 )
 
+const DefaultDriverName string = "godror"
+
 type Config struct {
 	DriverName           string
 	DataSourceName       string
@@ -80,7 +82,7 @@ func (d Dialector) Name() string {
 
 // Open creates a new godror Dialector with the given DSN
 func Open(dsn string) gorm.Dialector {
-	return &Dialector{Config: &Config{DriverName: "godror", DataSourceName: dsn}}
+	return &Dialector{Config: &Config{DataSourceName: dsn}}
 }
 
 // New creates a new Dialector with the given config
@@ -90,6 +92,10 @@ func New(config Config) gorm.Dialector {
 
 // Initializes the database connection
 func (d Dialector) Initialize(db *gorm.DB) (err error) {
+	if d.DriverName == "" {
+		d.DriverName = DefaultDriverName
+	}
+
 	d.DefaultStringSize = 4000
 
 	config := &callbacks.Config{

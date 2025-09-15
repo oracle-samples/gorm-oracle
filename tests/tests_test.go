@@ -118,12 +118,22 @@ func init() {
 }
 
 func OpenTestConnection(cfg *gorm.Config) (db *gorm.DB, err error) {
+	return openTestDBWithOptions(false, cfg)
+}
+
+func openTestDBWithOptions(skipQuoteIdentifiers bool, cfg *gorm.Config) (db *gorm.DB, err error) {
 	dbDSN := os.Getenv("GORM_DSN")
 	log.Println("testing oracle...")
 	if dbDSN == "" {
 		dbDSN = oracleDSN
 	}
-	db, err = gorm.Open(oracle.Open(dbDSN), cfg)
+	db, err = gorm.Open(
+		oracle.New(oracle.Config{
+			SkipQuoteIdentifiers: skipQuoteIdentifiers,
+			DataSourceName:       dbDSN,
+		}),
+		cfg,
+	)
 
 	if err != nil {
 		return
