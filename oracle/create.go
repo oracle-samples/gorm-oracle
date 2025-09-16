@@ -507,15 +507,37 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 	}
 	plsqlBuilder.WriteString("\n    BULK COLLECT INTO l_affected_records;\n")
 
-	// Add OUT parameter population
+	// Add OUT parameter population (JSON serialized to CLOB)
 	outParamIndex := len(stmt.Vars)
 	for rowIdx := 0; rowIdx < len(createValues.Values); rowIdx++ {
 		for _, column := range allColumns {
 			if field := findFieldByDBName(schema, column); field != nil {
-				stmt.Vars = append(stmt.Vars, sql.Out{Dest: createTypedDestination(field)})
-				plsqlBuilder.WriteString(fmt.Sprintf("  IF l_affected_records.COUNT > %d THEN :%d := l_affected_records(%d).", rowIdx, outParamIndex+1, rowIdx+1))
-				db.QuoteTo(&plsqlBuilder, column)
-				plsqlBuilder.WriteString("; END IF;\n")
+				if isJSONField(field) {
+					if isRawMessageField(field) {
+						// Column is a BLOB, return raw bytes; no JSON_SERIALIZE
+						stmt.Vars = append(stmt.Vars, sql.Out{Dest: new([]byte)})
+						plsqlBuilder.WriteString(fmt.Sprintf(
+							"  IF l_affected_records.COUNT > %d THEN :%d := l_affected_records(%d).",
+							rowIdx, outParamIndex+1, rowIdx+1,
+						))
+						writeQuotedIdentifier(&plsqlBuilder, column)
+						plsqlBuilder.WriteString("; END IF;\n")
+					} else {
+						// datatypes.JSON (text-based) -> serialize to CLOB
+						stmt.Vars = append(stmt.Vars, sql.Out{Dest: new(string)})
+						plsqlBuilder.WriteString(fmt.Sprintf(
+							"  IF l_affected_records.COUNT > %d THEN :%d := JSON_SERIALIZE(l_affected_records(%d).",
+							rowIdx, outParamIndex+1, rowIdx+1,
+						))
+						writeQuotedIdentifier(&plsqlBuilder, column)
+						plsqlBuilder.WriteString(" RETURNING CLOB); END IF;\n")
+					}
+				} else {
+					stmt.Vars = append(stmt.Vars, sql.Out{Dest: createTypedDestination(field)})
+					plsqlBuilder.WriteString(fmt.Sprintf("  IF l_affected_records.COUNT > %d THEN :%d := l_affected_records(%d).", rowIdx, outParamIndex+1, rowIdx+1))
+					writeQuotedIdentifier(&plsqlBuilder, column)
+					plsqlBuilder.WriteString("; END IF;\n")
+				}
 				outParamIndex++
 			}
 		}
@@ -613,7 +635,7 @@ func buildBulkInsertOnlyPLSQL(db *gorm.DB, createValues clause.Values) {
 	}
 	plsqlBuilder.WriteString("\n    BULK COLLECT INTO l_inserted_records;\n")
 
-	// Add OUT parameter population
+	// Add OUT parameter population (JSON serialized to CLOB)
 	outParamIndex := len(stmt.Vars)
 	for rowIdx := 0; rowIdx < len(createValues.Values); rowIdx++ {
 		for _, column := range allColumns {
@@ -622,9 +644,29 @@ func buildBulkInsertOnlyPLSQL(db *gorm.DB, createValues clause.Values) {
 			quotedColumn := columnBuilder.String()
 
 			if field := findFieldByDBName(schema, column); field != nil {
-				stmt.Vars = append(stmt.Vars, sql.Out{Dest: createTypedDestination(field)})
-				plsqlBuilder.WriteString(fmt.Sprintf("  IF l_inserted_records.COUNT > %d THEN :%d := l_inserted_records(%d).%s; END IF;\n",
-					rowIdx, outParamIndex+1, rowIdx+1, quotedColumn))
+				if isJSONField(field) {
+					if isRawMessageField(field) {
+						// Column is a BLOB, return raw bytes; no JSON_SERIALIZE
+						stmt.Vars = append(stmt.Vars, sql.Out{Dest: new([]byte)})
+						plsqlBuilder.WriteString(fmt.Sprintf(
+							"  IF l_inserted_records.COUNT > %d THEN :%d := l_inserted_records(%d).%s; END IF;\n",
+							rowIdx, outParamIndex+1, rowIdx+1, quotedColumn,
+						))
+					} else {
+						// datatypes.JSON (text-based) -> serialize to CLOB
+						stmt.Vars = append(stmt.Vars, sql.Out{Dest: new(string)})
+						plsqlBuilder.WriteString(fmt.Sprintf(
+							"  IF l_inserted_records.COUNT > %d THEN :%d := JSON_SERIALIZE(l_inserted_records(%d).%s RETURNING CLOB); END IF;\n",
+							rowIdx, outParamIndex+1, rowIdx+1, quotedColumn,
+						))
+					}
+				} else {
+					stmt.Vars = append(stmt.Vars, sql.Out{Dest: createTypedDestination(field)})
+					plsqlBuilder.WriteString(fmt.Sprintf(
+						"  IF l_inserted_records.COUNT > %d THEN :%d := l_inserted_records(%d).%s; END IF;\n",
+						rowIdx, outParamIndex+1, rowIdx+1, quotedColumn,
+					))
+				}
 				outParamIndex++
 			}
 		}

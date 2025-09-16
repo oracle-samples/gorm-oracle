@@ -40,11 +40,13 @@ package oracle
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
 	"time"
 
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
 )
@@ -174,6 +176,17 @@ func convertValue(val interface{}) interface{} {
 	}
 
 	switch v := val.(type) {
+	case json.RawMessage:
+		if v == nil {
+			return nil
+		}
+		return []byte(v)
+	case *json.RawMessage:
+		if v == nil {
+			return nil
+		}
+		b := []byte(*v)
+		return b
 	case bool:
 		if v {
 			return 1
@@ -198,7 +211,25 @@ func convertFromOracleToField(value interface{}, field *schema.Field) interface{
 	if isPtr {
 		targetType = targetType.Elem()
 	}
-
+	if field.FieldType == reflect.TypeOf(json.RawMessage{}) {
+		switch v := value.(type) {
+		case []byte:
+			return json.RawMessage(v) // from BLOB
+		case *[]byte:
+			if v == nil {
+				return json.RawMessage(nil)
+			}
+			return json.RawMessage(*v)
+		}
+	}
+	if isJSONField(field) {
+		switch v := value.(type) {
+		case string:
+			return datatypes.JSON([]byte(v))
+		case []byte:
+			return datatypes.JSON(v)
+		}
+	}
 	var converted interface{}
 
 	switch targetType {
@@ -274,6 +305,24 @@ func convertFromOracleToField(value interface{}, field *schema.Field) interface{
 	}
 
 	return converted
+}
+
+func isJSONField(f *schema.Field) bool {
+	_rawMsgT := reflect.TypeOf(json.RawMessage{})
+	_gormJSON := reflect.TypeOf(datatypes.JSON{})
+	if f == nil {
+		return false
+	}
+	ft := f.FieldType
+	return ft == _rawMsgT || ft == _gormJSON
+}
+
+func isRawMessageField(f *schema.Field) bool {
+	t := f.FieldType
+	for t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	return t == reflect.TypeOf(json.RawMessage(nil))
 }
 
 // Helper function to handle primitive type conversions

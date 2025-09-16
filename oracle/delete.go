@@ -283,27 +283,48 @@ func buildBulkDeletePLSQL(db *gorm.DB) {
 	}
 	plsqlBuilder.WriteString("\n  BULK COLLECT INTO l_deleted_records;\n")
 
-	// Create OUT parameters for each field and each row that will be deleted
+	// Create OUT parameters for each field and each row that will be deleted (JSON-safe)
 	outParamIndex := len(stmt.Vars)
-	//TODO make it configurable
-	estimatedRows := 100 // Estimate maximum rows to delete
+	// keep your current fixed cap (same as other callbacks)
+	estimatedRows := 100
 
 	for rowIdx := 0; rowIdx < estimatedRows; rowIdx++ {
 		for _, column := range allColumns {
-			field := findFieldByDBName(schema, column)
-			if field != nil {
-				dest := createTypedDestination(field)
-				stmt.Vars = append(stmt.Vars, sql.Out{Dest: dest})
-
-				plsqlBuilder.WriteString(fmt.Sprintf("  IF l_deleted_records.COUNT > %d THEN\n", rowIdx))
-				plsqlBuilder.WriteString(fmt.Sprintf("    :%d := l_deleted_records(%d).", outParamIndex+1, rowIdx+1))
-				db.QuoteTo(&plsqlBuilder, column)
-				plsqlBuilder.WriteString(";\n")
-				plsqlBuilder.WriteString("  END IF;\n")
+			if field := findFieldByDBName(schema, column); field != nil {
+				if isJSONField(field) {
+					if isRawMessageField(field) {
+						// Column is a BLOB, return raw bytes; no JSON_SERIALIZE
+						stmt.Vars = append(stmt.Vars, sql.Out{Dest: new([]byte)})
+						plsqlBuilder.WriteString(fmt.Sprintf(
+							"  IF l_deleted_records.COUNT > %d THEN :%d := l_deleted_records(%d).",
+							rowIdx, outParamIndex+1, rowIdx+1,
+						))
+						writeQuotedIdentifier(&plsqlBuilder, column)
+						plsqlBuilder.WriteString("; END IF;\n")
+					} else {
+						// JSON -> text bind
+						stmt.Vars = append(stmt.Vars, sql.Out{Dest: new(string)})
+						plsqlBuilder.WriteString(fmt.Sprintf("  IF l_deleted_records.COUNT > %d THEN\n", rowIdx))
+						plsqlBuilder.WriteString(fmt.Sprintf("    :%d := JSON_SERIALIZE(l_deleted_records(%d).", outParamIndex+1, rowIdx+1))
+						writeQuotedIdentifier(&plsqlBuilder, column)
+						plsqlBuilder.WriteString(" RETURNING CLOB);\n")
+						plsqlBuilder.WriteString("  END IF;\n")
+					}
+				} else {
+					// non-JSON as before
+					dest := createTypedDestination(field)
+					stmt.Vars = append(stmt.Vars, sql.Out{Dest: dest})
+					plsqlBuilder.WriteString(fmt.Sprintf("  IF l_deleted_records.COUNT > %d THEN\n", rowIdx))
+					plsqlBuilder.WriteString(fmt.Sprintf("    :%d := l_deleted_records(%d).", outParamIndex+1, rowIdx+1))
+					writeQuotedIdentifier(&plsqlBuilder, column)
+					plsqlBuilder.WriteString(";\n")
+					plsqlBuilder.WriteString("  END IF;\n")
+				}
 				outParamIndex++
 			}
 		}
 	}
+
 	plsqlBuilder.WriteString("END;")
 
 	stmt.SQL.Reset()
