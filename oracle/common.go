@@ -503,7 +503,7 @@ func QuoteIdentifier(identifier string) string {
 //   - plsqlBuilder: The builder to write the PL/SQL code into.
 //   - dbNames: The slice containing the column names.
 //   - table: The table name
-func writeTableRecordCollectionDecl(plsqlBuilder *strings.Builder, dbNames []string, table string) {
+func writeTableRecordCollectionDecl(db *gorm.DB, plsqlBuilder *strings.Builder, dbNames []string, table string) {
 	// Declare a record where each element has the same structure as a row from the given table
 	plsqlBuilder.WriteString("  TYPE t_record IS RECORD (\n")
 	for i, field := range dbNames {
@@ -511,11 +511,11 @@ func writeTableRecordCollectionDecl(plsqlBuilder *strings.Builder, dbNames []str
 			plsqlBuilder.WriteString(",\n")
 		}
 		plsqlBuilder.WriteString("    ")
-		writeQuotedIdentifier(plsqlBuilder, field)
+		db.QuoteTo(plsqlBuilder, field)
 		plsqlBuilder.WriteString(" ")
-		writeQuotedIdentifier(plsqlBuilder, table)
+		db.QuoteTo(plsqlBuilder, table)
 		plsqlBuilder.WriteString(".")
-		writeQuotedIdentifier(plsqlBuilder, field)
+		db.QuoteTo(plsqlBuilder, field)
 		plsqlBuilder.WriteString("%TYPE")
 	}
 	plsqlBuilder.WriteString("\n")
