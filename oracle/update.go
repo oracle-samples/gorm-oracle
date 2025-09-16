@@ -542,7 +542,12 @@ func buildUpdatePLSQL(db *gorm.DB) {
 		for _, column := range allColumns {
 			field := findFieldByDBName(schema, column)
 			if field != nil {
-				dest := createTypedDestination(field)
+				var dest interface{}
+				if isJSONField(field) {
+					dest = new(string) // JSON comes back serialized as text
+				} else {
+					dest = createTypedDestination(field)
+				}
 				stmt.Vars = append(stmt.Vars, sql.Out{Dest: dest})
 			}
 		}
@@ -553,18 +558,27 @@ func buildUpdatePLSQL(db *gorm.DB) {
 		for colIdx, column := range allColumns {
 			field := findFieldByDBName(schema, column)
 			if field != nil {
-				// Calculate the correct parameter index (1-based for Oracle)
 				paramIndex := outParamStartIndex + (rowIdx * len(allColumns)) + colIdx + 1
 
-				// Add the assignment to PL/SQL with correct parameter reference
-				plsqlBuilder.WriteString(fmt.Sprintf("  IF l_updated_records.COUNT > %d THEN\n", rowIdx))
-				plsqlBuilder.WriteString(fmt.Sprintf("    :%d := l_updated_records(%d).", paramIndex, rowIdx+1))
-				writeQuotedIdentifier(&plsqlBuilder, column)
-				plsqlBuilder.WriteString(";\n")
-				plsqlBuilder.WriteString("  END IF;\n")
+				plsqlBuilder.WriteString(fmt.Sprintf("  IF l_updated_records.COUNT > %d THEN ", rowIdx))
+				plsqlBuilder.WriteString(fmt.Sprintf(":%d := ", paramIndex))
+
+				if isJSONField(field) {
+					// serialize JSON so it binds as text
+					plsqlBuilder.WriteString("JSON_SERIALIZE(")
+					plsqlBuilder.WriteString(fmt.Sprintf("l_updated_records(%d).", rowIdx+1))
+					writeQuotedIdentifier(&plsqlBuilder, column)
+					plsqlBuilder.WriteString(" RETURNING CLOB)")
+				} else {
+					plsqlBuilder.WriteString(fmt.Sprintf("l_updated_records(%d).", rowIdx+1))
+					writeQuotedIdentifier(&plsqlBuilder, column)
+				}
+
+				plsqlBuilder.WriteString("; END IF;\n")
 			}
 		}
 	}
+
 	plsqlBuilder.WriteString("END;")
 
 	stmt.SQL.Reset()

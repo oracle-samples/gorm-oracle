@@ -45,6 +45,7 @@ import (
 	"strings"
 	"time"
 
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
 )
@@ -198,7 +199,14 @@ func convertFromOracleToField(value interface{}, field *schema.Field) interface{
 	if isPtr {
 		targetType = targetType.Elem()
 	}
-
+	if isJSONField(field) {
+		switch v := value.(type) {
+		case string:
+			return datatypes.JSON([]byte(v))
+		case []byte:
+			return datatypes.JSON(v)
+		}
+	}
 	var converted interface{}
 
 	switch targetType {
@@ -274,6 +282,22 @@ func convertFromOracleToField(value interface{}, field *schema.Field) interface{
 	}
 
 	return converted
+}
+
+func isJSONField(f *schema.Field) bool {
+	// Schema says it's JSON
+	if strings.EqualFold(string(f.DataType), "json") {
+		return true
+	}
+	// Some drivers/taggers carry type hints
+	if strings.Contains(strings.ToUpper(f.Tag.Get("TYPE")), "JSON") {
+		return true
+	}
+	// Detect gorm.io/datatypes.JSON by reflected type
+	if f.FieldType.Name() == "JSON" && f.FieldType.PkgPath() == "gorm.io/datatypes" {
+		return true
+	}
+	return false
 }
 
 // Helper function to handle primitive type conversions
