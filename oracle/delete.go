@@ -292,13 +292,24 @@ func buildBulkDeletePLSQL(db *gorm.DB) {
 		for _, column := range allColumns {
 			if field := findFieldByDBName(schema, column); field != nil {
 				if isJSONField(field) {
-					// JSON -> text bind
-					stmt.Vars = append(stmt.Vars, sql.Out{Dest: new(string)})
-					plsqlBuilder.WriteString(fmt.Sprintf("  IF l_deleted_records.COUNT > %d THEN\n", rowIdx))
-					plsqlBuilder.WriteString(fmt.Sprintf("    :%d := JSON_SERIALIZE(l_deleted_records(%d).", outParamIndex+1, rowIdx+1))
-					writeQuotedIdentifier(&plsqlBuilder, column)
-					plsqlBuilder.WriteString(" RETURNING CLOB);\n")
-					plsqlBuilder.WriteString("  END IF;\n")
+					if isRawMessageField(field) {
+						// Column is a BLOB, return raw bytes; no JSON_SERIALIZE
+						stmt.Vars = append(stmt.Vars, sql.Out{Dest: new([]byte)})
+						plsqlBuilder.WriteString(fmt.Sprintf(
+							"  IF l_deleted_records.COUNT > %d THEN :%d := l_deleted_records(%d).",
+							rowIdx, outParamIndex+1, rowIdx+1,
+						))
+						writeQuotedIdentifier(&plsqlBuilder, column)
+						plsqlBuilder.WriteString("; END IF;\n")
+					} else {
+						// JSON -> text bind
+						stmt.Vars = append(stmt.Vars, sql.Out{Dest: new(string)})
+						plsqlBuilder.WriteString(fmt.Sprintf("  IF l_deleted_records.COUNT > %d THEN\n", rowIdx))
+						plsqlBuilder.WriteString(fmt.Sprintf("    :%d := JSON_SERIALIZE(l_deleted_records(%d).", outParamIndex+1, rowIdx+1))
+						writeQuotedIdentifier(&plsqlBuilder, column)
+						plsqlBuilder.WriteString(" RETURNING CLOB);\n")
+						plsqlBuilder.WriteString("  END IF;\n")
+					}
 				} else {
 					// non-JSON as before
 					dest := createTypedDestination(field)

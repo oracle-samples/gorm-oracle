@@ -513,11 +513,25 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 		for _, column := range allColumns {
 			if field := findFieldByDBName(schema, column); field != nil {
 				if isJSONField(field) {
-					// JSON -> text bind
-					stmt.Vars = append(stmt.Vars, sql.Out{Dest: new(string)})
-					plsqlBuilder.WriteString(fmt.Sprintf("  IF l_affected_records.COUNT > %d THEN :%d := JSON_SERIALIZE(l_affected_records(%d).", rowIdx, outParamIndex+1, rowIdx+1))
-					writeQuotedIdentifier(&plsqlBuilder, column)
-					plsqlBuilder.WriteString(" RETURNING CLOB); END IF;\n")
+					if isRawMessageField(field) {
+						// Column is a BLOB, return raw bytes; no JSON_SERIALIZE
+						stmt.Vars = append(stmt.Vars, sql.Out{Dest: new([]byte)})
+						plsqlBuilder.WriteString(fmt.Sprintf(
+							"  IF l_affected_records.COUNT > %d THEN :%d := l_affected_records(%d).",
+							rowIdx, outParamIndex+1, rowIdx+1,
+						))
+						writeQuotedIdentifier(&plsqlBuilder, column)
+						plsqlBuilder.WriteString("; END IF;\n")
+					} else {
+						// datatypes.JSON (text-based) -> serialize to CLOB
+						stmt.Vars = append(stmt.Vars, sql.Out{Dest: new(string)})
+						plsqlBuilder.WriteString(fmt.Sprintf(
+							"  IF l_affected_records.COUNT > %d THEN :%d := JSON_SERIALIZE(l_affected_records(%d).",
+							rowIdx, outParamIndex+1, rowIdx+1,
+						))
+						writeQuotedIdentifier(&plsqlBuilder, column)
+						plsqlBuilder.WriteString(" RETURNING CLOB); END IF;\n")
+					}
 				} else {
 					stmt.Vars = append(stmt.Vars, sql.Out{Dest: createTypedDestination(field)})
 					plsqlBuilder.WriteString(fmt.Sprintf("  IF l_affected_records.COUNT > %d THEN :%d := l_affected_records(%d).", rowIdx, outParamIndex+1, rowIdx+1))
@@ -631,12 +645,21 @@ func buildBulkInsertOnlyPLSQL(db *gorm.DB, createValues clause.Values) {
 
 			if field := findFieldByDBName(schema, column); field != nil {
 				if isJSONField(field) {
-					// JSON -> text bind
-					stmt.Vars = append(stmt.Vars, sql.Out{Dest: new(string)})
-					plsqlBuilder.WriteString(fmt.Sprintf(
-						"  IF l_inserted_records.COUNT > %d THEN :%d := JSON_SERIALIZE(l_inserted_records(%d).%s RETURNING CLOB); END IF;\n",
-						rowIdx, outParamIndex+1, rowIdx+1, quotedColumn,
-					))
+					if isRawMessageField(field) {
+						// Column is a BLOB, return raw bytes; no JSON_SERIALIZE
+						stmt.Vars = append(stmt.Vars, sql.Out{Dest: new([]byte)})
+						plsqlBuilder.WriteString(fmt.Sprintf(
+							"  IF l_inserted_records.COUNT > %d THEN :%d := l_inserted_records(%d).%s; END IF;\n",
+							rowIdx, outParamIndex+1, rowIdx+1, quotedColumn,
+						))
+					} else {
+						// datatypes.JSON (text-based) -> serialize to CLOB
+						stmt.Vars = append(stmt.Vars, sql.Out{Dest: new(string)})
+						plsqlBuilder.WriteString(fmt.Sprintf(
+							"  IF l_inserted_records.COUNT > %d THEN :%d := JSON_SERIALIZE(l_inserted_records(%d).%s RETURNING CLOB); END IF;\n",
+							rowIdx, outParamIndex+1, rowIdx+1, quotedColumn,
+						))
+					}
 				} else {
 					stmt.Vars = append(stmt.Vars, sql.Out{Dest: createTypedDestination(field)})
 					plsqlBuilder.WriteString(fmt.Sprintf(

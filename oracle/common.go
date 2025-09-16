@@ -40,6 +40,7 @@ package oracle
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -175,6 +176,17 @@ func convertValue(val interface{}) interface{} {
 	}
 
 	switch v := val.(type) {
+	case json.RawMessage:
+		if v == nil {
+			return nil
+		}
+		return []byte(v)
+	case *json.RawMessage:
+		if v == nil {
+			return nil
+		}
+		b := []byte(*v)
+		return b
 	case bool:
 		if v {
 			return 1
@@ -198,6 +210,17 @@ func convertFromOracleToField(value interface{}, field *schema.Field) interface{
 	isPtr := targetType.Kind() == reflect.Ptr
 	if isPtr {
 		targetType = targetType.Elem()
+	}
+	if field.FieldType == reflect.TypeOf(json.RawMessage{}) {
+		switch v := value.(type) {
+		case []byte:
+			return json.RawMessage(v) // from BLOB
+		case *[]byte:
+			if v == nil {
+				return json.RawMessage(nil)
+			}
+			return json.RawMessage(*v)
+		}
 	}
 	if isJSONField(field) {
 		switch v := value.(type) {
@@ -285,19 +308,21 @@ func convertFromOracleToField(value interface{}, field *schema.Field) interface{
 }
 
 func isJSONField(f *schema.Field) bool {
-	// Schema says it's JSON
-	if strings.EqualFold(string(f.DataType), "json") {
-		return true
+	_rawMsgT := reflect.TypeOf(json.RawMessage{})
+	_gormJSON := reflect.TypeOf(datatypes.JSON{})
+	if f == nil {
+		return false
 	}
-	// Some drivers/taggers carry type hints
-	if strings.Contains(strings.ToUpper(f.Tag.Get("TYPE")), "JSON") {
-		return true
+	ft := f.FieldType
+	return ft == _rawMsgT || ft == _gormJSON
+}
+
+func isRawMessageField(f *schema.Field) bool {
+	t := f.FieldType
+	for t.Kind() == reflect.Ptr {
+		t = t.Elem()
 	}
-	// Detect gorm.io/datatypes.JSON by reflected type
-	if f.FieldType.Name() == "JSON" && f.FieldType.PkgPath() == "gorm.io/datatypes" {
-		return true
-	}
-	return false
+	return t == reflect.TypeOf(json.RawMessage(nil))
 }
 
 // Helper function to handle primitive type conversions

@@ -544,7 +544,13 @@ func buildUpdatePLSQL(db *gorm.DB) {
 			if field != nil {
 				var dest interface{}
 				if isJSONField(field) {
-					dest = new(string) // JSON comes back serialized as text
+					if isRawMessageField(field) {
+						// RawMessage -> BLOB -> []byte
+						dest = new([]byte)
+					} else {
+						// datatypes.JSON -> text -> string (CLOB)
+						dest = new(string)
+					}
 				} else {
 					dest = createTypedDestination(field)
 				}
@@ -564,11 +570,16 @@ func buildUpdatePLSQL(db *gorm.DB) {
 				plsqlBuilder.WriteString(fmt.Sprintf(":%d := ", paramIndex))
 
 				if isJSONField(field) {
-					// serialize JSON so it binds as text
-					plsqlBuilder.WriteString("JSON_SERIALIZE(")
-					plsqlBuilder.WriteString(fmt.Sprintf("l_updated_records(%d).", rowIdx+1))
-					writeQuotedIdentifier(&plsqlBuilder, column)
-					plsqlBuilder.WriteString(" RETURNING CLOB)")
+					if isRawMessageField(field) {
+						plsqlBuilder.WriteString(fmt.Sprintf("l_updated_records(%d).", rowIdx+1))
+						writeQuotedIdentifier(&plsqlBuilder, column)
+					} else {
+						// serialize JSON so it binds as text
+						plsqlBuilder.WriteString("JSON_SERIALIZE(")
+						plsqlBuilder.WriteString(fmt.Sprintf("l_updated_records(%d).", rowIdx+1))
+						writeQuotedIdentifier(&plsqlBuilder, column)
+						plsqlBuilder.WriteString(" RETURNING CLOB)")
+					}
 				} else {
 					plsqlBuilder.WriteString(fmt.Sprintf("l_updated_records(%d).", rowIdx+1))
 					writeQuotedIdentifier(&plsqlBuilder, column)
