@@ -289,7 +289,7 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 
 	// Start PL/SQL block
 	plsqlBuilder.WriteString("DECLARE\n")
-	writeTableRecordCollectionDecl(&plsqlBuilder, stmt.Schema.DBNames, stmt.Table)
+	writeTableRecordCollectionDecl(db, &plsqlBuilder, stmt.Schema.DBNames, stmt.Table)
 	plsqlBuilder.WriteString("  l_affected_records t_records;\n")
 
 	// Create array types and variables for each column
@@ -323,7 +323,7 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 	// FORALL with MERGE and RETURNING BULK COLLECT INTO
 	plsqlBuilder.WriteString(fmt.Sprintf("  FORALL i IN 1..%d\n", len(createValues.Values)))
 	plsqlBuilder.WriteString("    MERGE INTO ")
-	writeQuotedIdentifier(&plsqlBuilder, stmt.Table)
+	db.QuoteTo(&plsqlBuilder, stmt.Table)
 	plsqlBuilder.WriteString(" t\n")
 	// Build USING clause
 	plsqlBuilder.WriteString("    USING (SELECT ")
@@ -332,7 +332,7 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 			plsqlBuilder.WriteString(", ")
 		}
 		plsqlBuilder.WriteString(fmt.Sprintf("l_col_%d_array(i) AS ", idx))
-		writeQuotedIdentifier(&plsqlBuilder, column.Name)
+		db.QuoteTo(&plsqlBuilder, column.Name)
 	}
 	plsqlBuilder.WriteString(" FROM DUAL) s\n")
 
@@ -344,9 +344,9 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 			plsqlBuilder.WriteString(" AND ")
 		}
 		plsqlBuilder.WriteString("t.")
-		writeQuotedIdentifier(&plsqlBuilder, conflictCol.Name)
+		db.QuoteTo(&plsqlBuilder, conflictCol.Name)
 		plsqlBuilder.WriteString(" = s.")
-		writeQuotedIdentifier(&plsqlBuilder, conflictCol.Name)
+		db.QuoteTo(&plsqlBuilder, conflictCol.Name)
 	}
 	plsqlBuilder.WriteString(")\n")
 
@@ -371,9 +371,9 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 					plsqlBuilder.WriteString(", ")
 				}
 				plsqlBuilder.WriteString("t.")
-				writeQuotedIdentifier(&plsqlBuilder, column.Name)
+				db.QuoteTo(&plsqlBuilder, column.Name)
 				plsqlBuilder.WriteString(" = s.")
-				writeQuotedIdentifier(&plsqlBuilder, column.Name)
+				db.QuoteTo(&plsqlBuilder, column.Name)
 				updateCount++
 			}
 		}
@@ -405,9 +405,9 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 					plsqlBuilder.WriteString(", ")
 				}
 				plsqlBuilder.WriteString("t.")
-				writeQuotedIdentifier(&plsqlBuilder, column.Name)
+				db.QuoteTo(&plsqlBuilder, column.Name)
 				plsqlBuilder.WriteString(" = s.")
-				writeQuotedIdentifier(&plsqlBuilder, column.Name)
+				db.QuoteTo(&plsqlBuilder, column.Name)
 				updateCount++
 			}
 		}
@@ -427,9 +427,9 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 			}
 		}
 		plsqlBuilder.WriteString("    WHEN MATCHED THEN UPDATE SET t.")
-		writeQuotedIdentifier(&plsqlBuilder, noopCol)
-		plsqlBuilder.WriteString(" = s.")
-		writeQuotedIdentifier(&plsqlBuilder, noopCol)
+		db.QuoteTo(&plsqlBuilder, noopCol)
+		plsqlBuilder.WriteString(" = t.")
+		db.QuoteTo(&plsqlBuilder, noopCol)
 		plsqlBuilder.WriteString("\n")
 	}
 
@@ -444,7 +444,7 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 				if insertCount > 0 {
 					plsqlBuilder.WriteString(", ")
 				}
-				writeQuotedIdentifier(&plsqlBuilder, column.Name)
+				db.QuoteTo(&plsqlBuilder, column.Name)
 				insertCount++
 			}
 		}
@@ -459,7 +459,7 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 					plsqlBuilder.WriteString(", ")
 				}
 				plsqlBuilder.WriteString("s.")
-				writeQuotedIdentifier(&plsqlBuilder, column.Name)
+				db.QuoteTo(&plsqlBuilder, column.Name)
 				insertCount++
 			}
 		}
@@ -475,7 +475,7 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 				if insertCount > 0 {
 					plsqlBuilder.WriteString(", ")
 				}
-				writeQuotedIdentifier(&plsqlBuilder, column.Name)
+				db.QuoteTo(&plsqlBuilder, column.Name)
 				insertCount++
 			}
 		}
@@ -489,7 +489,7 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 					plsqlBuilder.WriteString(", ")
 				}
 				plsqlBuilder.WriteString("s.")
-				writeQuotedIdentifier(&plsqlBuilder, column.Name)
+				db.QuoteTo(&plsqlBuilder, column.Name)
 				insertCount++
 			}
 		}
@@ -503,7 +503,7 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 		if i > 0 {
 			plsqlBuilder.WriteString(", ")
 		}
-		writeQuotedIdentifier(&plsqlBuilder, column)
+		db.QuoteTo(&plsqlBuilder, column)
 	}
 	plsqlBuilder.WriteString("\n    BULK COLLECT INTO l_affected_records;\n")
 
@@ -556,7 +556,7 @@ func buildBulkInsertOnlyPLSQL(db *gorm.DB, createValues clause.Values) {
 
 	// Start PL/SQL block
 	plsqlBuilder.WriteString("DECLARE\n")
-	writeTableRecordCollectionDecl(&plsqlBuilder, stmt.Schema.DBNames, stmt.Table)
+	writeTableRecordCollectionDecl(db, &plsqlBuilder, stmt.Schema.DBNames, stmt.Table)
 	plsqlBuilder.WriteString("  l_inserted_records t_records;\n")
 
 	// Create array types and variables for each column
@@ -590,14 +590,14 @@ func buildBulkInsertOnlyPLSQL(db *gorm.DB, createValues clause.Values) {
 	// FORALL with RETURNING BULK COLLECT INTO
 	plsqlBuilder.WriteString(fmt.Sprintf("  FORALL i IN 1..%d\n", len(createValues.Values)))
 	plsqlBuilder.WriteString("    INSERT INTO ")
-	writeQuotedIdentifier(&plsqlBuilder, stmt.Table)
+	db.QuoteTo(&plsqlBuilder, stmt.Table)
 	plsqlBuilder.WriteString(" (")
 	// Add column names
 	for i, column := range createValues.Columns {
 		if i > 0 {
 			plsqlBuilder.WriteString(", ")
 		}
-		writeQuotedIdentifier(&plsqlBuilder, column.Name)
+		db.QuoteTo(&plsqlBuilder, column.Name)
 	}
 	plsqlBuilder.WriteString(") VALUES (")
 
@@ -617,7 +617,7 @@ func buildBulkInsertOnlyPLSQL(db *gorm.DB, createValues clause.Values) {
 		if i > 0 {
 			plsqlBuilder.WriteString(", ")
 		}
-		writeQuotedIdentifier(&plsqlBuilder, column)
+		db.QuoteTo(&plsqlBuilder, column)
 	}
 	plsqlBuilder.WriteString("\n    BULK COLLECT INTO l_inserted_records;\n")
 
@@ -626,7 +626,7 @@ func buildBulkInsertOnlyPLSQL(db *gorm.DB, createValues clause.Values) {
 	for rowIdx := 0; rowIdx < len(createValues.Values); rowIdx++ {
 		for _, column := range allColumns {
 			var columnBuilder strings.Builder
-			writeQuotedIdentifier(&columnBuilder, column)
+			db.QuoteTo(&columnBuilder, column)
 			quotedColumn := columnBuilder.String()
 
 			if field := findFieldByDBName(schema, column); field != nil {
