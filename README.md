@@ -79,6 +79,30 @@ BEGIN
 END;
 ```
 
+### JSON Columns
+
+Use either JSON type—both fully support `INSERT`, `UPDATE`, and `DELETE` … `RETURNING`:
+
+- `gorm.io/datatypes.JSON` — convenient for logging/printing; returned as text then rewrapped.
+- `encoding/json.RawMessage` — raw `[]byte` fast-path; ideal for large payloads or minimal decoding.
+
+#### Notes:
+- On multi-row `RETURNING`, we use PL/SQL bulk blocks and map results back into your structs.
+- `datatypes.JSON` comes back as text; `json.RawMessage` comes back as bytes.
+  
+Take the following struct as an example:
+
+```go
+type Record struct {
+  ID         uint            `gorm:"primaryKey;autoIncrement;column:record_id"`
+  Name       string          `gorm:"column:name"`
+  // Text-oriented JSON
+  Properties datatypes.JSON  `gorm:"column:properties"`
+  // Raw bytes JSON
+  Payload    json.RawMessage `gorm:"column:payload"`
+}
+```
+
 ## Contributing
 
 This project welcomes contributions from the community. Before submitting a pull request, please [review our contribution guide](./CONTRIBUTING.md)
