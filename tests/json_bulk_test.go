@@ -56,7 +56,7 @@ func TestBasicCRUD_JSONText(t *testing.T) {
 	}
 
 	DB.Migrator().DropTable(&JsonRecord{})
-	if err := DB.AutoMigrate(&JsonRecord{}); err != nil {
+	if err := DB.Set("gorm:table_options", "TABLESPACE SYSAUX").AutoMigrate(&JsonRecord{}); err != nil {
 		t.Fatalf("migrate failed: %v", err)
 	}
 
