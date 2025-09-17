@@ -38,6 +38,34 @@ jobs:
         # Update the runtime link path
         echo "/home/runner/work/_temp/instantclient_23_9" | sudo tee /etc/ld.so.conf.d/oracle-instantclient.conf
         sudo ldconfig
+    
+    - name: Wait for Oracle to be ready
+      run: |
+        # Wait until Oracle is accepting connections
+        for i in {1..30}; do
+          if docker exec $(docker ps -qf "ancestor=gvenzl/oracle-free:latest") \
+            bash -c "echo exit | sqlplus -s / as sysdba" >/dev/null 2>&1; then
+            echo "Oracle is ready!"
+            break
+          fi
+          echo "Waiting for Oracle..."
+          sleep 10
+        done
+
+    - name: Get SYS password from Oracle logs
+      id: get-sys-pass
+      run: |
+        CONTAINER_ID=$(docker ps -qf "ancestor=gvenzl/oracle-free:latest")
+        SYS_PASS=$(docker logs $CONTAINER_ID 2>&1 | grep "DATABASE IS READY TO USE!" -B20 | grep "SYS Password:" | awk '{print $3}')
+        echo "SYS_PASS=$SYS_PASS" >> $GITHUB_ENV
+
+    - name: Create tablespace and grant user access
+      run: |
+        cat <<'EOF' > alter_user.sql
+        ALTER USER $GORM_ORACLEDB_USER QUOTA UNLIMITED ON SYSAUX;
+        EOF
+
+        $GORM_ORACLEDB_LIBDIR/sqlplus -s sys/${SYS_PASS}@${GORM_ORACLEDB_CONNECTSTRING} AS SYSDBA @alter_user.sql
 
     - name: Checkout
       uses: actions/checkout@v4
