@@ -63,11 +63,11 @@ jobs:
 
     - name: Alter user quota on tablespace SYSAUX
       run: |
-        cat <<'EOF' > alter_user.sql
+        cat <<EOF > alter_user.sql
         ALTER USER $GORM_ORACLEDB_USER QUOTA UNLIMITED ON SYSAUX;
         EOF
 
-        $GORM_ORACLEDB_LIBDIR/sqlplus -s sys/${SYS_PASS}@${GORM_ORACLEDB_CONNECTSTRING} AS SYSDBA @alter_user.sql
+        $GORM_ORACLEDB_LIBDIR/sqlplus -s "sys/$SYS_PASS@${GORM_ORACLEDB_CONNECTSTRING} AS SYSDBA" @alter_user.sql
 
     - name: Checkout
       uses: actions/checkout@v4
