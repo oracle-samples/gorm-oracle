@@ -16,7 +16,7 @@ jobs:
         env:
           APP_USER: ${{ env.GORM_ORACLEDB_USER }}
           APP_USER_PASSWORD: ${{ env.GORM_ORACLEDB_PASSWORD }}
-          ORACLE_RANDOM_PASSWORD: yes
+          ORACLE_PASSWORD: oracle
         ports:
           - 1521:1521
     steps:
@@ -54,20 +54,13 @@ jobs:
           sleep 10
         done
 
-    - name: Get SYS password from Oracle logs
-      id: get-sys-pass
-      run: |
-        CONTAINER_ID=$(docker ps -qf "ancestor=gvenzl/oracle-free:latest")
-        SYS_PASS=$(docker logs $CONTAINER_ID 2>&1 | grep "DATABASE IS READY TO USE!" -B20 | grep "SYS Password:" | awk '{print $3}')
-        echo "SYS_PASS=$SYS_PASS" >> $GITHUB_ENV
-
     - name: Alter user quota on tablespace SYSAUX
       run: |
         cat <<EOF > alter_user.sql
         ALTER USER $GORM_ORACLEDB_USER QUOTA UNLIMITED ON SYSAUX;
         EOF
 
-        $GORM_ORACLEDB_LIBDIR/sqlplus -s "sys/$SYS_PASS@${GORM_ORACLEDB_CONNECTSTRING} AS SYSDBA" @alter_user.sql
+        $GORM_ORACLEDB_LIBDIR/sqlplus -s "sys/oracle@${GORM_ORACLEDB_CONNECTSTRING} AS SYSDBA" @alter_user.sql
 
     - name: Checkout
       uses: actions/checkout@v4
