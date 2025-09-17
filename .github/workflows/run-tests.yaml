@@ -29,10 +29,12 @@ jobs:
     - name: Install Oracle Instant Client
       run: |
         cd $RUNNER_TEMP
-        # Download the desired Oracle Instant Client zip files
+        # Download the desired Oracle Instant Client zip files and SQL*Plus packages
         curl -sSfLO "https://download.oracle.com/otn_software/linux/instantclient/2390000/instantclient-basic-linux.x64-23.9.0.25.07.zip"
+        curl -sSfLO "https://download.oracle.com/otn_software/linux/instantclient/2390000/instantclient-sqlplus-linux.x64-23.9.0.25.07.zip"
         # Unzip the packages into a single directory
         unzip -q -o "instantclient-basic-linux.x64-23.9.0.25.07.zip"
+        unzip -q -o "instantclient-sqlplus-linux.x64-23.9.0.25.07.zip"
         # Install the operating system libaio package
         sudo ln -s /usr/lib/x86_64-linux-gnu/libaio.so.1t64 /usr/lib/libaio.so.1
         # Update the runtime link path
@@ -59,7 +61,7 @@ jobs:
         SYS_PASS=$(docker logs $CONTAINER_ID 2>&1 | grep "DATABASE IS READY TO USE!" -B20 | grep "SYS Password:" | awk '{print $3}')
         echo "SYS_PASS=$SYS_PASS" >> $GITHUB_ENV
 
-    - name: Create tablespace and grant user access
+    - name: Alter user quota on tablespace SYSAUX
       run: |
         cat <<'EOF' > alter_user.sql
         ALTER USER $GORM_ORACLEDB_USER QUOTA UNLIMITED ON SYSAUX;
