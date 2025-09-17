@@ -9,6 +9,7 @@ jobs:
       GORM_ORACLEDB_USER: ${{ secrets.GORM_ORACLEDB_USER }}
       GORM_ORACLEDB_PASSWORD: ${{ secrets.GORM_ORACLEDB_PASSWORD }}
       GORM_ORACLEDB_CONNECTSTRING: ${{ secrets.GORM_ORACLEDB_CONNECTSTRING }}
+      GORM_SYS_PASSOWRD: ${{ secrets.GORM_SYS_PASSOWRD }}
       GORM_ORACLEDB_LIBDIR: /home/runner/work/_temp/instantclient_23_9
     services:
       oracle:
@@ -16,7 +17,7 @@ jobs:
         env:
           APP_USER: ${{ env.GORM_ORACLEDB_USER }}
           APP_USER_PASSWORD: ${{ env.GORM_ORACLEDB_PASSWORD }}
-          ORACLE_PASSWORD: oracle
+          ORACLE_PASSWORD: ${{ env.GORM_SYS_PASSOWRD }}
         ports:
           - 1521:1521
     steps:
@@ -60,7 +61,7 @@ jobs:
         ALTER USER $GORM_ORACLEDB_USER QUOTA UNLIMITED ON SYSAUX;
         EOF
 
-        $GORM_ORACLEDB_LIBDIR/sqlplus -s "sys/oracle@${GORM_ORACLEDB_CONNECTSTRING} AS SYSDBA" @alter_user.sql
+        $GORM_ORACLEDB_LIBDIR/sqlplus -s "sys/${GORM_SYS_PASSOWRD}@${GORM_ORACLEDB_CONNECTSTRING} AS SYSDBA" @alter_user.sql
 
     - name: Checkout
       uses: actions/checkout@v4
