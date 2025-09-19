@@ -65,3 +65,19 @@ func BeforeQuery(db *gorm.DB) {
 		}
 	}
 }
+
+// MismatchedCaseHandler handles Oracle Case Insensitivity.
+// When identifiers are not quoted, columns are returned by Oracle in uppercase.
+// Fields in the models may be lower case for compatibility with other databases.
+// Match them up with the fields using the column mapping.
+func MismatchedCaseHandler(gormDB *gorm.DB) {
+	if gormDB.Statement == nil || gormDB.Statement.Schema == nil {
+		return
+	}
+	if len(gormDB.Statement.Schema.Fields) > 0 && gormDB.Statement.ColumnMapping == nil {
+		gormDB.Statement.ColumnMapping = map[string]string{}
+	}
+	for _, field := range gormDB.Statement.Schema.Fields {
+		gormDB.Statement.ColumnMapping[strings.ToUpper(field.DBName)] = field.Name
+	}
+}
