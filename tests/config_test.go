@@ -78,23 +78,57 @@ func TestSkipQuoteIdentifiers(t *testing.T) {
 		t.Errorf("Failed to get column: name")
 	}
 
+	student := Student{ID: 1, Name: "John"}
+	if err := db.Model(&Student{}).Create(&student).Error; err != nil {
+		t.Errorf("Failed to insert student, got %v", err)
+	}
+
+	var result Student
+	if err := db.First(&result).Error; err != nil {
+		t.Errorf("Failed to query first student, got %v", err)
+	}
+
+	if result.ID != student.ID {
+		t.Errorf("id should be %v, but got %v", student.ID, result.ID)
+	}
+
+	if result.Name != student.Name {
+		t.Errorf("name should be %v, but got %v", student.Name, result.Name)
+	}
+}
+
+func TestSkipQuoteIdentifiersSQL(t *testing.T) {
+	db, err := openTestDBWithOptions(
+		&oracle.Config{SkipQuoteIdentifiers: true},
+		&gorm.Config{Logger: newLogger})
+	if err != nil {
+		t.Fatalf("failed to connect database, got error %v", err)
+	}
 	dryrunDB := db.Session(&gorm.Session{DryRun: true})
 
-	result := dryrunDB.Model(&Student{}).Create(&Student{ID: 1, Name: "John"})
+	insertedStudent := Student{ID: 1, Name: "John"}
+	result := dryrunDB.Model(&Student{}).Create(&insertedStudent)
+
 	if !regexp.MustCompile(`^INSERT INTO STUDENTS \(name,id\) VALUES \(:1,:2\)$`).MatchString(result.Statement.SQL.String()) {
 		t.Errorf("invalid insert SQL, got %v", result.Statement.SQL.String())
 	}
 
-	result = dryrunDB.First(&Student{})
+	// Test First
+	var firstStudent Student
+	result = dryrunDB.First(&firstStudent)
+
 	if !regexp.MustCompile(`^SELECT \* FROM STUDENTS ORDER BY STUDENTS\.id FETCH NEXT 1 ROW ONLY$`).MatchString(result.Statement.SQL.String()) {
 		t.Fatalf("SQL should include selected names, but got %v", result.Statement.SQL.String())
 	}
 
-	result = dryrunDB.Find(&Student{ID: 1, Name: "John"})
-	if !regexp.MustCompile(`^SELECT \* FROM STUDENTS WHERE STUDENTS\.id = :1$`).MatchString(result.Statement.SQL.String()) {
+	// Test Find
+	var foundStudent Student
+	result = dryrunDB.Find(foundStudent, "id = ?", insertedStudent.ID)
+	if !regexp.MustCompile(`^SELECT \* FROM STUDENTS WHERE id = :1$`).MatchString(result.Statement.SQL.String()) {
 		t.Fatalf("SQL should include selected names, but got %v", result.Statement.SQL.String())
 	}
 
+	// Test Save
 	result = dryrunDB.Save(&Student{ID: 2, Name: "Mary"})
 	if !regexp.MustCompile(`^UPDATE STUDENTS SET name=:1 WHERE id = :2$`).MatchString(result.Statement.SQL.String()) {
 		t.Fatalf("SQL should include selected names, but got %v", result.Statement.SQL.String())

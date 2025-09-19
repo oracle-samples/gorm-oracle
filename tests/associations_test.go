@@ -39,9 +39,11 @@
 package tests
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
 	. "github.com/oracle-samples/gorm-oracle/tests/utils"
 
 	"gorm.io/gorm"
@@ -542,4 +544,67 @@ func TestBasicManyToManyAssociation(t *testing.T) {
 	}
 
 	AssertAssociationCount(t, user, "Languages", 0, "after clear")
+}
+
+func TestSaveAssociationWithAutoIncrementField(t *testing.T) {
+	DB.Migrator().DropTable(&FolderData{}, &FolderProperty{})
+	DB.Migrator().CreateTable(&FolderData{}, &FolderProperty{})
+
+	id := uuid.New().String()
+	folder := FolderData{
+		ID:   id,
+		Name: "My Folder",
+		Properties: []FolderProperty{
+			{
+				ID:    id,
+				Key:   "foo1",
+				Value: "bar1",
+			},
+			{
+				ID:    id,
+				Key:   "foo2",
+				Value: "bar2",
+			},
+		},
+	}
+
+	if err := DB.Create(&folder).Error; err != nil {
+		t.Errorf("Failed to insert data, got %v", err)
+	}
+
+	createdFolder := FolderData{}
+	if err := DB.Model(&FolderData{}).Preload("Properties").First(&createdFolder).Error; err != nil {
+		t.Errorf("Failed to query data, got %v", err)
+	}
+
+	CheckFolderData(t, createdFolder, folder)
+
+	createdFolder.Properties[1].Value = "baz1"
+	createdFolder.Properties = append(createdFolder.Properties, FolderProperty{
+		ID:    id,
+		Key:   "foo3",
+		Value: "bar3",
+	})
+	createdFolder.Properties = append(createdFolder.Properties, FolderProperty{
+		ID:    id,
+		Key:   "foo4",
+		Value: "bar4",
+	})
+	DB.Save(&createdFolder)
+
+	updatedFolder := FolderData{}
+	if err := DB.Model(&FolderData{}).Preload("Properties").First(&updatedFolder).Error; err != nil {
+		t.Errorf("Failed to query data, got %v", err)
+	}
+
+	CheckFolderData(t, updatedFolder, createdFolder)
+
+	if err := DB.Select(clause.Associations).Delete(&createdFolder).Error; err != nil {
+		t.Errorf("Failed to delete data, got %v", err)
+	}
+
+	result := FolderData{}
+	if err := DB.Where("\"folder_id\" = ?", createdFolder.ID).First(&result).Error; err == nil || !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Errorf("should returns record not found error, but got %v", err)
+	}
 }

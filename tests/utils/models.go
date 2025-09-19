@@ -102,3 +102,16 @@ type Child struct {
 	ParentID *uint
 	Parent   *Parent
 }
+
+type FolderProperty struct {
+	Seq   uint64 `gorm:"autoIncrement"`
+	ID    string `gorm:"primaryKey;column:folder_id"`
+	Key   string `gorm:"primaryKey;unique"`
+	Value string
+}
+
+type FolderData struct {
+	ID         string           `gorm:"primaryKey;column:folder_id"`
+	Name       string           `gorm:"column:folder_nm"`
+	Properties []FolderProperty `gorm:"foreignKey:ID;PRELOAD:false"`
+}

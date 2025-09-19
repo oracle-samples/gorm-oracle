@@ -299,14 +299,14 @@ func buildBulkDeletePLSQL(db *gorm.DB) {
 							"  IF l_deleted_records.COUNT > %d THEN :%d := l_deleted_records(%d).",
 							rowIdx, outParamIndex+1, rowIdx+1,
 						))
-						writeQuotedIdentifier(&plsqlBuilder, column)
+						db.QuoteTo(&plsqlBuilder, column)
 						plsqlBuilder.WriteString("; END IF;\n")
 					} else {
 						// JSON -> text bind
 						stmt.Vars = append(stmt.Vars, sql.Out{Dest: new(string)})
 						plsqlBuilder.WriteString(fmt.Sprintf("  IF l_deleted_records.COUNT > %d THEN\n", rowIdx))
 						plsqlBuilder.WriteString(fmt.Sprintf("    :%d := JSON_SERIALIZE(l_deleted_records(%d).", outParamIndex+1, rowIdx+1))
-						writeQuotedIdentifier(&plsqlBuilder, column)
+						db.QuoteTo(&plsqlBuilder, column)
 						plsqlBuilder.WriteString(" RETURNING CLOB);\n")
 						plsqlBuilder.WriteString("  END IF;\n")
 					}
@@ -316,7 +316,7 @@ func buildBulkDeletePLSQL(db *gorm.DB) {
 					stmt.Vars = append(stmt.Vars, sql.Out{Dest: dest})
 					plsqlBuilder.WriteString(fmt.Sprintf("  IF l_deleted_records.COUNT > %d THEN\n", rowIdx))
 					plsqlBuilder.WriteString(fmt.Sprintf("    :%d := l_deleted_records(%d).", outParamIndex+1, rowIdx+1))
-					writeQuotedIdentifier(&plsqlBuilder, column)
+					db.QuoteTo(&plsqlBuilder, column)
 					plsqlBuilder.WriteString(";\n")
 					plsqlBuilder.WriteString("  END IF;\n")
 				}
