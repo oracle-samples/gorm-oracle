@@ -39,9 +39,10 @@
 package oracle
 
 import (
-	"gorm.io/gorm"
 	"regexp"
 	"strings"
+
+	"gorm.io/gorm"
 )
 
 // Identifies the table name alias provided as
@@ -63,5 +64,4 @@ func BeforeQuery(db *gorm.DB) {
 			}
 		}
 	}
-	return
 }
