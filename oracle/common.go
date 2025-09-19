@@ -46,6 +46,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
@@ -165,10 +166,10 @@ func convertValue(val interface{}) interface{} {
 	}
 
 	// Dereference pointers
-	v := reflect.ValueOf(val)
-	for v.Kind() == reflect.Ptr && !v.IsNil() {
-		v = v.Elem()
-		val = v.Interface()
+	rv := reflect.ValueOf(val)
+	for rv.Kind() == reflect.Ptr && !rv.IsNil() {
+		rv = rv.Elem()
+		val = rv.Interface()
 	}
 
 	switch v := val.(type) {
@@ -183,6 +184,13 @@ func convertValue(val interface{}) interface{} {
 		}
 		b := []byte(*v)
 		return b
+	case *uuid.UUID, *datatypes.UUID:
+		// Convert nil pointer to a UUID to empty string so that it is stored in the database as NULL
+		// rather than "00000000-0000-0000-0000-000000000000"
+		if rv.IsNil() {
+			return ""
+		}
+		return val
 	case bool:
 		if v {
 			return 1
@@ -203,30 +211,13 @@ func convertFromOracleToField(value interface{}, field *schema.Field) interface{
 	}
 
 	targetType := field.FieldType
-	isPtr := targetType.Kind() == reflect.Ptr
+	var converted any
+
+	// dereference the field if it's a pointer
+	isPtr := field.FieldType.Kind() == reflect.Ptr
 	if isPtr {
-		targetType = targetType.Elem()
+		targetType = field.FieldType.Elem()
 	}
-	if field.FieldType == reflect.TypeOf(json.RawMessage{}) {
-		switch v := value.(type) {
-		case []byte:
-			return json.RawMessage(v) // from BLOB
-		case *[]byte:
-			if v == nil {
-				return json.RawMessage(nil)
-			}
-			return json.RawMessage(*v)
-		}
-	}
-	if isJSONField(field) {
-		switch v := value.(type) {
-		case string:
-			return datatypes.JSON([]byte(v))
-		case []byte:
-			return datatypes.JSON(v)
-		}
-	}
-	var converted interface{}
 
 	switch targetType {
 	case reflect.TypeOf(gorm.DeletedAt{}):
@@ -235,6 +226,33 @@ func convertFromOracleToField(value interface{}, field *schema.Field) interface{
 		} else {
 			converted = gorm.DeletedAt{}
 		}
+
+	case reflect.TypeOf(json.RawMessage{}):
+		if field.FieldType == reflect.TypeOf(json.RawMessage{}) {
+			switch vv := value.(type) {
+			case []byte:
+				converted = json.RawMessage(vv) // from BLOB
+			case *[]byte:
+				if vv == nil {
+					converted = json.RawMessage(nil)
+				}
+				converted = json.RawMessage(*vv)
+			case string:
+				return datatypes.JSON([]byte(vv))
+			default:
+				converted = value
+			}
+		}
+	case reflect.TypeOf(datatypes.JSON{}):
+		switch vv := value.(type) {
+		case string:
+			converted = datatypes.JSON([]byte(vv))
+		case []byte:
+			converted = datatypes.JSON(vv)
+		default:
+			converted = value
+		}
+
 	case reflect.TypeOf(time.Time{}):
 		switch vv := value.(type) {
 		case time.Time:
@@ -309,7 +327,12 @@ func isJSONField(f *schema.Field) bool {
 	if f == nil {
 		return false
 	}
+
 	ft := f.FieldType
+	if ft.Kind() == reflect.Ptr {
+		ft = ft.Elem()
+	}
+
 	return ft == _rawMsgT || ft == _gormJSON
 }
 

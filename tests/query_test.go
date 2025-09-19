@@ -1713,3 +1713,160 @@ func TestLargeResultSet(t *testing.T) {
 		t.Errorf("Last row incorrect: %+v", results[999])
 	}
 }
+
+func TestBeforeQueryTableUnscoped(t *testing.T) {
+	beforequeryuserunscoped := []User{
+		{Name: "beforequery_user_unscoped", Age: 1},
+		{Name: "beforequery_user2_unscoped", Age: 2},
+		{Name: "beforequery_user3_unscoped", Age: 3},
+		{Name: "beforequery_user4_unscoped", Age: 4},
+		{Name: "beforequery_user5_unscoped", Age: 5},
+		{Name: "beforequery_user6_unscoped", Age: 6},
+		{Name: "beforequery_user7_unscoped", Age: 7},
+	}
+	DB.Save(&beforequeryuserunscoped)
+
+	var fetched1 []User
+	err1 := DB.Table("\"users\" u").Unscoped().Where("\"name\" = ?", "beforequery_user_unscoped").Find(&fetched1).Error
+	if err1 != nil {
+		t.Fatalf("Failed to query with table alias 'users u': %v", err1)
+	}
+	if len(fetched1) != 1 || fetched1[0].Name != "beforequery_user_unscoped" {
+		t.Errorf("Expected to fetch 'beforequery_user_unscoped' with table alias, got: %+v", fetched1)
+	}
+
+	var fetched2 []User
+	err2 := DB.Table(`users`).Unscoped().Where("\"name\" = ?", "beforequery_user2_unscoped").Find(&fetched2).Error
+	if err2 != nil {
+		t.Fatalf("Failed to query with backtick table name '`users`': %v", err2)
+	}
+	if len(fetched2) != 1 || fetched2[0].Name != "beforequery_user2_unscoped" {
+		t.Errorf("Expected to fetch 'beforequery_user2_unscoped' with backtick table, got: %+v", fetched2)
+	}
+
+	var fetched3 []User
+	err3 := DB.Table("(SELECT * FROM \"users\") temp").Unscoped().Where("\"name\" = ?", "beforequery_user3_unscoped").Find(&fetched3).Error
+	if err3 != nil {
+		t.Fatalf("Failed to query with subquery table: %v", err3)
+	}
+	if len(fetched3) != 1 || fetched3[0].Name != "beforequery_user3_unscoped" {
+		t.Errorf("Expected to fetch 'beforequery_user3_unscoped' with subquery table, got: %+v", fetched3)
+	}
+
+	var fetched4 []User
+	err4 := DB.Table("(SELECT * FROM \"users\")").Unscoped().Where("\"name\" = ?", "beforequery_user4_unscoped").Find(&fetched4).Error
+	if err4 != nil {
+		t.Fatalf("Failed to query with subquery table: %v", err4)
+	}
+	if len(fetched4) != 1 || fetched4[0].Name != "beforequery_user4_unscoped" {
+		t.Errorf("Expected to fetch 'beforequery_user4_unscoped' with subquery table, got: %+v", fetched4)
+	}
+
+	var fetched5 []User
+	err5 := DB.Table("\"users\"").Unscoped().Where("\"name\" = ?", "beforequery_user5_unscoped").Find(&fetched5).Error
+	if err5 != nil {
+		t.Fatalf("Failed to query with subquery table: %v", err5)
+	}
+	if len(fetched5) != 1 || fetched5[0].Name != "beforequery_user5_unscoped" {
+		t.Errorf("Expected to fetch 'beforequery_user5_unscoped' with subquery table, got: %+v", fetched5)
+	}
+
+	var fetched6 []User
+	err6 := DB.Table(`"users" "u"`).Unscoped().Where("\"name\" = ?", "beforequery_user6_unscoped").Find(&fetched6).Error
+	if err6 != nil {
+		t.Fatalf("Failed to query with subquery table: %v", err6)
+	}
+	if len(fetched6) != 1 || fetched6[0].Name != "beforequery_user6_unscoped" {
+		t.Errorf("Expected to fetch 'beforequery_user6_unscoped' with subquery table, got: %+v", fetched6)
+	}
+
+	var fetched7 []User
+	err7 := DB.Table(`"users" u`).Unscoped().Where("\"name\" = ?", "beforequery_user7_unscoped").Find(&fetched7).Error
+	if err7 != nil {
+		t.Fatalf("Failed to query with subquery table: %v", err7)
+	}
+	if len(fetched7) != 1 || fetched7[0].Name != "beforequery_user7_unscoped" {
+		t.Errorf("Expected to fetch 'beforequery_user7_unscoped' with subquery table, got: %+v", fetched7)
+	}
+
+}
+
+func TestBeforeQueryTable(t *testing.T) {
+	t.Skip()
+	beforequeryuser := []User{
+		{Name: "beforequery_user", Age: 11},
+		{Name: "beforequery_user2", Age: 12},
+		{Name: "beforequery_user3", Age: 13},
+		{Name: "beforequery_user4", Age: 14},
+		{Name: "beforequery_user5", Age: 15},
+		{Name: "beforequery_user6", Age: 16},
+		{Name: "beforequery_user7", Age: 17},
+	}
+	DB.Save(&beforequeryuser)
+
+	// https://github.com/oracle-samples/gorm-oracle/issues/36
+	var fetched1 []User
+	err1 := DB.Table("\"users\" u").Where("\"name\" = ?", "beforequery_user").Find(&fetched1).Error
+	if err1 != nil {
+		t.Fatalf("Failed to query with table alias 'users u': %v", err1)
+	}
+	if len(fetched1) != 1 || fetched1[0].Name != "beforequery_user" {
+		t.Errorf("Expected to fetch 'beforequery_user' with table alias, got: %+v", fetched1)
+	}
+
+	var fetched2 []User
+	err2 := DB.Table(`users`).Where("\"name\" = ?", "beforequery_user2").Find(&fetched2).Error
+	if err2 != nil {
+		t.Fatalf("Failed to query with backtick table name '`users`': %v", err2)
+	}
+	if len(fetched2) != 1 || fetched2[0].Name != "beforequery_user2" {
+		t.Errorf("Expected to fetch 'beforequery_user2' with backtick table, got: %+v", fetched2)
+	}
+
+	// https://github.com/oracle-samples/gorm-oracle/issues/70
+	var fetched3 []User
+	err3 := DB.Table("(SELECT * FROM \"users\") temp").Where("\"name\" = ?", "beforequery_user3").Find(&fetched3).Error
+	if err3 != nil {
+		t.Fatalf("Failed to query with subquery table: %v", err3)
+	}
+	if len(fetched3) != 1 || fetched3[0].Name != "beforequery_user3" {
+		t.Errorf("Expected to fetch 'beforequery_user3' with subquery table, got: %+v", fetched3)
+	}
+
+	var fetched4 []User
+	err4 := DB.Table("(SELECT * FROM \"users\")").Where("\"name\" = ?", "beforequery_user4").Find(&fetched4).Error
+	if err4 != nil {
+		t.Fatalf("Failed to query with subquery table: %v", err4)
+	}
+	if len(fetched4) != 1 || fetched4[0].Name != "beforequery_user4" {
+		t.Errorf("Expected to fetch 'beforequery_user4' with subquery table, got: %+v", fetched4)
+	}
+
+	var fetched5 []User
+	err5 := DB.Table("\"users\"").Where("\"name\" = ?", "beforequery_user5").Find(&fetched5).Error
+	if err5 != nil {
+		t.Fatalf("Failed to query with subquery table: %v", err5)
+	}
+	if len(fetched5) != 1 || fetched5[0].Name != "beforequery_user5" {
+		t.Errorf("Expected to fetch 'beforequery_user5' with subquery table, got: %+v", fetched5)
+	}
+
+	var fetched6 []User
+	err6 := DB.Table(`"users" "u"`).Where("\"name\" = ?", "beforequery_user6").Find(&fetched6).Error
+	if err6 != nil {
+		t.Fatalf("Failed to query with subquery table: %v", err6)
+	}
+	if len(fetched6) != 1 || fetched6[0].Name != "beforequery_user6" {
+		t.Errorf("Expected to fetch 'beforequery_user6' with subquery table, got: %+v", fetched6)
+	}
+
+	// https://github.com/oracle-samples/gorm-oracle/issues/36
+	var fetched7 []User
+	err7 := DB.Table(`"users" u`).Where("\"name\" = ?", "beforequery_user7").Find(&fetched7).Error
+	if err7 != nil {
+		t.Fatalf("Failed to query with subquery table: %v", err7)
+	}
+	if len(fetched7) != 1 || fetched7[0].Name != "beforequery_user7" {
+		t.Errorf("Expected to fetch 'beforequery_user7' with subquery table, got: %+v", fetched7)
+	}
+}

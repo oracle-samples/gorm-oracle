@@ -50,20 +50,23 @@ import (
 
 func TestBasicCRUD_JSONText(t *testing.T) {
 	type JsonRecord struct {
-		ID         uint           `gorm:"primaryKey;autoIncrement;column:record_id"`
-		Name       string         `gorm:"column:name"`
-		Properties datatypes.JSON `gorm:"column:properties"`
+		ID            uint            `gorm:"primaryKey;autoIncrement;column:record_id"`
+		Name          string          `gorm:"column:name"`
+		Properties    datatypes.JSON  `gorm:"column:properties"`
+		PropertiesPtr *datatypes.JSON `gorm:"column:propertiesPtr"`
 	}
 
 	DB.Migrator().DropTable(&JsonRecord{})
-	if err := DB.AutoMigrate(&JsonRecord{}); err != nil {
+	if err := DB.Set("gorm:table_options", "TABLESPACE SYSAUX").AutoMigrate(&JsonRecord{}); err != nil {
 		t.Fatalf("migrate failed: %v", err)
 	}
 
 	// INSERT
+	json := datatypes.JSON([]byte(`{"env":"prod","owner":"team-x"}`))
 	rec := JsonRecord{
-		Name:       "json-text",
-		Properties: datatypes.JSON([]byte(`{"env":"prod","owner":"team-x"}`)),
+		Name:          "json-text",
+		Properties:    json,
+		PropertiesPtr: &json,
 	}
 	if err := DB.Create(&rec).Error; err != nil {
 		t.Fatalf("create failed: %v", err)
@@ -73,6 +76,7 @@ func TestBasicCRUD_JSONText(t *testing.T) {
 	}
 
 	// UPDATE (with RETURNING)
+	updateJson := datatypes.JSON([]byte(`{"env":"staging","owner":"team-y","flag":true}`))
 	var ret JsonRecord
 	if err := DB.
 		Clauses(clause.Returning{
@@ -80,13 +84,15 @@ func TestBasicCRUD_JSONText(t *testing.T) {
 				{Name: "record_id"},
 				{Name: "name"},
 				{Name: "properties"},
+				{Name: "propertiesPtr"},
 			},
 		}).
 		Model(&ret).
 		Where("\"record_id\" = ?", rec.ID).
 		Updates(map[string]any{
-			"name":       "json-text-upd",
-			"properties": datatypes.JSON([]byte(`{"env":"staging","owner":"team-y","flag":true}`)),
+			"name":          "json-text-upd",
+			"properties":    updateJson,
+			"propertiesPtr": &updateJson,
 		}).Error; err != nil {
 		t.Fatalf("update returning failed: %v", err)
 	}
@@ -103,6 +109,7 @@ func TestBasicCRUD_JSONText(t *testing.T) {
 				{Name: "record_id"},
 				{Name: "name"},
 				{Name: "properties"},
+				{Name: "propertiesPtr"},
 			},
 		}).
 		Delete(&deleted).Error; err != nil {
@@ -122,9 +129,10 @@ func TestBasicCRUD_JSONText(t *testing.T) {
 
 func TestBasicCRUD_RawMessage(t *testing.T) {
 	type RawRecord struct {
-		ID         uint            `gorm:"primaryKey;autoIncrement;column:record_id"`
-		Name       string          `gorm:"column:name"`
-		Properties json.RawMessage `gorm:"column:properties"`
+		ID            uint             `gorm:"primaryKey;autoIncrement;column:record_id"`
+		Name          string           `gorm:"column:name"`
+		Properties    json.RawMessage  `gorm:"column:properties"`
+		PropertiesPtr *json.RawMessage `gorm:"column:propertiesPtr"`
 	}
 
 	DB.Migrator().DropTable(&RawRecord{})
@@ -132,10 +140,12 @@ func TestBasicCRUD_RawMessage(t *testing.T) {
 		t.Fatalf("migrate failed: %v", err)
 	}
 
+	rawMsg := json.RawMessage(`{"a":1,"b":"x"}`)
 	// INSERT
 	rec := RawRecord{
-		Name:       "raw-json",
-		Properties: json.RawMessage(`{"a":1,"b":"x"}`),
+		Name:          "raw-json",
+		Properties:    rawMsg,
+		PropertiesPtr: &rawMsg,
 	}
 	if err := DB.Create(&rec).Error; err != nil {
 		t.Fatalf("create failed: %v", err)
@@ -145,6 +155,7 @@ func TestBasicCRUD_RawMessage(t *testing.T) {
 	}
 
 	// UPDATE (with RETURNING)
+	upatedRawMsg := json.RawMessage(`{"a":2,"c":true}`)
 	var ret RawRecord
 	if err := DB.
 		Clauses(clause.Returning{
@@ -152,17 +163,22 @@ func TestBasicCRUD_RawMessage(t *testing.T) {
 				{Name: "record_id"},
 				{Name: "name"},
 				{Name: "properties"},
+				{Name: "propertiesPtr"},
 			},
 		}).
 		Model(&ret).
 		Where("\"record_id\" = ?", rec.ID).
 		Updates(map[string]any{
-			"name":       "raw-json-upd",
-			"properties": json.RawMessage(`{"a":2,"c":true}`),
+			"name":          "raw-json-upd",
+			"properties":    upatedRawMsg,
+			"propertiesPtr": &upatedRawMsg,
 		}).Error; err != nil {
 		t.Fatalf("update returning failed: %v", err)
 	}
-	if ret.ID != rec.ID || ret.Name != "raw-json-upd" || len(ret.Properties) == 0 {
+	if ret.ID != rec.ID ||
+		ret.Name != "raw-json-upd" ||
+		len(ret.Properties) == 0 ||
+		ret.PropertiesPtr == nil || (ret.PropertiesPtr != nil && len(*ret.PropertiesPtr) == 0) {
 		t.Fatalf("unexpected returning row: %#v", ret)
 	}
 
@@ -175,6 +191,7 @@ func TestBasicCRUD_RawMessage(t *testing.T) {
 				{Name: "record_id"},
 				{Name: "name"},
 				{Name: "properties"},
+				{Name: "propertiesPtr"},
 			},
 		}).
 		Delete(&deleted).Error; err != nil {
