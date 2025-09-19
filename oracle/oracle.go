@@ -57,15 +57,16 @@ import (
 	"gorm.io/gorm/migrator"
 	"gorm.io/gorm/schema"
 	"gorm.io/gorm/utils"
-
-	_ "github.com/godror/godror"
 )
 
+const DefaultDriverName string = "godror"
+
 type Config struct {
-	DriverName        string
-	DataSourceName    string
-	Conn              *sql.DB
-	DefaultStringSize uint
+	DriverName           string
+	DataSourceName       string
+	Conn                 *sql.DB
+	DefaultStringSize    uint
+	SkipQuoteIdentifiers bool
 }
 
 type Dialector struct {
@@ -79,7 +80,7 @@ func (d Dialector) Name() string {
 
 // Open creates a new godror Dialector with the given DSN
 func Open(dsn string) gorm.Dialector {
-	return &Dialector{Config: &Config{DriverName: "godror", DataSourceName: dsn}}
+	return &Dialector{Config: &Config{DataSourceName: dsn}}
 }
 
 // New creates a new Dialector with the given config
@@ -89,6 +90,10 @@ func New(config Config) gorm.Dialector {
 
 // Initializes the database connection
 func (d Dialector) Initialize(db *gorm.DB) (err error) {
+	if d.DriverName == "" {
+		d.DriverName = DefaultDriverName
+	}
+
 	d.DefaultStringSize = 4000
 
 	config := &callbacks.Config{
@@ -237,9 +242,13 @@ func (d Dialector) BindVarTo(writer clause.Writer, stmt *gorm.Statement, v inter
 
 // Manages quoting of identifiers
 func (d Dialector) QuoteTo(writer clause.Writer, str string) {
-	var builder strings.Builder
-	writeQuotedIdentifier(&builder, str)
-	writer.WriteString(builder.String())
+	out := str
+	if !d.SkipQuoteIdentifiers {
+		var builder strings.Builder
+		writeQuotedIdentifier(&builder, str)
+		out = builder.String()
+	}
+	_, _ = writer.WriteString(out)
 }
 
 var numericPlaceholder = regexp.MustCompile(`:(\d+)`)

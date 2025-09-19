@@ -36,6 +36,73 @@ func main() {
 }
 ```
 
+## Documentation
+
+### OnUpdate Foreign Key Constraint
+
+Since Oracle doesn’t support `ON UPDATE` in foreign keys, the driver simulates it using **triggers**.
+
+When a field has a constraint tagged with `OnUpdate`, the driver:
+
+1. Skips generating the unsupported `ON UPDATE` clause in the foreign key definition.
+2. Creates a trigger on the parent table that automatically cascades updates to the child table(s) whenever the referenced column is changed.
+
+The `OnUpdate` tag accepts the following values (case-insensitive): `CASCADE`, `SET NULL`, and `SET DEFAULT`.
+
+Take the following struct for an example:
+
+```go
+type Profile struct {
+  ID    uint
+  Name  string
+  Refer uint
+}
+
+type Member struct {
+  ID        uint
+  Name      string
+  ProfileID uint
+  Profile   Profile `gorm:"Constraint:OnUpdate:CASCADE"`
+}
+```
+
+Trigger SQL created by the driver when migrating:
+
+```sql
+CREATE OR REPLACE TRIGGER "fk_trigger_profiles_id_members_profile_id"
+AFTER UPDATE OF "id" ON "profiles"
+FOR EACH ROW
+BEGIN
+  UPDATE "members"
+  SET "profile_id" = :NEW."id"
+  WHERE "profile_id" = :OLD."id";
+END;
+```
+
+### JSON Columns
+
+Use either JSON type—both fully support `INSERT`, `UPDATE`, and `DELETE` … `RETURNING`:
+
+- `gorm.io/datatypes.JSON` — convenient for logging/printing; returned as text then rewrapped.
+- `encoding/json.RawMessage` — raw `[]byte` fast-path; ideal for large payloads or minimal decoding.
+
+#### Notes:
+- On multi-row `RETURNING`, we use PL/SQL bulk blocks and map results back into your structs.
+- `datatypes.JSON` comes back as text; `json.RawMessage` comes back as bytes.
+  
+Take the following struct as an example:
+
+```go
+type Record struct {
+  ID         uint            `gorm:"primaryKey;autoIncrement;column:record_id"`
+  Name       string          `gorm:"column:name"`
+  // Text-oriented JSON
+  Properties datatypes.JSON  `gorm:"column:properties"`
+  // Raw bytes JSON
+  Payload    json.RawMessage `gorm:"column:payload"`
+}
+```
+
 ## Contributing
 
 This project welcomes contributions from the community. Before submitting a pull request, please [review our contribution guide](./CONTRIBUTING.md)

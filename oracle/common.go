@@ -40,11 +40,13 @@ package oracle
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
 	"time"
 
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
 )
@@ -169,11 +171,18 @@ func convertValue(val interface{}) interface{} {
 		val = v.Interface()
 	}
 
-	if v.Kind() == reflect.Ptr && v.IsNil() {
-		return nil
-	}
-
 	switch v := val.(type) {
+	case json.RawMessage:
+		if v == nil {
+			return nil
+		}
+		return []byte(v)
+	case *json.RawMessage:
+		if v == nil {
+			return nil
+		}
+		b := []byte(*v)
+		return b
 	case bool:
 		if v {
 			return 1
@@ -198,7 +207,25 @@ func convertFromOracleToField(value interface{}, field *schema.Field) interface{
 	if isPtr {
 		targetType = targetType.Elem()
 	}
-
+	if field.FieldType == reflect.TypeOf(json.RawMessage{}) {
+		switch v := value.(type) {
+		case []byte:
+			return json.RawMessage(v) // from BLOB
+		case *[]byte:
+			if v == nil {
+				return json.RawMessage(nil)
+			}
+			return json.RawMessage(*v)
+		}
+	}
+	if isJSONField(field) {
+		switch v := value.(type) {
+		case string:
+			return datatypes.JSON([]byte(v))
+		case []byte:
+			return datatypes.JSON(v)
+		}
+	}
 	var converted interface{}
 
 	switch targetType {
@@ -274,6 +301,24 @@ func convertFromOracleToField(value interface{}, field *schema.Field) interface{
 	}
 
 	return converted
+}
+
+func isJSONField(f *schema.Field) bool {
+	_rawMsgT := reflect.TypeOf(json.RawMessage{})
+	_gormJSON := reflect.TypeOf(datatypes.JSON{})
+	if f == nil {
+		return false
+	}
+	ft := f.FieldType
+	return ft == _rawMsgT || ft == _gormJSON
+}
+
+func isRawMessageField(f *schema.Field) bool {
+	t := f.FieldType
+	for t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	return t == reflect.TypeOf(json.RawMessage(nil))
 }
 
 // Helper function to handle primitive type conversions
@@ -424,6 +469,12 @@ func writeQuotedIdentifier(builder *strings.Builder, identifier string) {
 	builder.WriteByte('"')
 }
 
+func QuoteIdentifier(identifier string) string {
+	var builder strings.Builder
+	writeQuotedIdentifier(&builder, identifier)
+	return builder.String()
+}
+
 // writeTableRecordCollectionDecl writes the PL/SQL declarations needed to
 // define a custom record type and a collection of that record type,
 // based on the schema of the given table.
@@ -448,7 +499,7 @@ func writeQuotedIdentifier(builder *strings.Builder, identifier string) {
 //   - plsqlBuilder: The builder to write the PL/SQL code into.
 //   - dbNames: The slice containing the column names.
 //   - table: The table name
-func writeTableRecordCollectionDecl(plsqlBuilder *strings.Builder, dbNames []string, table string) {
+func writeTableRecordCollectionDecl(db *gorm.DB, plsqlBuilder *strings.Builder, dbNames []string, table string) {
 	// Declare a record where each element has the same structure as a row from the given table
 	plsqlBuilder.WriteString("  TYPE t_record IS RECORD (\n")
 	for i, field := range dbNames {
@@ -456,11 +507,11 @@ func writeTableRecordCollectionDecl(plsqlBuilder *strings.Builder, dbNames []str
 			plsqlBuilder.WriteString(",\n")
 		}
 		plsqlBuilder.WriteString("    ")
-		writeQuotedIdentifier(plsqlBuilder, field)
+		db.QuoteTo(plsqlBuilder, field)
 		plsqlBuilder.WriteString(" ")
-		writeQuotedIdentifier(plsqlBuilder, table)
+		db.QuoteTo(plsqlBuilder, table)
 		plsqlBuilder.WriteString(".")
-		writeQuotedIdentifier(plsqlBuilder, field)
+		db.QuoteTo(plsqlBuilder, field)
 		plsqlBuilder.WriteString("%TYPE")
 	}
 	plsqlBuilder.WriteString("\n")
