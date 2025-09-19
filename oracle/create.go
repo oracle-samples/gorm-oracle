@@ -398,6 +398,8 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 				schema.PrioritizedPrimaryField.AutoIncrement &&
 				strings.EqualFold(schema.PrioritizedPrimaryField.DBName, column.Name) {
 				isAutoIncrement = true
+			} else if stmt.Schema.LookUpField(column.Name).AutoIncrement {
+				isAutoIncrement = true
 			}
 
 			if !isConflictColumn && !isAutoIncrement {
@@ -520,7 +522,7 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 							"  IF l_affected_records.COUNT > %d THEN :%d := l_affected_records(%d).",
 							rowIdx, outParamIndex+1, rowIdx+1,
 						))
-						writeQuotedIdentifier(&plsqlBuilder, column)
+						db.QuoteTo(&plsqlBuilder, column)
 						plsqlBuilder.WriteString("; END IF;\n")
 					} else {
 						// datatypes.JSON (text-based) -> serialize to CLOB
@@ -529,13 +531,13 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 							"  IF l_affected_records.COUNT > %d THEN :%d := JSON_SERIALIZE(l_affected_records(%d).",
 							rowIdx, outParamIndex+1, rowIdx+1,
 						))
-						writeQuotedIdentifier(&plsqlBuilder, column)
+						db.QuoteTo(&plsqlBuilder, column)
 						plsqlBuilder.WriteString(" RETURNING CLOB); END IF;\n")
 					}
 				} else {
 					stmt.Vars = append(stmt.Vars, sql.Out{Dest: createTypedDestination(field)})
 					plsqlBuilder.WriteString(fmt.Sprintf("  IF l_affected_records.COUNT > %d THEN :%d := l_affected_records(%d).", rowIdx, outParamIndex+1, rowIdx+1))
-					writeQuotedIdentifier(&plsqlBuilder, column)
+					db.QuoteTo(&plsqlBuilder, column)
 					plsqlBuilder.WriteString("; END IF;\n")
 				}
 				outParamIndex++
@@ -695,6 +697,8 @@ func shouldIncludeColumnInInsert(stmt *gorm.Statement, columnName string) bool {
 	if stmt.Schema.PrioritizedPrimaryField != nil &&
 		stmt.Schema.PrioritizedPrimaryField.AutoIncrement &&
 		strings.EqualFold(stmt.Schema.PrioritizedPrimaryField.DBName, columnName) {
+		return false
+	} else if stmt.Schema.LookUpField(columnName).AutoIncrement {
 		return false
 	}
 	return true
