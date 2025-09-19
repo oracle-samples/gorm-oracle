@@ -9,6 +9,7 @@ jobs:
       GORM_ORACLEDB_USER: ${{ secrets.GORM_ORACLEDB_USER }}
       GORM_ORACLEDB_PASSWORD: ${{ secrets.GORM_ORACLEDB_PASSWORD }}
       GORM_ORACLEDB_CONNECTSTRING: ${{ secrets.GORM_ORACLEDB_CONNECTSTRING }}
+      GORM_SYS_PASSOWRD: ${{ secrets.GORM_SYS_PASSOWRD }}
       GORM_ORACLEDB_LIBDIR: /home/runner/work/_temp/instantclient_23_9
     services:
       oracle:
@@ -16,7 +17,7 @@ jobs:
         env:
           APP_USER: ${{ env.GORM_ORACLEDB_USER }}
           APP_USER_PASSWORD: ${{ env.GORM_ORACLEDB_PASSWORD }}
-          ORACLE_RANDOM_PASSWORD: yes
+          ORACLE_PASSWORD: ${{ env.GORM_SYS_PASSOWRD }}
         ports:
           - 1521:1521
     steps:
@@ -29,15 +30,38 @@ jobs:
     - name: Install Oracle Instant Client
       run: |
         cd $RUNNER_TEMP
-        # Download the desired Oracle Instant Client zip files
+        # Download the desired Oracle Instant Client zip files and SQL*Plus packages
         curl -sSfLO "https://download.oracle.com/otn_software/linux/instantclient/2390000/instantclient-basic-linux.x64-23.9.0.25.07.zip"
+        curl -sSfLO "https://download.oracle.com/otn_software/linux/instantclient/2390000/instantclient-sqlplus-linux.x64-23.9.0.25.07.zip"
         # Unzip the packages into a single directory
         unzip -q -o "instantclient-basic-linux.x64-23.9.0.25.07.zip"
+        unzip -q -o "instantclient-sqlplus-linux.x64-23.9.0.25.07.zip"
         # Install the operating system libaio package
         sudo ln -s /usr/lib/x86_64-linux-gnu/libaio.so.1t64 /usr/lib/libaio.so.1
         # Update the runtime link path
         echo "/home/runner/work/_temp/instantclient_23_9" | sudo tee /etc/ld.so.conf.d/oracle-instantclient.conf
         sudo ldconfig
+    
+    - name: Wait for Oracle to be ready
+      run: |
+        # Wait until Oracle is accepting connections
+        for i in {1..30}; do
+          if docker exec $(docker ps -qf "ancestor=gvenzl/oracle-free:latest") \
+            bash -c "echo exit | sqlplus -s / as sysdba" >/dev/null 2>&1; then
+            echo "Oracle is ready!"
+            break
+          fi
+          echo "Waiting for Oracle..."
+          sleep 10
+        done
+
+    - name: Alter user quota on tablespace SYSAUX
+      run: |
+        cat <<EOF > alter_user.sql
+        ALTER USER $GORM_ORACLEDB_USER QUOTA UNLIMITED ON SYSAUX;
+        EOF
+
+        $GORM_ORACLEDB_LIBDIR/sqlplus -s "sys/${GORM_SYS_PASSOWRD}@${GORM_ORACLEDB_CONNECTSTRING} AS SYSDBA" @alter_user.sql
 
     - name: Checkout
       uses: actions/checkout@v4
