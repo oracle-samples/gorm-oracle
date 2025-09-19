@@ -357,3 +357,24 @@ func db(unscoped bool) *gorm.DB {
 		return DB
 	}
 }
+
+func CheckFolderData(t *testing.T, folderData FolderData, expect FolderData) {
+	tests.AssertObjEqual(t, folderData, expect, "ID", "Name")
+	t.Run("Properties", func(t *testing.T) {
+		if len(folderData.Properties) != len(expect.Properties) {
+			t.Fatalf("properties should equal, expect: %v, got %v", len(expect.Properties), len(folderData.Properties))
+		}
+
+		sort.Slice(folderData.Properties, func(i, j int) bool {
+			return folderData.Properties[i].ID > folderData.Properties[j].ID
+		})
+
+		sort.Slice(expect.Properties, func(i, j int) bool {
+			return expect.Properties[i].ID > expect.Properties[j].ID
+		})
+
+		for idx, property := range folderData.Properties {
+			tests.AssertObjEqual(t, property, expect.Properties[idx], "Seq", "ID", "Key", "Value")
+		}
+	})
+}
