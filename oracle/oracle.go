@@ -109,6 +109,18 @@ func (d Dialector) Initialize(db *gorm.DB) (err error) {
 	callback.Update().Replace("gorm:update", Update)
 	callback.Query().Before("gorm:query").Register("oracle:before_query", BeforeQuery)
 
+	if d.SkipQuoteIdentifiers {
+		// When identifiers are not quoted, columns are returned by Oracle in uppercase.
+		// Fields in the models may be lower case for compatibility with other databases.
+		// Match them up with the fields using the column mapping.
+		oracleCaseHandler := "oracle:case_handler"
+		if callback.Query().Get(oracleCaseHandler) == nil {
+			if err := callback.Query().Before("gorm:query").Register(oracleCaseHandler, MismatchedCaseHandler); err != nil {
+				return err
+			}
+		}
+	}
+
 	maps.Copy(db.ClauseBuilders, OracleClauseBuilders())
 
 	if d.Conn == nil {
