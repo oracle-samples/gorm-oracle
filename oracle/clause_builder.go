@@ -503,6 +503,8 @@ func shouldIncludeColumn(stmt *gorm.Statement, columnName string) bool {
 		stmt.Schema.PrioritizedPrimaryField.AutoIncrement &&
 		stmt.Schema.PrioritizedPrimaryField.DBName == columnName {
 		return false
+	} else if stmt.Schema.LookUpField(columnName).AutoIncrement {
+		return false
 	}
 	return true
 }
