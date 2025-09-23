@@ -218,6 +218,24 @@ func TestSupportedDialectorWithErrDuplicatedKeyNegative(t *testing.T) {
 	if !errors.Is(err, gorm.ErrDuplicatedKey) {
 		t.Errorf("expected ErrDuplicatedKey on unique Code, got: %v", err)
 	}
+
+	var cities []City
+	if err := db.Find(&cities, "code = ?", "P1").Error; err != nil {
+		t.Fatalf("failed to fetch cities: %v", err)
+	}
+	if len(cities) != 1 {
+		t.Fatalf("expected 1 city with code 'P1', found %d", len(cities))
+	}
+	if cities[0].Name != "Paris" {
+		t.Errorf("expected city name 'Paris', got '%s'", cities[0].Name)
+	}
+
+	if err := db.Create(&City{Name: "NullCodeCity", Code: ""}).Error; err != nil {
+		t.Fatalf("failed to create record with empty Code: %v", err)
+	}
+	if err := db.Create(&City{Name: "NullCodeCity2"}).Error; err != nil {
+		t.Fatalf("failed to create second record with NULL Code: %v", err)
+	}
 }
 
 func TestSupportedDialectorWithErrForeignKeyViolatedNegative(t *testing.T) {
