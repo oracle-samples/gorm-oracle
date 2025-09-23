@@ -1,6 +1,6 @@
 module github.com/oracle-samples/gorm-oracle/tests
 
-go 1.24.4
+go 1.25.1
 
 require gorm.io/gorm v1.31.0
 
