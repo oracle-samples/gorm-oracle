@@ -572,17 +572,17 @@ func buildUpdatePLSQL(db *gorm.DB) {
 				if isJSONField(field) {
 					if isRawMessageField(field) {
 						plsqlBuilder.WriteString(fmt.Sprintf("l_updated_records(%d).", rowIdx+1))
-						writeQuotedIdentifier(&plsqlBuilder, column)
+						db.QuoteTo(&plsqlBuilder, column)
 					} else {
 						// serialize JSON so it binds as text
 						plsqlBuilder.WriteString("JSON_SERIALIZE(")
 						plsqlBuilder.WriteString(fmt.Sprintf("l_updated_records(%d).", rowIdx+1))
-						writeQuotedIdentifier(&plsqlBuilder, column)
+						db.QuoteTo(&plsqlBuilder, column)
 						plsqlBuilder.WriteString(" RETURNING CLOB)")
 					}
 				} else {
 					plsqlBuilder.WriteString(fmt.Sprintf("l_updated_records(%d).", rowIdx+1))
-					writeQuotedIdentifier(&plsqlBuilder, column)
+					db.QuoteTo(&plsqlBuilder, column)
 				}
 
 				plsqlBuilder.WriteString("; END IF;\n")
