@@ -300,6 +300,17 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 		} else {
 			arrayType = "TABLE OF VARCHAR2(4000)"
 		}
+		for i, ccolumn := range createValues.Columns {
+			if strings.EqualFold(ccolumn.Name, column.Name) {
+				for j := range createValues.Values {
+					if strValue, ok := createValues.Values[j][i].(string); ok {
+						if len(strValue) > 4000 {
+							arrayType = "TABLE OF CLOB"
+						}
+					}
+				}
+			}
+		}
 
 		plsqlBuilder.WriteString(fmt.Sprintf("  TYPE t_col_%d_array IS %s;\n", i, arrayType))
 		plsqlBuilder.WriteString(fmt.Sprintf("  l_col_%d_array t_col_%d_array;\n", i, i))
@@ -582,6 +593,17 @@ func buildBulkInsertOnlyPLSQL(db *gorm.DB, createValues clause.Values) {
 			arrayType = getOracleArrayType(field)
 		} else {
 			arrayType = "TABLE OF VARCHAR2(4000)"
+		}
+		for i, ccolumn := range createValues.Columns {
+			if strings.EqualFold(ccolumn.Name, column.Name) {
+				for j := range createValues.Values {
+					if strValue, ok := createValues.Values[j][i].(string); ok {
+						if len(strValue) > 4000 {
+							arrayType = "TABLE OF CLOB"
+						}
+					}
+				}
+			}
 		}
 
 		plsqlBuilder.WriteString(fmt.Sprintf("  TYPE t_col_%d_array IS %s;\n", i, arrayType))
