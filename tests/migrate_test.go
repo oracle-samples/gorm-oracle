@@ -565,18 +565,17 @@ func TestMigrateAddDropColumns(t *testing.T) {
 		t.Fatalf("Should fail to add column with existing name")
 	}
 
-	// https://github.com/oracle-samples/gorm-oracle/issues/80
-	// if err := DB.Table("migrate_add_drop_columns").Migrator().DropColumn(&MigrateAddDropColumns{}, "NewName"); err != nil {
-	// 	t.Fatalf("Failed to drop column, got %v", err)
-	// }
+	if err := DB.Table("migrate_add_drop_columns").Migrator().DropColumn(&MigrateAddDropColumns{}, "NewName"); err != nil {
+		t.Fatalf("Failed to drop column, got %v", err)
+	}
 
-	// if DB.Table("migrate_add_drop_columns").Migrator().HasColumn(&MigrateAddDropColumns{}, "NewName") {
-	// 	t.Fatalf("Found deleted column")
-	// }
+	if DB.Table("migrate_add_drop_columns").Migrator().HasColumn(&MigrateAddDropColumns{}, "NewName") {
+		t.Fatalf("Found deleted column")
+	}
 
-	// if err := DB.Table("migrate_add_drop_columns").Migrator().AddColumn(&MigrateAddDropColumns{}, "NewName"); err != nil {
-	// 	t.Fatalf("Failed to add column, got %v", err)
-	// }
+	if err := DB.Table("migrate_add_drop_columns").Migrator().AddColumn(&MigrateAddDropColumns{}, "NewName"); err != nil {
+		t.Fatalf("Failed to add column, got %v", err)
+	}
 
 	if err := DB.Table("migrate_add_drop_columns").Migrator().RenameColumn(&MigrateAddDropColumns{}, "NewName",
 		"new_new_name"); err != nil {
@@ -591,14 +590,13 @@ func TestMigrateAddDropColumns(t *testing.T) {
 		t.Fatalf("Found renamed column")
 	}
 
-	// https://github.com/oracle-samples/gorm-oracle/issues/80
-	// if err := DB.Table("migrate_add_drop_columns").Migrator().DropColumn(&MigrateAddDropColumns{}, "new_new_name"); err != nil {
-	// 	t.Fatalf("Failed to add column, got %v", err)
-	// }
+	if err := DB.Table("migrate_add_drop_columns").Migrator().DropColumn(&MigrateAddDropColumns{}, "new_new_name"); err != nil {
+		t.Fatalf("Failed to add column, got %v", err)
+	}
 
-	// if DB.Table("migrate_add_drop_columns").Migrator().HasColumn(&MigrateAddDropColumns{}, "new_new_name") {
-	// 	t.Fatalf("Found deleted column")
-	// }
+	if DB.Table("migrate_add_drop_columns").Migrator().HasColumn(&MigrateAddDropColumns{}, "new_new_name") {
+		t.Fatalf("Found deleted column")
+	}
 }
 
 func TestMigrateConstraint(t *testing.T) {
