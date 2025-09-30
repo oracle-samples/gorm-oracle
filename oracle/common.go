@@ -53,7 +53,7 @@ import (
 )
 
 // Helper function to get Oracle array type for a field
-func getOracleArrayType(field *schema.Field) string {
+func getOracleArrayType(field *schema.Field, values []any) string {
 	switch field.DataType {
 	case schema.Bool:
 		return "TABLE OF NUMBER(1)"
@@ -64,6 +64,14 @@ func getOracleArrayType(field *schema.Field) string {
 	case schema.String:
 		if field.Size > 0 && field.Size <= 4000 {
 			return fmt.Sprintf("TABLE OF VARCHAR2(%d)", field.Size)
+		} else {
+			for _, value := range values {
+				if strValue, ok := value.(string); ok {
+					if len(strValue) > 4000 {
+						return "TABLE OF CLOB"
+					}
+				}
+			}
 		}
 		return "TABLE OF VARCHAR2(4000)"
 	case schema.Time:

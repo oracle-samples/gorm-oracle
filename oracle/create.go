@@ -296,7 +296,7 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 	for i, column := range createValues.Columns {
 		var arrayType string
 		if field := findFieldByDBName(schema, column.Name); field != nil {
-			arrayType = getOracleArrayType(field)
+			arrayType = getOracleArrayType(field, pluck(createValues.Values, i))
 		} else {
 			arrayType = "TABLE OF VARCHAR2(4000)"
 		}
@@ -579,7 +579,7 @@ func buildBulkInsertOnlyPLSQL(db *gorm.DB, createValues clause.Values) {
 	for i, column := range createValues.Columns {
 		var arrayType string
 		if field := findFieldByDBName(schema, column.Name); field != nil {
-			arrayType = getOracleArrayType(field)
+			arrayType = getOracleArrayType(field, pluck(createValues.Values, i))
 		} else {
 			arrayType = "TABLE OF VARCHAR2(4000)"
 		}
@@ -1006,4 +1006,13 @@ func sanitizeCreateValuesForBulkArrays(stmt *gorm.Statement, cv *clause.Values) 
 			}
 		}
 	}
+}
+
+// pluck extracts the values at index col from a slice of arrays []T.
+func pluck[T any, N int](data [][]T, col int) []T {
+	out := make([]T, len(data))
+	for i := range data {
+		out[i] = data[i][col]
+	}
+	return out
 }
