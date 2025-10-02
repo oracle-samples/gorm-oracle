@@ -46,6 +46,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/oracle-samples/gorm-oracle/oracle"
 	"gorm.io/gorm"
 )
 
@@ -587,5 +588,38 @@ func TestConnectionPoolStats(t *testing.T) {
 	}
 	if afterStats.Idle < 0 {
 		t.Error("Idle connections should not be negative")
+	}
+}
+
+func TestGormOpenWithExistingConn(t *testing.T) {
+	sqlDB, err := DB.DB()
+	if err != nil {
+		t.Fatalf("Failed to get underlying DB: %v", err)
+	}
+
+	sqlDB.SetMaxOpenConns(10)
+	sqlDB.SetMaxIdleConns(5)
+	sqlDB.SetConnMaxLifetime(30 * time.Minute)
+	sqlDB.SetConnMaxIdleTime(5 * time.Minute)
+
+	config := oracle.Config{
+		Conn: sqlDB,
+	}
+
+	dialector := oracle.New(config)
+
+	newDB, err := gorm.Open(dialector, &gorm.Config{})
+	if err != nil {
+		panic(err)
+	}
+
+	underlyingDB, err := newDB.DB()
+	if err != nil {
+		panic(err)
+	}
+
+	stats := underlyingDB.Stats()
+	if stats.MaxOpenConnections != 10 {
+		t.Errorf("Expected MaxOpenConnections: 10, got: %d", stats.MaxOpenConnections)
 	}
 }

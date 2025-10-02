@@ -829,6 +829,19 @@ func TestToSQL(t *testing.T) {
 	})
 	assertEqualSQL(t, `INSERT INTO "users" ("created_at","updated_at","deleted_at","name","age","birthday","company_id","manager_id","active") VALUES ('2021-10-18 00:00:00','2021-10-18 00:00:00',NULL,'foo',20,NULL,NULL,NULL,false) RETURNING "id" INTO .*`, sql)
 
+	// insert with explicit Table via clause.Insert
+	user = &User{Name: "bar", Age: 42}
+	user.CreatedAt = date
+	user.UpdatedAt = date
+	sql = DB.ToSQL(func(tx *gorm.DB) *gorm.DB {
+		return tx.Clauses(clause.Insert{Table: clause.Table{Name: "custom_table"}}).Create(user)
+	})
+	assertEqualSQL(t, `INSERT INTO "custom_table" ("created_at","updated_at","deleted_at","name","age","birthday","company_id","manager_id","active") VALUES ('2021-10-18 00:00:00','2021-10-18 00:00:00',NULL,'bar',42,NULL,NULL,NULL,false) RETURNING "id" INTO .*`, sql)
+	sql = DB.ToSQL(func(tx *gorm.DB) *gorm.DB {
+		return tx.Clauses(clause.Insert{Table: clause.Table{Name: "custom_table"}}).Unscoped().Create(user)
+	})
+	assertEqualSQL(t, `INSERT INTO "custom_table" ("created_at","updated_at","deleted_at","name","age","birthday","company_id","manager_id","active") VALUES ('2021-10-18 00:00:00','2021-10-18 00:00:00',NULL,'bar',42,NULL,NULL,NULL,false) RETURNING "id" INTO .*`, sql)
+
 	// updates
 	user = &User{Name: "bar", Age: 22}
 	user.CreatedAt = date
@@ -837,6 +850,22 @@ func TestToSQL(t *testing.T) {
 		return tx.Model(&User{}).Where("id = ?", 100).Updates(user)
 	})
 	assertEqualSQL(t, `UPDATE "users" SET "created_at"='2021-10-18 00:00:00',"updated_at"='2021-10-18 19:50:09.438',"name"='bar',"age"=22 WHERE id = 100 AND "users"."deleted_at" IS NULL`, sql)
+
+	// UPDATE with explicit Table via clause.Update
+	sql = DB.ToSQL(func(tx *gorm.DB) *gorm.DB {
+		return tx.Clauses(clause.Update{Table: clause.Table{Name: "custom_update_table"}}).Unscoped().
+			Where("id = ?", 200).
+			Updates(&User{Name: "patched", Age: 99})
+	})
+	assertEqualSQL(t, `UPDATE "custom_update_table" SET "updated_at"=?,"name"='patched',"age"=99 WHERE id = 200`, sql)
+
+	// https://github.com/oracle-samples/gorm-oracle/issues/81
+	// sql = DB.ToSQL(func(tx *gorm.DB) *gorm.DB {
+	// 	return tx.Clauses(clause.Update{Table: clause.Table{Name: "custom_update_table"}}).
+	// 		Where("id = ?", 200).
+	// 		Updates(&User{Name: "patched", Age: 99})
+	// })
+	// assertEqualSQL(t, `UPDATE "custom_update_table" SET "updated_at"=?,"name"='patched',"age"=99 WHERE id = 200 AND "custom_update_table"."deleted_at" IS NULL`, sql)
 
 	// update
 	sql = DB.ToSQL(func(tx *gorm.DB) *gorm.DB {

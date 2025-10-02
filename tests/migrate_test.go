@@ -359,6 +359,19 @@ func TestMigrateWithUniqueIndex(t *testing.T) {
 	if !DB.Migrator().HasIndex(&UserWithUniqueIndex{}, "idx_user_with_unique_indices_u_name") {
 		t.Errorf("Failed to find created index")
 	}
+
+	type IndexWithOption struct {
+		ID   int
+		Name string `gorm:"size:20;index:idx_name_opt,unique,option:TABLESPACE SYSAUX NOPARALLEL"`
+	}
+	DB.Migrator().DropTable(&IndexWithOption{})
+	if err := DB.AutoMigrate(&IndexWithOption{}); err != nil {
+		t.Fatalf("failed to migrate, got %v", err)
+	}
+
+	if !DB.Migrator().HasIndex(&IndexWithOption{}, "idx_name_opt") {
+		t.Errorf("Failed to find created index")
+	}
 }
 
 func TestMigrateTable(t *testing.T) {
@@ -536,47 +549,52 @@ func TestMigrateColumns(t *testing.T) {
 			}
 		}
 	}
+}
 
-	type NewColumnStruct struct {
+func TestMigrateAddDropColumns(t *testing.T) {
+	type MigrateAddDropColumns struct {
 		gorm.Model
 		Name    string
 		NewName string
 	}
 
-	if err := DB.Table("column_structs").Migrator().AddColumn(&NewColumnStruct{}, "NewName"); err != nil {
-		t.Fatalf("Failed to add column, got %v", err)
+	DB.Migrator().DropTable(&MigrateAddDropColumns{})
+	DB.AutoMigrate(&MigrateAddDropColumns{})
+
+	if err := DB.Table("migrate_add_drop_columns").Migrator().AddColumn(&MigrateAddDropColumns{}, "NewName"); err == nil {
+		t.Fatalf("Should fail to add column with existing name")
 	}
 
-	if !DB.Table("column_structs").Migrator().HasColumn(&NewColumnStruct{}, "NewName") {
-		t.Fatalf("Failed to find added column")
+	if err := DB.Table("migrate_add_drop_columns").Migrator().DropColumn(&MigrateAddDropColumns{}, "NewName"); err != nil {
+		t.Fatalf("Failed to drop column, got %v", err)
 	}
 
-	if err := DB.Table("column_structs").Migrator().DropColumn(&NewColumnStruct{}, "NewName"); err != nil {
-		t.Fatalf("Failed to add column, got %v", err)
-	}
-
-	if DB.Table("column_structs").Migrator().HasColumn(&NewColumnStruct{}, "NewName") {
+	if DB.Table("migrate_add_drop_columns").Migrator().HasColumn(&MigrateAddDropColumns{}, "NewName") {
 		t.Fatalf("Found deleted column")
 	}
 
-	if err := DB.Table("column_structs").Migrator().AddColumn(&NewColumnStruct{}, "NewName"); err != nil {
+	if err := DB.Table("migrate_add_drop_columns").Migrator().AddColumn(&MigrateAddDropColumns{}, "NewName"); err != nil {
 		t.Fatalf("Failed to add column, got %v", err)
 	}
 
-	if err := DB.Table("column_structs").Migrator().RenameColumn(&NewColumnStruct{}, "NewName",
+	if err := DB.Table("migrate_add_drop_columns").Migrator().RenameColumn(&MigrateAddDropColumns{}, "NewName",
 		"new_new_name"); err != nil {
 		t.Fatalf("Failed to add column, got %v", err)
 	}
 
-	if !DB.Table("column_structs").Migrator().HasColumn(&NewColumnStruct{}, "new_new_name") {
+	if !DB.Table("migrate_add_drop_columns").Migrator().HasColumn(&MigrateAddDropColumns{}, "new_new_name") {
 		t.Fatalf("Failed to found renamed column")
 	}
 
-	if err := DB.Table("column_structs").Migrator().DropColumn(&NewColumnStruct{}, "new_new_name"); err != nil {
+	if DB.Table("migrate_add_drop_columns").Migrator().HasColumn(&MigrateAddDropColumns{}, "NewName") {
+		t.Fatalf("Found renamed column")
+	}
+
+	if err := DB.Table("migrate_add_drop_columns").Migrator().DropColumn(&MigrateAddDropColumns{}, "new_new_name"); err != nil {
 		t.Fatalf("Failed to add column, got %v", err)
 	}
 
-	if DB.Table("column_structs").Migrator().HasColumn(&NewColumnStruct{}, "new_new_name") {
+	if DB.Table("migrate_add_drop_columns").Migrator().HasColumn(&MigrateAddDropColumns{}, "new_new_name") {
 		t.Fatalf("Found deleted column")
 	}
 }
@@ -2073,6 +2091,17 @@ func TestOracleErrorHandling(t *testing.T) {
 	if err := DB.AutoMigrate(&TestModel{}); err != nil {
 		t.Fatalf("Duplicate table creation should not error: %v", err)
 	}
+
+	type NotAModel struct{}
+	if err := DB.Migrator().CreateTable(NotAModel{}); err == nil {
+		t.Fatalf("table creation with empty struct shoud report error: %v", err)
+	}
+
+	err := DB.Migrator().CreateTable("not_a_model_name")
+	if err != nil && err.Error() != "failed to get schema" {
+		t.Fatalf("Expect 'failed to get schema', but got : %v", err)
+	}
+
 }
 
 func TestMigrateOnUpdateConstraint(t *testing.T) {
