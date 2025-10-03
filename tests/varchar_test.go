@@ -51,7 +51,7 @@ type VarcharTestModel struct {
 	SmallText        string    `gorm:"size:50"`
 	MediumText       string    `gorm:"size:500"`
 	LargeText        string    `gorm:"size:4000"`
-	DefaultSizeText  string    // Should use DefaultStringSize (4000)
+	DefaultSizeText  string
 	OptionalText     *string   `gorm:"size:100"`
 	NotNullText      string    `gorm:"size:200;not null"`
 	UniqueText       string    `gorm:"size:100;uniqueIndex"`
@@ -72,7 +72,6 @@ func setupVarcharTestTables(t *testing.T) {
 	t.Log("VARCHAR test tables created successfully")
 }
 
-// Test 1: Basic CRUD operations with VARCHAR fields of different sizes
 func TestVarcharBasicCRUD(t *testing.T) {
 	setupVarcharTestTables(t)
 
@@ -142,11 +141,10 @@ func TestVarcharBasicCRUD(t *testing.T) {
 	}
 }
 
-// Test 2: Edge case - Maximum VARCHAR2 size (4000 bytes) and boundary testing
 func TestVarcharMaximumSize(t *testing.T) {
 	setupVarcharTestTables(t)
 
-	// Test at exactly 4000 bytes (Oracle VARCHAR2 limit)
+	// Test at 4000 bytes
 	text4000 := strings.Repeat("X", 4000)
 	
 	model := &VarcharTestModel{
@@ -174,7 +172,7 @@ func TestVarcharMaximumSize(t *testing.T) {
 		t.Error("4000-byte VARCHAR content mismatch")
 	}
 
-	// Test at boundary: 3999, 4000, 4001 bytes (4001 should work as LargeText is 4000)
+	// Test at boundary: 3999, 4000, 4001 bytes
 	testCases := []struct {
 		name     string
 		size     int
@@ -209,8 +207,6 @@ func TestVarcharMaximumSize(t *testing.T) {
 	}
 }
 
-// This is failing
-// Test 3: Edge case - NULL values and empty strings
 func TestVarcharNullAndEmpty(t *testing.T) {
 	setupVarcharTestTables(t)
 
@@ -283,11 +279,10 @@ func TestVarcharNullAndEmpty(t *testing.T) {
 	}
 }
 
-// Test 4: Negative test - Exceeding VARCHAR size limit
 func TestVarcharSizeExceeded(t *testing.T) {
 	setupVarcharTestTables(t)
 
-	// Try to insert text larger than SmallText limit (50)
+	// insert text larger than SmallText limit (50)
 	tooLargeForSmall := strings.Repeat("X", 100) // 100 chars, but limit is 50
 
 	model := &VarcharTestModel{
@@ -298,7 +293,6 @@ func TestVarcharSizeExceeded(t *testing.T) {
 
 	err := DB.Create(model).Error
 	if err == nil {
-		// Oracle may truncate or allow it, check what actually got stored
 		var retrieved VarcharTestModel
 		DB.First(&retrieved, model.ID)
 		if len(retrieved.SmallText) > 50 {
@@ -328,7 +322,6 @@ func TestVarcharSizeExceeded(t *testing.T) {
 	}
 }
 
-// Test 5: Edge case - Special characters, Unicode, and whitespace
 func TestVarcharSpecialCharacters(t *testing.T) {
 	setupVarcharTestTables(t)
 
@@ -371,11 +364,10 @@ func TestVarcharSpecialCharacters(t *testing.T) {
 	}
 }
 
-// Test 6: Edge case - Bulk operations and unique constraints
 func TestVarcharBulkAndConstraints(t *testing.T) {
 	setupVarcharTestTables(t)
 
-	// Test bulk insert with multiple records
+	// bulk insert with multiple records
 	records := []VarcharTestModel{
 		{SmallText: "Bulk 1", NotNullText: "Required 1", UniqueText: "bulk_unique_001"},
 		{SmallText: "Bulk 2", NotNullText: "Required 2", UniqueText: "bulk_unique_002"},
@@ -389,14 +381,14 @@ func TestVarcharBulkAndConstraints(t *testing.T) {
 		t.Fatalf("Failed to bulk create records: %v", err)
 	}
 
-	// Verify all records were created
+	// Verify all records
 	var count int64
 	DB.Model(&VarcharTestModel{}).Count(&count)
 	if count < 5 {
 		t.Errorf("Expected at least 5 records, got %d", count)
 	}
 
-	// Test unique constraint violation
+	// unique constraint violation
 	duplicateModel := &VarcharTestModel{
 		SmallText:   "Duplicate test",
 		NotNullText: "Required",
