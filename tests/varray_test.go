@@ -41,6 +41,8 @@ package tests
 import (
 	"reflect"
 	"testing"
+
+	"github.com/oracle-samples/gorm-oracle/oracle"
 )
 
 // Struct mapping to phone_typ object
@@ -58,12 +60,11 @@ type DeptPhoneList struct {
 
 // Struct for table with email VARRAY
 type EmailVarrayTable struct {
-	ID     uint     `gorm:"column:ID;primaryKey"`
-	Emails []string `gorm:"column:EMAILS;type:\"email_list_arr\""`
+	ID     uint             `gorm:"column:ID;primaryKey"`
+	Emails oracle.EmailList `gorm:"column:EMAILS;type:\"email_list_arr\""`
 }
 
 func TestStringVarray(t *testing.T) {
-	t.Skip("Skipping due to issue #87")
 	dropTable := `
 				BEGIN
 				EXECUTE IMMEDIATE 'DROP TABLE "email_varray_tables"';
@@ -90,6 +91,13 @@ func TestStringVarray(t *testing.T) {
 		t.Fatalf("Failed to create email_varray_tables: %v", err)
 	}
 
+	// expose raw *sql.DB to oracle package for godror.GetObjectType
+	sqlDB, err := DB.DB()
+	if err != nil {
+		t.Fatalf("cannot get *sql.DB from GORM: %v", err)
+	}
+	oracle.DB = sqlDB
+
 	// Insert initial data via raw SQL
 	insertRaw := `INSERT INTO "email_varray_tables" VALUES (1, "email_list_arr"('alice@example.com','bob@example.com','gorm@oracle.com'))`
 	if err := DB.Exec(insertRaw).Error; err != nil {
@@ -102,7 +110,7 @@ func TestStringVarray(t *testing.T) {
 		t.Fatalf("Failed to fetch varray: %v", err)
 	}
 	expected := []string{"alice@example.com", "bob@example.com", "gorm@oracle.com"}
-	if !reflect.DeepEqual(expected, got.Emails) {
+	if !reflect.DeepEqual(expected, []string(got.Emails)) {
 		t.Errorf("String VARRAY roundtrip failed: got %v, want %v", got.Emails, expected)
 	}
 
@@ -115,7 +123,7 @@ func TestStringVarray(t *testing.T) {
 	if err := DB.First(&updated, 1).Error; err != nil {
 		t.Fatalf("Failed to reload updated EmailVarrayTable: %v", err)
 	}
-	if !reflect.DeepEqual(updated.Emails, newEmails) {
+	if !reflect.DeepEqual(updated.Emails, oracle.EmailList(newEmails)) {
 		t.Errorf("String VARRAY update failed: got %v, want %v", updated.Emails, newEmails)
 	}
 
@@ -130,7 +138,6 @@ func TestStringVarray(t *testing.T) {
 }
 
 func TestVarrayOfObject(t *testing.T) {
-	t.Skip("Skipping due to issue #87")
 	dropTable := `
 				BEGIN
 				EXECUTE IMMEDIATE 'DROP TABLE "dept_phone_lists"';

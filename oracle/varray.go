@@ -60,7 +60,7 @@ func (e EmailList) Value() (driver.Value, error) {
 
 	ctx := context.Background()
 
-	objType, err := godror.GetObjectType(ctx, DB, "EMAIL_LIST_ARR")
+	objType, err := godror.GetObjectType(ctx, DB, "\"email_list_arr\"")
 	if err != nil {
 		return nil, fmt.Errorf("get object type: %w", err)
 	}
