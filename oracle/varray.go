@@ -11,9 +11,9 @@ import (
 	"github.com/godror/godror"
 )
 
-var DB godror.Execer // set in tests
+var DB godror.Execer
 
-// EmailList is a Go wrapper for Oracle VARRAY type EMAIL_LIST_ARR.
+// StringList is a Go wrapper for Oracle VARRAY type
 type StringList []string
 
 // Scan implements sql.Scanner (Oracle -> Go)
@@ -63,7 +63,7 @@ func (s StringList) Value() (driver.Value, error) {
 
 	ctx := context.Background()
 
-	// Try to detect Oracle type name dynamically via reflection
+	// detect Oracle type name dynamically via reflection
 	typeName, err := detectOracleTypeName(s)
 	if err != nil {
 		return nil, err
@@ -91,27 +91,24 @@ func (s StringList) Value() (driver.Value, error) {
 	return obj, nil
 }
 
-// detectOracleTypeName uses reflection to look up the `gorm:"type:..."` tag.
 func detectOracleTypeName(value interface{}) (string, error) {
-	val := reflect.ValueOf(value)
-	if val.Kind() == reflect.Ptr {
-		val = val.Elem()
+	rt := reflect.TypeOf(value)
+	if rt.Kind() != reflect.Struct {
+		// Not a struct → cannot detect; return a hint instead of panic
+		return "", fmt.Errorf("detectOracleTypeName: not a struct (got %s)", rt.Kind())
 	}
 
-	// walk up the call stack and look for the struct field tag
-	// (GORM provides the value as part of the struct — this works during model serialization)
-	rt := reflect.TypeOf(value)
 	for i := 0; i < rt.NumField(); i++ {
 		field := rt.Field(i)
-		if tag := field.Tag.Get("gorm"); strings.Contains(tag, "type:") {
+		tag := field.Tag.Get("gorm")
+		if strings.Contains(tag, "type:") {
 			re := regexp.MustCompile(`type:"?([a-zA-Z0-9_]+)"?`)
 			match := re.FindStringSubmatch(tag)
 			if len(match) > 1 {
-				return strings.ToUpper(match[1]), nil
+				return match[1], nil
 			}
 		}
 	}
 
-	// fallback
-	return "", fmt.Errorf("cannot detect Oracle type name for %T", value)
+	return "", fmt.Errorf("no type tag found for %T", value)
 }
