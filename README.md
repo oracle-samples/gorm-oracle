@@ -10,7 +10,7 @@ To use ODPI-C with Godror, you’ll need to install the Oracle Instant Client on
 
 Follow the steps on [this page](https://odpi-c.readthedocs.io/en/latest/user_guide/installation.html) complete the installation.
 
-After that, use a logfmt-encoded parameter list to specify the instanct client directory in the `dataSourceName` when you connect to the database. For example:
+After that, use a logfmt-encoded parameter list to specify the instant client directory in the `dataSourceName` when you connect to the database. For example:
 
 ```go
 dsn := `user="scott" password="tiger" 
