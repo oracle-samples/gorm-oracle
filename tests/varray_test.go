@@ -60,8 +60,8 @@ type DeptPhoneList struct {
 
 // Struct for table with email VARRAY
 type EmailVarrayTable struct {
-	ID     uint             `gorm:"column:ID;primaryKey"`
-	Emails oracle.EmailList `gorm:"column:EMAILS;type:\"email_list_arr\""`
+	ID     uint              `gorm:"column:ID;primaryKey"`
+	Emails oracle.StringList `gorm:"column:EMAILS;type:\"email_list_arr\""`
 }
 
 func TestStringVarray(t *testing.T) {
@@ -123,7 +123,7 @@ func TestStringVarray(t *testing.T) {
 	if err := DB.First(&updated, 1).Error; err != nil {
 		t.Fatalf("Failed to reload updated EmailVarrayTable: %v", err)
 	}
-	if !reflect.DeepEqual(updated.Emails, oracle.EmailList(newEmails)) {
+	if !reflect.DeepEqual(updated.Emails, oracle.StringList(newEmails)) {
 		t.Errorf("String VARRAY update failed: got %v, want %v", updated.Emails, newEmails)
 	}
 
