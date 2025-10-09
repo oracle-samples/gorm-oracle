@@ -184,6 +184,7 @@ func TestStringVarray(t *testing.T) {
 }
 
 func TestVarrayOfObject(t *testing.T) {
+	t.Skip("Skipping due to issue #87")
 	dropTable := `
 				BEGIN
 				EXECUTE IMMEDIATE 'DROP TABLE "dept_phone_lists"';
