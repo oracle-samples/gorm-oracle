@@ -39,11 +39,64 @@
 package tests
 
 import (
+	"context"
+	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
-	"github.com/oracle-samples/gorm-oracle/oracle"
+	"github.com/godror/godror"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
+
+// custom data type
+type StringList []string
+
+// Scan implements sql.Scanner (Oracle -> Go)
+func (e *StringList) Scan(src interface{}) error {
+	obj, ok := src.(*godror.Object)
+	if !ok {
+		return fmt.Errorf("expected *godror.Object, got %T", src)
+	}
+	defer obj.Close()
+
+	coll := obj.Collection()
+	length, err := coll.Len()
+	if err != nil {
+		return fmt.Errorf("get collection length: %w", err)
+	}
+
+	var list []string
+	for i := 0; i < length; i++ {
+		var data godror.Data
+		if err := coll.GetItem(&data, i); err != nil {
+			return fmt.Errorf("GetItem %d: %w", i, err)
+		}
+		val := data.Get()
+		switch v := val.(type) {
+		case string:
+			list = append(list, v)
+		case []byte:
+			list = append(list, string(v))
+		default:
+			if v != nil {
+				list = append(list, fmt.Sprint(v))
+			}
+		}
+	}
+	*e = list
+	return nil
+}
+
+// Implement GormValue interface
+func (e StringList) GormValue(ctx context.Context, db *gorm.DB) clause.Expr {
+	if len(e) == 0 {
+		return gorm.Expr(`"email_list_arr"()`)
+	}
+	vals := "'" + strings.Join(e, "','") + "'"
+	return gorm.Expr(fmt.Sprintf(`"email_list_arr"(%s)`, vals))
+}
 
 // Struct mapping to phone_typ object
 type Phone struct {
@@ -60,8 +113,8 @@ type DeptPhoneList struct {
 
 // Struct for table with email VARRAY
 type EmailVarrayTable struct {
-	ID     uint              `gorm:"column:ID;primaryKey"`
-	Emails oracle.StringList `gorm:"column:EMAILS;type:\"email_list_arr\""`
+	ID     uint       `gorm:"column:ID;primaryKey"`
+	Emails StringList `gorm:"column:EMAILS;type:\"email_list_arr\""`
 }
 
 func TestStringVarray(t *testing.T) {
@@ -91,13 +144,6 @@ func TestStringVarray(t *testing.T) {
 		t.Fatalf("Failed to create email_varray_tables: %v", err)
 	}
 
-	// expose raw *sql.DB to oracle package for godror.GetObjectType
-	sqlDB, err := DB.DB()
-	if err != nil {
-		t.Fatalf("cannot get *sql.DB from GORM: %v", err)
-	}
-	oracle.DB = sqlDB
-
 	// Insert initial data via raw SQL
 	insertRaw := `INSERT INTO "email_varray_tables" VALUES (1, "email_list_arr"('alice@example.com','bob@example.com','gorm@oracle.com'))`
 	if err := DB.Exec(insertRaw).Error; err != nil {
@@ -116,20 +162,20 @@ func TestStringVarray(t *testing.T) {
 
 	// Update
 	newEmails := []string{"u1@ex.com", "u2@ex.com"}
-	if err := DB.Model(&got).Update("Emails", newEmails).Error; err != nil {
+	if err := DB.Model(&got).Update("Emails", StringList(newEmails)).Error; err != nil {
 		t.Fatalf("Failed to update emails: %v", err)
 	}
 	var updated EmailVarrayTable
 	if err := DB.First(&updated, 1).Error; err != nil {
 		t.Fatalf("Failed to reload updated EmailVarrayTable: %v", err)
 	}
-	if !reflect.DeepEqual(updated.Emails, oracle.StringList(newEmails)) {
+	if !reflect.DeepEqual(updated.Emails, StringList(newEmails)) {
 		t.Errorf("String VARRAY update failed: got %v, want %v", updated.Emails, newEmails)
 	}
 
 	// Insert
 	item := EmailVarrayTable{
-		ID:     1,
+		ID:     2,
 		Emails: []string{"alice_new@example.com", "bob_new@example.com", "gorm_new@oracle.com"},
 	}
 	if err := DB.Create(&item).Error; err != nil {
