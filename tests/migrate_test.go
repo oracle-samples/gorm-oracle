@@ -50,6 +50,7 @@ import (
 
 	"time"
 
+	"github.com/oracle-samples/gorm-oracle/oracle"
 	. "github.com/oracle-samples/gorm-oracle/tests/utils"
 
 	"github.com/stretchr/testify/assert"
@@ -1968,6 +1969,84 @@ func TestOracleSequences(t *testing.T) {
 	if len(retrieved) != 3 {
 		t.Fatalf("Expected 3 records, got %d", len(retrieved))
 	}
+}
+
+func TestOracleTypeCreateDrop(t *testing.T) {
+	if DB.Dialector.Name() != "oracle" {
+		t.Skip("Skipping Oracle type test: not running on Oracle")
+	}
+
+	const typeName = "email_list"
+	const tableName = "email_varray_tab"
+
+	// Assert that DB.Migrator() is an oracle.Migrator (so we can use Oracle-specific methods)
+	m, ok := DB.Migrator().(oracle.Migrator)
+	if !ok {
+		t.Skip("Skipping: current dialect migrator is not Oracle-specific")
+	}
+
+	// 1️⃣ Drop type if it exists
+	t.Run("drop_existing_type_if_any", func(t *testing.T) {
+		err := m.Droptype(typeName)
+		if err != nil && !strings.Contains(err.Error(), "ORA-04043") {
+			t.Fatalf("Unexpected error dropping type: %v", err)
+		}
+	})
+
+	// 2️⃣ Create new VARRAY type
+	t.Run("create_varray_type", func(t *testing.T) {
+		err := m.CreateType(typeName, "VARRAY(10) OF VARCHAR2(80)")
+		if err != nil {
+			t.Fatalf("Failed to create Oracle type: %v", err)
+		}
+
+		// Verify it exists
+		var count int
+		if err := DB.Raw(`SELECT COUNT(*) FROM USER_TYPES WHERE TYPE_NAME = UPPER(?)`, typeName).Scan(&count).Error; err != nil {
+			t.Fatalf("Failed to verify created type: %v", err)
+		}
+		if count == 0 {
+			t.Fatalf("Expected Oracle type %s to exist", typeName)
+		}
+	})
+
+	// 3️⃣ Create table using the custom type
+	t.Run("create_table_using_custom_type", func(t *testing.T) {
+		createTableSQL := fmt.Sprintf(`
+			CREATE TABLE "%s" (
+				"ID" NUMBER PRIMARY KEY,
+				"EMAILS" "%s"
+			)`, tableName, typeName)
+
+		if err := DB.Exec(createTableSQL).Error; err != nil {
+			t.Fatalf("Failed to create table using type %s: %v", typeName, err)
+		}
+
+		// Verify table exists
+		if !m.HasTable(tableName) {
+			t.Fatalf("Expected table %s to exist", tableName)
+		}
+	})
+
+	// 4️⃣ Drop table and type
+	t.Run("drop_table_and_type", func(t *testing.T) {
+		if err := m.DropTable(tableName); err != nil {
+			t.Fatalf("Failed to drop table %s: %v", tableName, err)
+		}
+
+		if err := m.Droptype(typeName); err != nil {
+			t.Fatalf("Failed to drop type %s: %v", typeName, err)
+		}
+
+		// Verify type is gone
+		var count int
+		if err := DB.Raw(`SELECT COUNT(*) FROM USER_TYPES WHERE TYPE_NAME = LOWER(?)`, typeName).Scan(&count).Error; err != nil {
+			t.Fatalf("Failed to verify dropped type: %v", err)
+		}
+		if count > 0 {
+			t.Fatalf("Expected Oracle type %s to be dropped", typeName)
+		}
+	})
 }
 
 func TestOracleIndexes(t *testing.T) {

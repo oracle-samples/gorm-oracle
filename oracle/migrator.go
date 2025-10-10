@@ -484,6 +484,46 @@ func (m Migrator) DropConstraint(value interface{}, name string) error {
 	return m.Migrator.DropConstraint(value, name)
 }
 
+// CreateOracleType creates or replaces an Oracle user-defined type (UDT).
+func (m Migrator) CreateType(typeName, definition string) error {
+	if typeName == "" || definition == "" {
+		return fmt.Errorf("CreateOracleType: both typeName and definition are required")
+	}
+
+	sql := fmt.Sprintf(`CREATE OR REPLACE TYPE "%s" AS %s`, strings.ToLower(typeName), definition)
+	return m.DB.Exec(sql).Error
+}
+
+// DropOracleType drops an Oracle user-defined type safely.
+func (m Migrator) Droptype(typeName string) error {
+	if typeName == "" {
+		return fmt.Errorf("DropOracleType: typeName is required")
+	}
+
+	sql := fmt.Sprintf(`
+BEGIN
+  EXECUTE IMMEDIATE 'DROP TYPE "%s" FORCE';
+EXCEPTION
+  WHEN OTHERS THEN
+    IF SQLCODE != -4043 THEN
+      RAISE;
+    END IF;
+END;`, strings.ToLower(typeName))
+
+	return m.DB.Exec(sql).Error
+}
+
+// HasType checks whether a user-defined type exists in Oracle.
+func (m Migrator) HasType(typeName string) bool {
+	if typeName == "" {
+		return false
+	}
+
+	var count int
+	err := m.DB.Raw(`SELECT COUNT(*) FROM USER_TYPES WHERE TYPE_NAME = UPPER(?)`, typeName).Scan(&count).Error
+	return err == nil && count > 0
+}
+
 // DropIndex drops the index with the specified `name` from the table associated with `value`
 func (m Migrator) DropIndex(value interface{}, name string) error {
 	return m.RunWithValue(value, func(stmt *gorm.Statement) error {
