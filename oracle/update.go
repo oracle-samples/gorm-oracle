@@ -109,6 +109,11 @@ func Update(db *gorm.DB) {
 			// Always use PL/SQL for RETURNING, just like delete callback
 			buildUpdatePLSQL(db)
 		} else {
+			if updateClause, ok := stmt.Clauses["UPDATE"].Expression.(clause.Update); ok {
+				if updateClause.Table.Name != "" {
+					stmt.Table = updateClause.Table.Name
+				}
+			}
 			// Use GORM's standard build for non-RETURNING updates
 			stmt.Build("UPDATE", "SET", "WHERE")
 			// Convert values for Oracle
