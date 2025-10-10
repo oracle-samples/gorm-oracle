@@ -310,7 +310,7 @@ func (m Migrator) DropColumn(value interface{}, name string) error {
 		}
 
 		return m.DB.Exec(
-			"ALTER TABLE ? DROP ?",
+			"ALTER TABLE ? DROP COLUMN ?",
 			clause.Table{Name: stmt.Schema.Table},
 			clause.Column{Name: name},
 		).Error

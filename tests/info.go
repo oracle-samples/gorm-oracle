@@ -83,7 +83,7 @@ func GormInfo() {
 	// Get ORACLE DATABASE VERSION
 	var banner, bannerFull, bannerLegacy string
 	var conID int
-	err = sqlDB.QueryRow(`SELECT BANNER, BANNER_FULL, BANNER_LEGACY, CON_ID FROM v$version WHERE banner LIKE 'Oracle Database%'`).Scan(&banner, &bannerFull, &bannerLegacy, &conID)
+	err = sqlDB.QueryRow(`SELECT BANNER, BANNER_FULL, BANNER_LEGACY, CON_ID FROM v$version WHERE banner LIKE 'Oracle % Database%'`).Scan(&banner, &bannerFull, &bannerLegacy, &conID)
 	if err != nil {
 		fmt.Printf("Failed to get Oracle DB version: %v\n", err)
 	} else {
@@ -114,6 +114,8 @@ func GormInfo() {
 	if err == nil && clientVersion2 != "" {
 		fmt.Printf("Oracle Client library version : %s\n", clientVersion2)
 	}
+
+	fmt.Printf("CurrentDatabase               : %s\n", db.Migrator().CurrentDatabase())
 
 	fmt.Printf("==========================================\n\n")
 }
