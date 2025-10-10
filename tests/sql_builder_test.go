@@ -859,13 +859,12 @@ func TestToSQL(t *testing.T) {
 	})
 	assertEqualSQL(t, `UPDATE "custom_update_table" SET "updated_at"=?,"name"='patched',"age"=99 WHERE id = 200`, sql)
 
-	// https://github.com/oracle-samples/gorm-oracle/issues/81
-	// sql = DB.ToSQL(func(tx *gorm.DB) *gorm.DB {
-	// 	return tx.Clauses(clause.Update{Table: clause.Table{Name: "custom_update_table"}}).
-	// 		Where("id = ?", 200).
-	// 		Updates(&User{Name: "patched", Age: 99})
-	// })
-	// assertEqualSQL(t, `UPDATE "custom_update_table" SET "updated_at"=?,"name"='patched',"age"=99 WHERE id = 200 AND "custom_update_table"."deleted_at" IS NULL`, sql)
+	sql = DB.ToSQL(func(tx *gorm.DB) *gorm.DB {
+		return tx.Clauses(clause.Update{Table: clause.Table{Name: "custom_update_table"}}).
+			Where("id = ?", 200).
+			Updates(&User{Name: "patched", Age: 99})
+	})
+	assertEqualSQL(t, `UPDATE "custom_update_table" SET "updated_at"=?,"name"='patched',"age"=99 WHERE id = 200 AND "custom_update_table"."deleted_at" IS NULL`, sql)
 
 	// update
 	sql = DB.ToSQL(func(tx *gorm.DB) *gorm.DB {
