@@ -500,7 +500,7 @@ func (m Migrator) DropType(typeName string) error {
 		return fmt.Errorf("DropOracleType: typeName is required")
 	}
 
-	sql := fmt.Sprintf(`DROP TYPE "%s";`, strings.ToLower(typeName))
+	sql := fmt.Sprintf(`DROP TYPE "%s"`, strings.ToLower(typeName))
 
 	return m.DB.Exec(sql).Error
 }
