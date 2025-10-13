@@ -2002,7 +2002,7 @@ func TestOracleTypeCreateDrop(t *testing.T) {
 
 		// Verify it exists
 		var count int
-		if err := DB.Raw(`SELECT COUNT(*) FROM USER_TYPES WHERE TYPE_NAME = UPPER(?)`, typeName).Scan(&count).Error; err != nil {
+		if err := DB.Raw(`SELECT COUNT(*) FROM USER_TYPES WHERE TYPE_NAME = LOWER(?)`, typeName).Scan(&count).Error; err != nil {
 			t.Fatalf("Failed to verify created type: %v", err)
 		}
 		if count == 0 {
