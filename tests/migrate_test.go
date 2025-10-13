@@ -1985,17 +1985,17 @@ func TestOracleTypeCreateDrop(t *testing.T) {
 		t.Skip("Skipping: current dialect migrator is not Oracle-specific")
 	}
 
-	// 1️⃣ Drop type if it exists
+	// Drop type if it exists
 	t.Run("drop_existing_type_if_any", func(t *testing.T) {
-		err := m.Droptype(typeName)
+		err := m.DropType(typeName)
 		if err != nil && !strings.Contains(err.Error(), "ORA-04043") {
 			t.Fatalf("Unexpected error dropping type: %v", err)
 		}
 	})
 
-	// 2️⃣ Create new VARRAY type
+	// Create new VARRAY type
 	t.Run("create_varray_type", func(t *testing.T) {
-		err := m.CreateType(typeName, "VARRAY(10) OF VARCHAR2(80)")
+		err := m.CreateType(typeName, "VARRAY(10)", "VARCHAR2(60)")
 		if err != nil {
 			t.Fatalf("Failed to create Oracle type: %v", err)
 		}
@@ -2010,7 +2010,7 @@ func TestOracleTypeCreateDrop(t *testing.T) {
 		}
 	})
 
-	// 3️⃣ Create table using the custom type
+	// Create table using the custom type
 	t.Run("create_table_using_custom_type", func(t *testing.T) {
 		createTableSQL := fmt.Sprintf(`
 			CREATE TABLE "%s" (
@@ -2028,13 +2028,13 @@ func TestOracleTypeCreateDrop(t *testing.T) {
 		}
 	})
 
-	// 4️⃣ Drop table and type
+	// Drop table and type
 	t.Run("drop_table_and_type", func(t *testing.T) {
 		if err := m.DropTable(tableName); err != nil {
 			t.Fatalf("Failed to drop table %s: %v", tableName, err)
 		}
 
-		if err := m.Droptype(typeName); err != nil {
+		if err := m.DropType(typeName); err != nil {
 			t.Fatalf("Failed to drop type %s: %v", typeName, err)
 		}
 

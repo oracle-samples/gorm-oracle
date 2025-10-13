@@ -484,31 +484,23 @@ func (m Migrator) DropConstraint(value interface{}, name string) error {
 	return m.Migrator.DropConstraint(value, name)
 }
 
-// CreateOracleType creates or replaces an Oracle user-defined type (UDT).
-func (m Migrator) CreateType(typeName, definition string) error {
-	if typeName == "" || definition == "" {
+// CreateType creates or replaces an Oracle user-defined type.
+func (m Migrator) CreateType(typeName, typeKind, typeof string) error {
+	if typeName == "" || typeKind == "" || typeof == "" {
 		return fmt.Errorf("CreateOracleType: both typeName and definition are required")
 	}
 
-	sql := fmt.Sprintf(`CREATE OR REPLACE TYPE "%s" AS %s`, strings.ToLower(typeName), definition)
+	sql := fmt.Sprintf(`CREATE OR REPLACE TYPE "%s" AS %s OF %s`, strings.ToLower(typeName), typeKind, typeof)
 	return m.DB.Exec(sql).Error
 }
 
-// DropOracleType drops an Oracle user-defined type safely.
-func (m Migrator) Droptype(typeName string) error {
+// DropType drops an Oracle user-defined type safely.
+func (m Migrator) DropType(typeName string) error {
 	if typeName == "" {
 		return fmt.Errorf("DropOracleType: typeName is required")
 	}
 
-	sql := fmt.Sprintf(`
-BEGIN
-  EXECUTE IMMEDIATE 'DROP TYPE "%s" FORCE';
-EXCEPTION
-  WHEN OTHERS THEN
-    IF SQLCODE != -4043 THEN
-      RAISE;
-    END IF;
-END;`, strings.ToLower(typeName))
+	sql := fmt.Sprintf(`DROP TYPE "%s";`, strings.ToLower(typeName))
 
 	return m.DB.Exec(sql).Error
 }
