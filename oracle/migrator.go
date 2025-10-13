@@ -496,11 +496,16 @@ func (m Migrator) CreateType(typeName, typeKind, typeof string) error {
 
 // DropType drops an Oracle user-defined type safely.
 func (m Migrator) DropType(typeName string) error {
-	if typeName == "" {
-		return fmt.Errorf("DropOracleType: typeName is required")
-	}
+	sql := fmt.Sprintf(`
+		BEGIN
+		  EXECUTE IMMEDIATE 'DROP TYPE "%s" FORCE';
+		EXCEPTION
+		  WHEN OTHERS THEN
+			IF SQLCODE != -4043 THEN
+			  RAISE;
+			END IF;
+		END;`, strings.ToLower(typeName))
 
-	sql := fmt.Sprintf(`DROP TYPE "%s" FORCE`, strings.ToLower(typeName))
 	return m.DB.Exec(sql).Error
 }
 
