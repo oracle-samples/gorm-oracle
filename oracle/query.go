@@ -46,9 +46,9 @@ import (
 )
 
 // Identifies the table name alias provided as
-// "\"users\" \"u\"" and "\"users\" u". Gorm already handles
+// "\"users\" \"u\"" and "\"users\" u" and "\"users\"". Gorm already handles
 // the other formats like "users u", "users AS u" etc.
-var tableRegexp = regexp.MustCompile(`^"(\w+)"\s+"?(\w+)"?$`)
+var tableRegexp = regexp.MustCompile(`^"(\w+)"(?:\s+"?(\w+)"?)?$`)
 
 func BeforeQuery(db *gorm.DB) {
 	if db == nil || db.Statement == nil || db.Statement.TableExpr == nil {
@@ -64,6 +64,7 @@ func BeforeQuery(db *gorm.DB) {
 			}
 		}
 	}
+	return
 }
 
 // MismatchedCaseHandler handles Oracle Case Insensitivity.
