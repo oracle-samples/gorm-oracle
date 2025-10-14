@@ -57,11 +57,7 @@ func BeforeQuery(db *gorm.DB) {
 	name := db.Statement.TableExpr.SQL
 	if strings.Contains(name, " ") || strings.Contains(name, "`") {
 		if results := tableRegexp.FindStringSubmatch(name); len(results) == 3 {
-			if results[2] != "" {
-				db.Statement.Table = results[2]
-			} else {
-				db.Statement.Table = results[1]
-			}
+			db.Statement.Table = results[2]
 		}
 	}
 }
