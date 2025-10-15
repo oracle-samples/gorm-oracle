@@ -484,32 +484,23 @@ func (m Migrator) DropConstraint(value interface{}, name string) error {
 	return m.Migrator.DropConstraint(value, name)
 }
 
-// CreateType creates or replaces an Oracle user-defined type.
+// CreateType creates or replaces an Oracle user-defined type
 func (m Migrator) CreateType(typeName, typeKind, typeof string) error {
 	if typeName == "" || typeKind == "" || typeof == "" {
-		return fmt.Errorf("CreateOracleType: both typeName and definition are required")
+		return fmt.Errorf("createType: both typeName and definition are required")
 	}
 
 	sql := fmt.Sprintf(`CREATE OR REPLACE TYPE "%s" AS %s OF %s`, strings.ToLower(typeName), typeKind, typeof)
 	return m.DB.Exec(sql).Error
 }
 
-// DropType drops an Oracle user-defined type safely.
+// DropType drops an Oracle user-defined type
 func (m Migrator) DropType(typeName string) error {
-	sql := fmt.Sprintf(`
-		BEGIN
-		  EXECUTE IMMEDIATE 'DROP TYPE "%s" FORCE';
-		EXCEPTION
-		  WHEN OTHERS THEN
-			IF SQLCODE != -4043 THEN
-			  RAISE;
-			END IF;
-		END;`, strings.ToLower(typeName))
-
+	sql := fmt.Sprintf(`DROP TYPE "%s" FORCE`, strings.ToLower(typeName))
 	return m.DB.Exec(sql).Error
 }
 
-// HasType checks whether a user-defined type exists in Oracle.
+// HasType checks whether a user-defined type exists
 func (m Migrator) HasType(typeName string) bool {
 	if typeName == "" {
 		return false
