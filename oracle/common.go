@@ -39,13 +39,16 @@
 package oracle
 
 import (
+	"bytes"
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"math"
 	"reflect"
 	"strings"
 	"time"
 
+	"github.com/godror/godror"
 	"github.com/google/uuid"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -206,6 +209,14 @@ func convertValue(val interface{}) interface{} {
 			return 0
 		}
 	case string:
+		if len(v) > math.MaxInt16 {
+			return godror.Lob{IsClob: true, Reader: strings.NewReader(v)}
+		}
+		return v
+	case []byte:
+		if len(v) > math.MaxInt16 {
+			return godror.Lob{IsClob: false, Reader: bytes.NewReader(v)}
+		}
 		return v
 	default:
 		return val

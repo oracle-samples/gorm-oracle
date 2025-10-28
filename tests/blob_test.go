@@ -41,6 +41,7 @@ package tests
 import (
 	"bytes"
 	"crypto/rand"
+	"strings"
 	"testing"
 	"time"
 
@@ -48,26 +49,36 @@ import (
 )
 
 type BlobTestModel struct {
-	ID          uint   `gorm:"primaryKey;autoIncrement"`
-	Name        string `gorm:"size:100;not null"`
-	Data        []byte `gorm:"type:blob"`
+	ID           uint    `gorm:"primaryKey;autoIncrement"`
+	Name         string  `gorm:"size:100;not null"`
+	Data         []byte  `gorm:"type:blob"`
 	OptionalData *[]byte `gorm:"type:blob"`
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }
 
 type BlobVariantModel struct {
-	ID       uint   `gorm:"primaryKey"`
+	ID        uint   `gorm:"primaryKey"`
 	SmallBlob []byte `gorm:"type:blob"`
 	LargeBlob []byte `gorm:"type:blob"`
+}
+
+type BlobOneToManyModel struct {
+	ID       uint             `gorm:"primaryKey"`
+	Children []BlobChildModel `gorm:"foreignKey:ID"`
+}
+
+type BlobChildModel struct {
+	ID   uint   `gorm:"primaryKey"`
+	Data []byte `gorm:"type:blob"`
 }
 
 func setupBlobTestTables(t *testing.T) {
 	t.Log("Setting up BLOB test tables")
 
-	DB.Migrator().DropTable(&BlobTestModel{}, &BlobVariantModel{})
+	DB.Migrator().DropTable(&BlobTestModel{}, &BlobVariantModel{}, &BlobOneToManyModel{}, &BlobChildModel{})
 
-	err := DB.AutoMigrate(&BlobTestModel{}, &BlobVariantModel{})
+	err := DB.AutoMigrate(&BlobTestModel{}, &BlobVariantModel{}, &BlobOneToManyModel{}, &BlobChildModel{})
 	if err != nil {
 		t.Fatalf("Failed to migrate BLOB test tables: %v", err)
 	}
@@ -420,6 +431,23 @@ func TestBlobWithReturning(t *testing.T) {
 
 	if model.CreatedAt.IsZero() {
 		t.Error("Expected CreatedAt timestamp in RETURNING")
+	}
+}
+
+func TestBlobOnConflict(t *testing.T) {
+	setupBlobTestTables(t)
+
+	model := &BlobOneToManyModel{
+		ID: 1,
+		Children: []BlobChildModel{
+			{
+				Data: []byte(strings.Repeat("X", 32768)),
+			},
+		},
+	}
+	err := DB.Create(model).Error
+	if err != nil {
+		t.Fatalf("Failed to create BLOB record with ON CONFLICT: %v", err)
 	}
 }
 
