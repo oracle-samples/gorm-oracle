@@ -485,19 +485,67 @@ func (m Migrator) DropConstraint(value interface{}, name string) error {
 }
 
 // CreateType creates or replaces an Oracle user-defined type
-func (m Migrator) CreateType(typeName, typeKind, typeof string) error {
-	if typeName == "" || typeKind == "" || typeof == "" {
-		return fmt.Errorf("createType: both typeName and definition are required")
+func (m Migrator) CreateType(typeName string, args ...string) error {
+	typeName = strings.TrimSpace(typeName)
+	if typeName == "" {
+		return fmt.Errorf("typeName is required")
+	}
+	var typeKind, typeOf string
+	if len(args) > 0 {
+		typeKind = args[0]
+	}
+	if len(args) > 1 {
+		typeOf = args[1]
 	}
 
-	sql := fmt.Sprintf(`CREATE OR REPLACE TYPE "%s" AS %s OF %s`, strings.ToLower(typeName), typeKind, typeof)
-	return m.DB.Exec(sql).Error
+	name := strings.ToLower(typeName)
+	typeKind = strings.TrimSpace(typeKind)
+	typeOf = strings.TrimSpace(typeOf)
+
+	// Incomplete object type
+	if typeKind == "" && typeOf == "" {
+		ddl := fmt.Sprintf(`CREATE TYPE "%s"`, name)
+		return m.DB.Exec(ddl).Error
+	}
+
+	k := strings.ToUpper(typeKind)
+	var ddl string
+
+	switch {
+	// Standalone varying array (varray) type and Standalone nested table type
+	case strings.HasPrefix(k, "VARRAY") || strings.HasPrefix(k, "TABLE "):
+		if typeOf == "" {
+			return fmt.Errorf("typeof is required for collection types (VARRAY/TABLE)")
+		}
+		ddl = fmt.Sprintf(`CREATE OR REPLACE TYPE "%s" AS %s OF %s`, name, typeKind, typeOf)
+
+	// Abstract Data Type (ADT)
+	case k == "OBJECT" || strings.HasPrefix(k, "OBJECT"):
+		if typeOf == "" {
+			return fmt.Errorf("attributes definition is required for OBJECT types")
+		}
+		attrs := typeOf
+		if !strings.HasPrefix(attrs, "(") {
+			attrs = "(" + attrs + ")"
+		}
+		ddl = fmt.Sprintf(`CREATE OR REPLACE TYPE "%s" AS OBJECT %s`, name, attrs)
+
+	default:
+		// Invalid or unsupported types
+		return fmt.Errorf("unsupported type kind %q (must be OBJECT, VARRAY, or TABLE)", typeKind)
+	}
+
+	return m.DB.Exec(ddl).Error
 }
 
-// DropType drops an Oracle user-defined type
+// DropType drops a user-defined type
 func (m Migrator) DropType(typeName string) error {
-	sql := fmt.Sprintf(`DROP TYPE "%s" FORCE`, strings.ToLower(typeName))
-	return m.DB.Exec(sql).Error
+	typeName = strings.TrimSpace(typeName)
+	if typeName == "" {
+		return fmt.Errorf("dropType: typeName is required")
+	}
+	ddl := fmt.Sprintf(`DROP TYPE "%s" FORCE`, strings.ToLower(typeName))
+	return m.DB.Exec(ddl).Error
 }
 
 // HasType checks whether a user-defined type exists
@@ -507,7 +555,7 @@ func (m Migrator) HasType(typeName string) bool {
 	}
 
 	var count int
-	err := m.DB.Raw(`SELECT COUNT(*) FROM USER_TYPES WHERE TYPE_NAME = UPPER(?)`, typeName).Scan(&count).Error
+	err := m.DB.Raw(`SELECT COUNT(*) FROM USER_TYPES WHERE UPPER(TYPE_NAME) = UPPER(?)`, typeName).Scan(&count).Error
 	return err == nil && count > 0
 }
 

@@ -1976,8 +1976,16 @@ func TestOracleTypeCreateDrop(t *testing.T) {
 		t.Skip("Skipping Oracle type test: not running on Oracle")
 	}
 
-	const typeName = "email_list"
-	const tableName = "email_varray_tab"
+	const (
+		typeName  = "email_list"
+		tableName = "email_varray_tab"
+
+		objectTypeName  = "person_obj"
+		objectTableName = "person_obj_tab"
+
+		incompleteTypeName  = "department_t"
+		unsupportedTypeName = "unsupported_type_t"
+	)
 
 	// Assert that DB.Migrator() is an oracle.Migrator (so we can use Oracle-specific methods)
 	m, ok := DB.Migrator().(oracle.Migrator)
@@ -1985,11 +1993,16 @@ func TestOracleTypeCreateDrop(t *testing.T) {
 		t.Skip("Skipping: current dialect migrator is not Oracle-specific")
 	}
 
-	// Drop type if it exists
-	t.Run("drop_existing_type_if_any", func(t *testing.T) {
-		err := m.DropType(typeName)
-		if err != nil && !strings.Contains(err.Error(), "ORA-04043") {
-			t.Fatalf("Unexpected error dropping type: %v", err)
+	// Drop types if they exist
+	t.Run("drop_existing_types_if_any", func(t *testing.T) {
+		if err := m.DropType(typeName); err != nil && !strings.Contains(err.Error(), "ORA-04043") {
+			t.Fatalf("Unexpected error dropping type %s: %v", typeName, err)
+		}
+		if err := m.DropType(objectTypeName); err != nil && !strings.Contains(err.Error(), "ORA-04043") {
+			t.Fatalf("Unexpected error dropping type %s: %v", objectTypeName, err)
+		}
+		if err := m.DropType(incompleteTypeName); err != nil && !strings.Contains(err.Error(), "ORA-04043") {
+			t.Fatalf("Unexpected error dropping type %s: %v", incompleteTypeName, err)
 		}
 	})
 
@@ -1997,21 +2010,17 @@ func TestOracleTypeCreateDrop(t *testing.T) {
 	t.Run("create_varray_type", func(t *testing.T) {
 		err := m.CreateType(typeName, "VARRAY(10)", "VARCHAR2(60)")
 		if err != nil {
-			t.Fatalf("Failed to create Oracle type: %v", err)
+			t.Fatalf("Failed to create Oracle VARRAY type: %v", err)
 		}
 
-		// Verify it exists
-		var count int
-		if err := DB.Raw(`SELECT COUNT(*) FROM USER_TYPES WHERE TYPE_NAME = LOWER(?)`, typeName).Scan(&count).Error; err != nil {
-			t.Fatalf("Failed to verify created type: %v", err)
-		}
-		if count == 0 {
-			t.Fatalf("Expected Oracle type %s to exist", typeName)
+		// Verify it exists via HasType
+		if !m.HasType(typeName) {
+			t.Fatalf("Expected Oracle VARRAY type %s to exist", typeName)
 		}
 	})
 
-	// Create table using the custom type
-	t.Run("create_table_using_custom_type", func(t *testing.T) {
+	// Create table using the VARRAY type
+	t.Run("create_table_using_varray_type", func(t *testing.T) {
 		createTableSQL := fmt.Sprintf(`
 			CREATE TABLE "%s" (
 				"ID" NUMBER PRIMARY KEY,
@@ -2028,23 +2037,104 @@ func TestOracleTypeCreateDrop(t *testing.T) {
 		}
 	})
 
-	// Drop table and type
-	t.Run("drop_table_and_type", func(t *testing.T) {
+	// Create ADT (OBJECT) type
+	t.Run("create_object_type", func(t *testing.T) {
+		err := m.CreateType(objectTypeName, "OBJECT", `
+			first_name VARCHAR2(50),
+			last_name  VARCHAR2(50),
+			age        NUMBER
+		`)
+		if err != nil {
+			t.Fatalf("Failed to create Oracle OBJECT type: %v", err)
+		}
+
+		// Verify it exists via HasType
+		if !m.HasType(objectTypeName) {
+			t.Fatalf("Expected Oracle OBJECT type %s to exist", objectTypeName)
+		}
+	})
+
+	// Create table using the OBJECT type
+	t.Run("create_table_using_object_type", func(t *testing.T) {
+		createTableSQL := fmt.Sprintf(`
+			CREATE TABLE "%s" (
+				"ID" NUMBER PRIMARY KEY,
+				"PERSON" "%s"
+			)`, objectTableName, objectTypeName)
+
+		if err := DB.Exec(createTableSQL).Error; err != nil {
+			t.Fatalf("Failed to create table using object type %s: %v", objectTypeName, err)
+		}
+
+		// Verify table exists
+		if !m.HasTable(objectTableName) {
+			t.Fatalf("Expected table %s to exist", objectTableName)
+		}
+	})
+
+	// Create incomplete type (forward declaration)
+	t.Run("create_incomplete_type", func(t *testing.T) {
+		if err := m.CreateType(incompleteTypeName); err != nil {
+			t.Fatalf("Failed to create incomplete type %s: %v", incompleteTypeName, err)
+		}
+		if !m.HasType(incompleteTypeName) {
+			t.Fatalf("Expected incomplete type %s to exist", incompleteTypeName)
+		}
+		if err := m.DropType(incompleteTypeName); err != nil {
+			t.Fatalf("Failed to drop incomplete type %s: %v", incompleteTypeName, err)
+		}
+		if m.HasType(incompleteTypeName) {
+			t.Fatalf("Expected incomplete type %s to be dropped", incompleteTypeName)
+		}
+	})
+
+	// Unsupported type kinds should return an error and not create anything
+	t.Run("create_unsupported_type", func(t *testing.T) {
+		err := m.CreateType(unsupportedTypeName, "Unsupported", "Unsupported")
+		if err == nil {
+			t.Fatalf("Expected error when creating unsupported type %s, got nil", unsupportedTypeName)
+		}
+
+		// Ensure the type was NOT created
+		if m.HasType(unsupportedTypeName) {
+			t.Fatalf("Type %s should not exist after failed creation", unsupportedTypeName)
+		}
+
+		// Also ensure DropType is safe to call (idempotent)
+		if err := m.DropType(unsupportedTypeName); err != nil {
+			if !strings.Contains(strings.ToLower(err.Error()), "does not exist") {
+				t.Fatalf("Unexpected error dropping type %s: %v", unsupportedTypeName, err)
+			}
+		}
+
+		if m.HasType(unsupportedTypeName) {
+			t.Fatalf("Expected type %s to be absent after drop", unsupportedTypeName)
+		}
+	})
+
+	// Drop tables and types
+	t.Run("drop_tables_and_types", func(t *testing.T) {
+		if err := m.DropTable(objectTableName); err != nil {
+			t.Fatalf("Failed to drop table %s: %v", objectTableName, err)
+		}
 		if err := m.DropTable(tableName); err != nil {
 			t.Fatalf("Failed to drop table %s: %v", tableName, err)
 		}
 
+		// Drop types
+		if err := m.DropType(objectTypeName); err != nil {
+			t.Fatalf("Failed to drop type %s: %v", objectTypeName, err)
+		}
 		if err := m.DropType(typeName); err != nil {
 			t.Fatalf("Failed to drop type %s: %v", typeName, err)
 		}
 
-		// Verify type is gone
-		var count int
-		if err := DB.Raw(`SELECT COUNT(*) FROM USER_TYPES WHERE TYPE_NAME = LOWER(?)`, typeName).Scan(&count).Error; err != nil {
-			t.Fatalf("Failed to verify dropped type: %v", err)
-		}
-		if count > 0 {
+		// Verify types are gone via HasType
+		if m.HasType(typeName) {
 			t.Fatalf("Expected Oracle type %s to be dropped", typeName)
+		}
+		if m.HasType(objectTypeName) {
+			t.Fatalf("Expected Oracle type %s to be dropped", objectTypeName)
 		}
 	})
 }
