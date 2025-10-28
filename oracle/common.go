@@ -120,15 +120,12 @@ const (
 // Create typed destination for OUT parameters
 func createTypedDestination(f *schema.Field) interface{} {
 	if f == nil {
-		var s string
-		return &s
+		return new(string)
 	}
 
 	// If the field has a serializer, the field type may not be directly related to the column type in the database.
-	// In this case, determine the destination type using the field's data type, which is the column type in the database.
-	//  use the data type as the destination type,
-	// because
-	// If the type is declared in the tag,
+	// In this case, determine the destination type using the field's data type, which is the column type in the
+	// database.
 	if f.Serializer != nil {
 		dt := strings.ToLower(string(f.DataType))
 		switch schema.DataType(dt) {
@@ -202,8 +199,7 @@ func createTypedDestination(f *schema.Field) interface{} {
 	}
 
 	// Fallback
-	var s string
-	return &s
+	return new(string)
 }
 
 // Convert values for Oracle-specific types
