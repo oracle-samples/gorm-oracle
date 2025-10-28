@@ -131,7 +131,6 @@ func TestSerializer(t *testing.T) {
 	}
 
 	createdAt := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-	fmt.Printf("======= createdAt1 = %v\n", createdAt.Unix())
 	updatedAt := createdAt.Unix()
 
 	data := SerializerStruct{
