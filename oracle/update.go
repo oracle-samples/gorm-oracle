@@ -168,7 +168,6 @@ func checkMissingWhereConditions(db *gorm.DB) {
 					}
 					// Has non-soft-delete equality condition, this is valid
 					hasMeaningfulConditions = true
-					break
 				case clause.IN:
 					// Has IN condition with values, this is valid
 					if len(e.Values) > 0 {
@@ -187,11 +186,9 @@ func checkMissingWhereConditions(db *gorm.DB) {
 					}
 					// Has non-soft-delete expression condition, consider it valid
 					hasMeaningfulConditions = true
-					break
 				case clause.AndConditions, clause.OrConditions:
 					// Complex conditions are likely valid (but we could be more thorough here)
 					hasMeaningfulConditions = true
-					break
 				case clause.Where:
 					// Handle nested WHERE clauses - recursively check their expressions
 					if len(e.Exprs) > 0 {
@@ -208,7 +205,6 @@ func checkMissingWhereConditions(db *gorm.DB) {
 				default:
 					// Unknown condition types - assume they're meaningful for safety
 					hasMeaningfulConditions = true
-					break
 				}
 
 				// If we found meaningful conditions, we can stop checking
