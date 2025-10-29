@@ -41,13 +41,18 @@ package tests
 import (
 	"database/sql"
 	"testing"
+	"strings"
 )
 
 type BooleanTest struct {
-	ID       uint        `gorm:"column:ID;primaryKey"`
-	Flag     bool        `gorm:"column:FLAG"` 
-	Nullable *bool       `gorm:"column:NULLABLE"` 
+	ID       uint         `gorm:"column:ID;primaryKey"`
+	Flag     bool         `gorm:"column:FLAG"`
+	Nullable *bool        `gorm:"column:NULLABLE"`
 	SQLBool  sql.NullBool `gorm:"column:SQL_BOOL"`
+}
+
+func (BooleanTest) TableName() string {
+	return "BOOLEAN_TESTS"
 }
 
 func TestBooleanBasicInsert(t *testing.T) {
@@ -95,7 +100,6 @@ func TestBooleanUpdate(t *testing.T) {
 	bt := BooleanTest{Flag: false}
 	DB.Create(&bt)
 
-	// Update false → true
 	if err := DB.Model(&bt).Update("Flag", true).Error; err != nil {
 		t.Fatalf("update failed: %v", err)
 	}
@@ -118,6 +122,11 @@ func TestBooleanQueryFilters(t *testing.T) {
 	if err := DB.Where("FLAG = ?", true).Find(&trues).Error; err != nil {
 		t.Fatal(err)
 	}
+
+	if len(trues) == 0 {
+		t.Fatalf("expected at least 1 row, got 0")
+	}
+
 	for _, row := range trues {
 		if !row.Flag {
 			t.Errorf("expected only true rows, got false")
@@ -126,15 +135,148 @@ func TestBooleanQueryFilters(t *testing.T) {
 }
 
 func TestBooleanNegativeInvalidDBValue(t *testing.T) {
-	// Insert invalid value directly (bypassing GORM)
-	if err := DB.Exec("INSERT INTO BOOLEAN_TEST (ID, FLAG) VALUES (999, 2)").Error; err != nil {
-		t.Logf("expected insert error: %v", err)
-		return
+    DB.Migrator().DropTable(&BooleanTest{})
+    DB.AutoMigrate(&BooleanTest{})
+
+    if err := DB.Exec(`INSERT INTO "BOOLEAN_TESTS" ("ID","FLAG") VALUES (2001, 2)`).Error; err != nil {
+        t.Fatalf("failed to insert invalid bool: %v", err)
+    }
+
+    var got BooleanTest
+    err := DB.First(&got, 2001).Error
+    if err == nil {
+        t.Fatal("expected invalid boolean scan error, got nil")
+    }
+
+    if !strings.Contains(err.Error(), "invalid") &&
+       !strings.Contains(err.Error(), "convert") {
+        t.Fatalf("expected boolean conversion error, got: %v", err)
+    }
+}
+
+func TestBooleanInsertWithIntValues(t *testing.T) {
+	DB.Migrator().DropTable(&BooleanTest{})
+	DB.AutoMigrate(&BooleanTest{})
+
+	if err := DB.Exec("INSERT INTO BOOLEAN_TESTS (ID, FLAG) VALUES (1001, 1)").Error; err != nil {
+		t.Fatalf("failed to insert int 1 as boolean: %v", err)
+	}
+	if err := DB.Exec("INSERT INTO BOOLEAN_TESTS (ID, FLAG) VALUES (1002, 0)").Error; err != nil {
+		t.Fatalf("failed to insert int 0 as boolean: %v", err)
+	}
+
+	var gotTrue, gotFalse BooleanTest
+	if err := DB.First(&gotTrue, 1001).Error; err != nil {
+		t.Fatalf("fetch failed: %v", err)
+	}
+	if gotTrue.Flag != true {
+		t.Errorf("expected true for 1, got %v", gotTrue.Flag)
+	}
+
+	if err := DB.First(&gotFalse, 1002).Error; err != nil {
+		t.Fatalf("fetch failed: %v", err)
+	}
+	if gotFalse.Flag != false {
+		t.Errorf("expected false for 0, got %v", gotFalse.Flag)
+	}
+}
+
+func TestBooleanSQLNullBool(t *testing.T) {
+	DB.Migrator().DropTable(&BooleanTest{})
+	DB.AutoMigrate(&BooleanTest{})
+
+	bt := BooleanTest{SQLBool: sql.NullBool{Bool: true, Valid: true}}
+	DB.Create(&bt)
+
+	var got BooleanTest
+	DB.First(&got, bt.ID)
+	if !got.SQLBool.Valid || got.SQLBool.Bool != true {
+		t.Errorf("expected sql.NullBool true/valid, got %+v", got.SQLBool)
+	}
+}
+
+func TestBooleanDefaultValue(t *testing.T) {
+	DB.Migrator().DropTable(&BooleanTest{})
+	DB.AutoMigrate(&BooleanTest{})
+
+	bt := BooleanTest{}
+	if err := DB.Create(&bt).Error; err != nil {
+		t.Fatalf("insert default failed: %v", err)
 	}
 
 	var got BooleanTest
-	err := DB.First(&got, 999).Error
-	if err == nil {
-		t.Errorf("expected scan error for invalid boolean mapping, got %+v", got)
+	DB.First(&got, bt.ID)
+
+	// Expect default (false or NULL depending on DB)
+	if got.Flag != false {
+		t.Errorf("expected default false, got %v", got.Flag)
+	}
+}
+
+func TestBooleanQueryMixedComparisons(t *testing.T) {
+    DB.Migrator().DropTable(&BooleanTest{})
+    DB.AutoMigrate(&BooleanTest{})
+
+    DB.Create(&BooleanTest{Flag: true})
+    DB.Create(&BooleanTest{Flag: false})
+
+    var gotNum []BooleanTest
+
+    // FILTER USING NUMBER
+    if err := DB.Where("FLAG = 1").Find(&gotNum).Error; err != nil {
+        t.Fatal(err)
+    }
+    if len(gotNum) == 0 {
+        t.Errorf("expected at least 1 row for FLAG=1")
+    }
+
+    // FILTER USING TEXT (invalid in Oracle)
+    var gotStr []BooleanTest
+    if err := DB.Where("FLAG = 'true'").Find(&gotStr).Error; err == nil {
+        t.Errorf("expected ORA-01722 when comparing NUMBER to string literal")
+    }
+}
+
+func TestBooleanStringCoercion(t *testing.T) {
+	DB.Migrator().DropTable(&BooleanTest{})
+	DB.AutoMigrate(&BooleanTest{})
+
+	// Insert using string literals
+	if err := DB.Exec("INSERT INTO BOOLEAN_TESTS (ID, FLAG) VALUES (2001, '1')").Error; err != nil {
+		t.Fatalf("failed to insert '1': %v", err)
+	}
+	if err := DB.Exec("INSERT INTO BOOLEAN_TESTS (ID, FLAG) VALUES (2002, '0')").Error; err != nil {
+		t.Fatalf("failed to insert '0': %v", err)
+	}
+
+	var got1, got2 BooleanTest
+	DB.First(&got1, 2001)
+	DB.First(&got2, 2002)
+
+	if got1.Flag != true {
+		t.Errorf("expected true for '1', got %v", got1.Flag)
+	}
+	if got2.Flag != false {
+		t.Errorf("expected false for '0', got %v", got2.Flag)
+	}
+}
+
+func TestBooleanNullableColumn(t *testing.T) {
+	DB.Migrator().DropTable(&BooleanTest{})
+	DB.AutoMigrate(&BooleanTest{})
+
+	// Insert a row with NULL value for Nullable column
+	bt := BooleanTest{Flag: true, Nullable: nil}
+	if err := DB.Create(&bt).Error; err != nil {
+		t.Fatalf("failed to insert NULL bool: %v", err)
+	}
+
+	var got BooleanTest
+	if err := DB.First(&got, bt.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	if got.Nullable != nil {
+		t.Errorf("expected NULL, got %v", *got.Nullable)
 	}
 }
