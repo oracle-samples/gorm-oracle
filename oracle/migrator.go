@@ -202,7 +202,7 @@ func (m Migrator) CreateTable(values ...interface{}) error {
 			createTableSQL += ")"
 
 			if tableOption, ok := m.DB.Get("gorm:table_options"); ok {
-				createTableSQL += fmt.Sprint(tableOption)
+				createTableSQL += " " + fmt.Sprint(tableOption)
 			}
 
 			err = tx.Exec(createTableSQL, values...).Error
