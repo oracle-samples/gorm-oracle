@@ -59,7 +59,7 @@ import (
 func getOracleArrayType(field *schema.Field, values []any) string {
 	switch field.DataType {
 	case schema.Bool:
-		return "TABLE OF NUMBER(1)"
+		return "TABLE OF BOOLEAN"
 	case schema.Int, schema.Uint:
 		return "TABLE OF NUMBER"
 	case schema.Float:
@@ -189,7 +189,7 @@ func createTypedDestination(f *schema.Field) interface{} {
 		return new(string)
 
 	case reflect.Bool:
-		return new(int64)
+		return new(bool)
 
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		return new(int64)
@@ -237,12 +237,6 @@ func convertValue(val interface{}) interface{} {
 			return ""
 		}
 		return val
-	case bool:
-		if v {
-			return 1
-		} else {
-			return 0
-		}
 	case string:
 		if len(v) > math.MaxInt16 {
 			return godror.Lob{IsClob: true, Reader: strings.NewReader(v)}
@@ -411,6 +405,9 @@ func convertPrimitiveType(value interface{}, targetType reflect.Type) interface{
 	case reflect.Bool:
 		if v, ok := value.(int64); ok {
 			return v != 0
+		}
+		if v, ok := value.(bool); ok {
+			return v
 		}
 		return value
 	case reflect.Int:

@@ -188,8 +188,7 @@ func (d Dialector) getStringType(field *schema.Field) string {
 }
 
 func (d Dialector) getBooleanType() string {
-	// Oracle doesn't support BOOLEAN in CREATE TABLE, use NUMBER(1) instead
-	return "NUMBER(1)"
+	return "BOOLEAN"
 }
 
 func (d Dialector) getDataTimeType() string {

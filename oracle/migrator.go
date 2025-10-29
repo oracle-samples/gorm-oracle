@@ -646,9 +646,9 @@ func (m Migrator) buildOracleDefault(defaultValue string) string {
 	case "SYSDATE":
 		return "DEFAULT SYSDATE"
 	case "TRUE":
-		return "DEFAULT 1"
+		return "DEFAULT TRUE"
 	case "FALSE":
-		return "DEFAULT 0"
+		return "DEFAULT FALSE"
 	}
 
 	// Handle sequence calls (contains .NEXTVAL)
@@ -682,9 +682,9 @@ func (m Migrator) buildOracleDefaultFromInterface(value interface{}) string {
 	switch v := value.(type) {
 	case bool:
 		if v {
-			return "DEFAULT 1"
+			return "DEFAULT TRUE"
 		}
-		return "DEFAULT 0"
+		return "DEFAULT FALSE"
 	case string:
 		if v == "" {
 			return "DEFAULT ''"
