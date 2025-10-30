@@ -207,7 +207,6 @@ func TestBooleanDefaultValue(t *testing.T) {
 	var got BooleanTest
 	DB.First(&got, bt.ID)
 
-	// Expect default (false or NULL depending on DB)
 	if got.Flag != false {
 		t.Errorf("expected default false, got %v", got.Flag)
 	}
@@ -230,7 +229,6 @@ func TestBooleanQueryMixedComparisons(t *testing.T) {
         t.Errorf("expected at least 1 row for FLAG=1")
     }
 
-    // FILTER USING TEXT (invalid in Oracle)
     var gotStr []BooleanTest
     if err := DB.Where("FLAG = 'true'").Find(&gotStr).Error; err == nil {
         t.Errorf("expected ORA-01722 when comparing NUMBER to string literal")
