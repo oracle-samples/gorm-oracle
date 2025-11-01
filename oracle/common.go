@@ -55,6 +55,14 @@ import (
 	"gorm.io/gorm/schema"
 )
 
+// Extra data types for the data type that are not declared in the
+// default DataType list
+const (
+	JSON                  schema.DataType = "json"
+	Timestamp             schema.DataType = "timestamp"
+	TimestampWithTimeZone schema.DataType = "timestamp with time zone"
+)
+
 // Helper function to get Oracle array type for a field
 func getOracleArrayType(field *schema.Field, values []any) string {
 	switch field.DataType {
@@ -64,6 +72,10 @@ func getOracleArrayType(field *schema.Field, values []any) string {
 		return "TABLE OF NUMBER"
 	case schema.Float:
 		return "TABLE OF NUMBER"
+	case JSON:
+		// PL/SQL does not yet allow declaring collections of JSON (TABLE OF JSON) directly.
+		// Workaround for JSON type
+		fallthrough
 	case schema.String:
 		if field.Size > 0 && field.Size <= 4000 {
 			return fmt.Sprintf("TABLE OF VARCHAR2(%d)", field.Size)
@@ -112,13 +124,6 @@ func findFieldByDBName(schema *schema.Schema, dbName string) *schema.Field {
 	}
 	return nil
 }
-
-// Extra data types to determine the destination type for OUT parameters
-// when using a serializer
-const (
-	Timestamp             schema.DataType = "timestamp"
-	TimestampWithTimeZone schema.DataType = "timestamp with time zone"
-)
 
 // Create typed destination for OUT parameters
 func createTypedDestination(f *schema.Field) interface{} {
