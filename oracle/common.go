@@ -39,17 +39,28 @@
 package oracle
 
 import (
+	"bytes"
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"math"
 	"reflect"
 	"strings"
 	"time"
 
+	"github.com/godror/godror"
 	"github.com/google/uuid"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
+)
+
+// Extra data types for the data type that are not declared in the
+// default DataType list
+const (
+	JSON                  schema.DataType = "json"
+	Timestamp             schema.DataType = "timestamp"
+	TimestampWithTimeZone schema.DataType = "timestamp with time zone"
 )
 
 // Helper function to get Oracle array type for a field
@@ -61,6 +72,10 @@ func getOracleArrayType(field *schema.Field, values []any) string {
 		return "TABLE OF NUMBER"
 	case schema.Float:
 		return "TABLE OF NUMBER"
+	case JSON:
+		// PL/SQL does not yet allow declaring collections of JSON (TABLE OF JSON) directly.
+		// Workaround for JSON type
+		fallthrough
 	case schema.String:
 		if field.Size > 0 && field.Size <= 4000 {
 			return fmt.Sprintf("TABLE OF VARCHAR2(%d)", field.Size)
@@ -79,7 +94,7 @@ func getOracleArrayType(field *schema.Field, values []any) string {
 	case schema.Bytes:
 		return "TABLE OF BLOB"
 	default:
-		return "TABLE OF VARCHAR2(4000)" // Safe default
+		return "TABLE OF " + strings.ToUpper(string(field.DataType))
 	}
 }
 
@@ -113,8 +128,37 @@ func findFieldByDBName(schema *schema.Schema, dbName string) *schema.Field {
 // Create typed destination for OUT parameters
 func createTypedDestination(f *schema.Field) interface{} {
 	if f == nil {
-		var s string
-		return &s
+		return new(string)
+	}
+
+	// If the field has a serializer, the field type may not be directly related to the column type in the database.
+	// In this case, determine the destination type using the field's data type, which is the column type in the
+	// database.
+	if f.Serializer != nil {
+		dt := strings.ToLower(string(f.DataType))
+		switch schema.DataType(dt) {
+		case schema.Bool:
+			return new(bool)
+		case schema.Uint:
+			return new(uint64)
+		case schema.Int:
+			return new(int64)
+		case schema.Float:
+			return new(float64)
+		case schema.String:
+			return new(string)
+		case Timestamp:
+			fallthrough
+		case TimestampWithTimeZone:
+			fallthrough
+		case schema.Time:
+			return new(time.Time)
+		case schema.Bytes:
+			return new([]byte)
+		default:
+			// Fallback
+			return new(string)
+		}
 	}
 
 	ft := f.FieldType
@@ -163,8 +207,7 @@ func createTypedDestination(f *schema.Field) interface{} {
 	}
 
 	// Fallback
-	var s string
-	return &s
+	return new(string)
 }
 
 // Convert values for Oracle-specific types
@@ -206,6 +249,14 @@ func convertValue(val interface{}) interface{} {
 			return 0
 		}
 	case string:
+		if len(v) > math.MaxInt16 {
+			return godror.Lob{IsClob: true, Reader: strings.NewReader(v)}
+		}
+		return v
+	case []byte:
+		if len(v) > math.MaxInt16 {
+			return godror.Lob{IsClob: false, Reader: bytes.NewReader(v)}
+		}
 		return v
 	default:
 		return val
@@ -216,6 +267,13 @@ func convertValue(val interface{}) interface{} {
 func convertFromOracleToField(value interface{}, field *schema.Field) interface{} {
 	if value == nil || field == nil {
 		return nil
+	}
+
+	// Deserialize data into objects when a serializer is used
+	if field.Serializer != nil {
+		serializerField := field.NewValuePool.Get().(sql.Scanner)
+		serializerField.Scan(value)
+		return serializerField
 	}
 
 	targetType := field.FieldType

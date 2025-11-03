@@ -36,44 +36,49 @@
 ** SOFTWARE.
  */
 
-package oracle
+package tests
 
 import (
-	"regexp"
 	"strings"
-
-	"gorm.io/gorm"
+	"testing"
 )
 
-// Identifies the table name alias provided as
-// "\"users\" \"u\"" and "\"users\" u". Gorm already handles
-// the other formats like "users u", "users AS u" etc.
-var tableRegexp = regexp.MustCompile(`^"(\w+)"\s+"?(\w+)"?$`)
-
-func BeforeQuery(db *gorm.DB) {
-	if db == nil || db.Statement == nil || db.Statement.TableExpr == nil {
-		return
-	}
-	name := db.Statement.TableExpr.SQL
-	if strings.Contains(name, " ") || strings.Contains(name, "`") {
-		if results := tableRegexp.FindStringSubmatch(name); len(results) == 3 {
-			db.Statement.Table = results[2]
-		}
-	}
+type ClobOneToManyModel struct {
+	ID       uint             `gorm:"primaryKey"`
+	Children []ClobChildModel `gorm:"foreignKey:ID"`
 }
 
-// MismatchedCaseHandler handles Oracle Case Insensitivity.
-// When identifiers are not quoted, columns are returned by Oracle in uppercase.
-// Fields in the models may be lower case for compatibility with other databases.
-// Match them up with the fields using the column mapping.
-func MismatchedCaseHandler(gormDB *gorm.DB) {
-	if gormDB.Statement == nil || gormDB.Statement.Schema == nil {
-		return
+type ClobChildModel struct {
+	ID   uint   `gorm:"primaryKey"`
+	Data string `gorm:"type:clob"`
+}
+
+func setupClobTestTables(t *testing.T) {
+	t.Log("Setting up CLOB test tables")
+
+	DB.Migrator().DropTable(&ClobOneToManyModel{}, &ClobChildModel{})
+
+	err := DB.AutoMigrate(&ClobOneToManyModel{}, &ClobChildModel{})
+	if err != nil {
+		t.Fatalf("Failed to migrate CLOB test tables: %v", err)
 	}
-	if len(gormDB.Statement.Schema.Fields) > 0 && gormDB.Statement.ColumnMapping == nil {
-		gormDB.Statement.ColumnMapping = map[string]string{}
+
+	t.Log("CLOB test tables created successfully")
+}
+
+func TestClobOnConflict(t *testing.T) {
+	setupClobTestTables(t)
+
+	model := &ClobOneToManyModel{
+		ID: 1,
+		Children: []ClobChildModel{
+			{
+				Data: strings.Repeat("X", 32768),
+			},
+		},
 	}
-	for _, field := range gormDB.Statement.Schema.Fields {
-		gormDB.Statement.ColumnMapping[strings.ToUpper(field.DBName)] = field.Name
+	err := DB.Create(model).Error
+	if err != nil {
+		t.Fatalf("Failed to create BLOB record with ON CONFLICT: %v", err)
 	}
 }

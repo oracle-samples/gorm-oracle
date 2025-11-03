@@ -60,8 +60,8 @@ type SerializerStruct struct {
 	Roles3                 *Roles                 `gorm:"serializer:json;not null"`
 	Contracts              map[string]interface{} `gorm:"serializer:json"`
 	JobInfo                Job                    `gorm:"type:bytes;serializer:gob"`
-	CreatedTime            int64                  `gorm:"serializer:unixtime;type:timestamp"` // store time in db, use int as field type
-	UpdatedTime            *int64                 `gorm:"serializer:unixtime;type:timestamp"` // store time in db, use int as field type
+	CreatedTime            int64                  `gorm:"serializer:unixtime;type:timestamp with time zone"` // store time in db, use int as field type
+	UpdatedTime            *int64                 `gorm:"serializer:unixtime;type:timestamp with time zone"` // store time in db, use int as field type
 	CustomSerializerString string                 `gorm:"serializer:custom"`
 	EncryptedString        EncryptedString
 }
@@ -122,7 +122,9 @@ func (c *CustomSerializer) Value(ctx context.Context, field *schema.Field, dst r
 }
 
 func TestSerializer(t *testing.T) {
-	schema.RegisterSerializer("custom", NewCustomSerializer("hello"))
+	if _, ok := schema.GetSerializer("custom"); !ok {
+		schema.RegisterSerializer("custom", NewCustomSerializer("hello"))
+	}
 	DB.Migrator().DropTable(adaptorSerializerModel(&SerializerStruct{}))
 	if err := DB.Migrator().AutoMigrate(adaptorSerializerModel(&SerializerStruct{})); err != nil {
 		t.Fatalf("no error should happen when migrate scanner, valuer struct, got error %v", err)
@@ -168,8 +170,82 @@ func TestSerializer(t *testing.T) {
 	}
 }
 
+// Issue 48: https://github.com/oracle-samples/gorm-oracle/issues/48
+func TestSerializerBulkInsert(t *testing.T) {
+	if _, ok := schema.GetSerializer("custom"); !ok {
+		schema.RegisterSerializer("custom", NewCustomSerializer("hello"))
+	}
+	DB.Migrator().DropTable(adaptorSerializerModel(&SerializerStruct{}))
+	if err := DB.Migrator().AutoMigrate(adaptorSerializerModel(&SerializerStruct{})); err != nil {
+		t.Fatalf("no error should happen when migrate scanner, valuer struct, got error %v", err)
+	}
+
+	createdAt := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	updatedAt := createdAt.Unix()
+
+	data := []SerializerStruct{
+		{
+			Name:            []byte("jinzhu"),
+			Roles:           []string{"r1", "r2"},
+			Roles3:          &Roles{},
+			Contracts:       map[string]interface{}{"name": "jinzhu", "age": 10},
+			EncryptedString: EncryptedString("pass"),
+			CreatedTime:     createdAt.Unix(),
+			UpdatedTime:     &updatedAt,
+			JobInfo: Job{
+				Title:    "programmer",
+				Number:   9920,
+				Location: "Kenmawr",
+				IsIntern: false,
+			},
+			CustomSerializerString: "world",
+		},
+		{
+			Name:            []byte("john"),
+			Roles:           []string{"l1", "l2"},
+			Roles3:          &Roles{},
+			Contracts:       map[string]interface{}{"name": "john", "age": 20},
+			EncryptedString: EncryptedString("pass"),
+			CreatedTime:     createdAt.Unix(),
+			UpdatedTime:     &updatedAt,
+			JobInfo: Job{
+				Title:    "manager",
+				Number:   7710,
+				Location: "Redwood City",
+				IsIntern: false,
+			},
+			CustomSerializerString: "foo",
+		},
+	}
+
+	if err := DB.Create(&data).Error; err != nil {
+		t.Fatalf("failed to create data, got error %v", err)
+	}
+
+	var result []SerializerStruct
+	if err := DB.Find(&result).Error; err != nil {
+		t.Fatalf("failed to query data, got error %v", err)
+	}
+
+	tests.AssertEqual(t, result, data)
+
+	// Update all the "roles" columns to "n1"
+	if err := DB.Model(&SerializerStruct{}).Where("\"roles\" IS NOT NULL").Update("roles", []string{"n1"}).Error; err != nil {
+		t.Fatalf("failed to update data's roles, got error %v", err)
+	}
+
+	var count int64
+	if err := DB.Model(&SerializerStruct{}).Where("\"roles\" = ?", "n1").Count(&count).Error; err != nil {
+		t.Fatalf("failed to query data, got error %v", err)
+	}
+
+	tests.AssertEqual(t, count, 2)
+}
+
 func TestSerializerZeroValue(t *testing.T) {
-	schema.RegisterSerializer("custom", NewCustomSerializer("hello"))
+	if _, ok := schema.GetSerializer("custom"); !ok {
+		schema.RegisterSerializer("custom", NewCustomSerializer("hello"))
+	}
 	DB.Migrator().DropTable(adaptorSerializerModel(&SerializerStruct{}))
 	if err := DB.Migrator().AutoMigrate(adaptorSerializerModel(&SerializerStruct{})); err != nil {
 		t.Fatalf("no error should happen when migrate scanner, valuer struct, got error %v", err)
@@ -200,7 +276,9 @@ func TestSerializerZeroValue(t *testing.T) {
 }
 
 func TestSerializerAssignFirstOrCreate(t *testing.T) {
-	schema.RegisterSerializer("custom", NewCustomSerializer("hello"))
+	if _, ok := schema.GetSerializer("custom"); !ok {
+		schema.RegisterSerializer("custom", NewCustomSerializer("hello"))
+	}
 	DB.Migrator().DropTable(adaptorSerializerModel(&SerializerStruct{}))
 	if err := DB.Migrator().AutoMigrate(adaptorSerializerModel(&SerializerStruct{})); err != nil {
 		t.Fatalf("no error should happen when migrate scanner, valuer struct, got error %v", err)
