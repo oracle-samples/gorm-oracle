@@ -39,46 +39,82 @@
 package tests
 
 import (
-	"strings"
 	"testing"
+
+	"github.com/google/uuid"
+	"gorm.io/gorm/clause"
 )
 
-type ClobOneToManyModel struct {
-	ID       uint             `gorm:"primaryKey"`
-	Children []ClobChildModel `gorm:"foreignKey:ID"`
+type UUIDModel struct {
+	ID   uint       `gorm:"primaryKey"`
+	UUID *uuid.UUID `gorm:"type:VARCHAR2(36)"`
+	// Data string     `gorm:"type:clob"`
 }
 
-type ClobChildModel struct {
-	ID   uint   `gorm:"primaryKey"`
-	Data string `gorm:"type:clob"`
-}
+func setupUUIDTestTables(t *testing.T) {
+	t.Log("Setting up UUID test tables")
 
-func setupClobTestTables(t *testing.T) {
-	t.Log("Setting up CLOB test tables")
+	DB.Migrator().DropTable(&UUIDModel{})
 
-	DB.Migrator().DropTable(&ClobOneToManyModel{}, &ClobChildModel{})
-
-	err := DB.AutoMigrate(&ClobOneToManyModel{}, &ClobChildModel{})
+	err := DB.AutoMigrate(&UUIDModel{})
 	if err != nil {
-		t.Fatalf("Failed to migrate CLOB test tables: %v", err)
+		t.Fatalf("Failed to migrate UUID test tables: %v", err)
 	}
 
-	t.Log("CLOB test tables created successfully")
+	t.Log("UUID test tables created successfully")
 }
 
-func TestClobOnConflict(t *testing.T) {
-	setupClobTestTables(t)
-
-	model := &ClobOneToManyModel{
-		ID: 1,
-		Children: []ClobChildModel{
-			{
-				Data: strings.Repeat("X", 32768),
+func TestUUIDPLSQL(t *testing.T) {
+	myUUID := uuid.New()
+	type test struct {
+		model any
+		fn    func(model any) error
+	}
+	tests := map[string]test{
+		"InsertWithReturning": {
+			model: []UUIDModel{
+				{
+					UUID: &myUUID,
+				},
+			},
+			fn: func(model any) error {
+				return DB.Create(model).Error
+			},
+		},
+		"InsertWithReturningNil": {
+			model: []UUIDModel{
+				{
+					UUID: nil,
+				},
+			},
+			fn: func(model any) error {
+				return DB.Create(model).Error
+			},
+		},
+		"BatchInsert": {
+			model: []UUIDModel{
+				{
+					UUID: &myUUID,
+				},
+				{
+					UUID: nil,
+				},
+			},
+			fn: func(model any) error {
+				return DB.Clauses(clause.OnConflict{
+					UpdateAll: true,
+				}).CreateInBatches(model, 1000).Error
 			},
 		},
 	}
-	err := DB.Create(model).Error
-	if err != nil {
-		t.Fatalf("Failed to create BLOB record with ON CONFLICT: %v", err)
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			setupUUIDTestTables(t)
+			err := tc.fn(tc.model)
+			if err != nil {
+				t.Fatalf("Failed to create UUID record with PLSQL: %v", err)
+			}
+		})
 	}
 }
