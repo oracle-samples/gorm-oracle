@@ -218,6 +218,10 @@ func convertValue(val interface{}) interface{} {
 
 	// Dereference pointers
 	rv := reflect.ValueOf(val)
+	if rv.Kind() == reflect.Ptr && rv.IsNil() {
+		return nil
+	}
+
 	for rv.Kind() == reflect.Ptr && !rv.IsNil() {
 		rv = rv.Elem()
 		val = rv.Interface()
