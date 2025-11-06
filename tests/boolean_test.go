@@ -259,9 +259,8 @@ func TestBooleanStringCoercion(t *testing.T) {
 	}
 }
 
-
 func TestBooleanNullableColumn(t *testing.T) {
-	t.Skip("Skipping until nullable bool bug is resolved")
+	// t.Skip("Skipping until nullable bool bug is resolved")
 	DB.Migrator().DropTable(&BooleanTest{})
 	DB.AutoMigrate(&BooleanTest{})
 
