@@ -40,8 +40,8 @@ package tests
 
 import (
 	"database/sql"
-	"testing"
 	"strings"
+	"testing"
 )
 
 type BooleanTest struct {
@@ -135,23 +135,23 @@ func TestBooleanQueryFilters(t *testing.T) {
 }
 
 func TestBooleanNegativeInvalidDBValue(t *testing.T) {
-    DB.Migrator().DropTable(&BooleanTest{})
-    DB.AutoMigrate(&BooleanTest{})
+	DB.Migrator().DropTable(&BooleanTest{})
+	DB.AutoMigrate(&BooleanTest{})
 
-    if err := DB.Exec(`INSERT INTO "BOOLEAN_TESTS" ("ID","FLAG") VALUES (2001, 2)`).Error; err != nil {
-        t.Fatalf("failed to insert invalid bool: %v", err)
-    }
+	if err := DB.Exec(`INSERT INTO "BOOLEAN_TESTS" ("ID","FLAG") VALUES (2001, 2)`).Error; err != nil {
+		t.Fatalf("failed to insert invalid bool: %v", err)
+	}
 
-    var got BooleanTest
-    err := DB.First(&got, 2001).Error
-    if err == nil {
-        t.Fatal("expected invalid boolean scan error, got nil")
-    }
+	var got BooleanTest
+	err := DB.First(&got, 2001).Error
+	if err == nil {
+		t.Fatal("expected invalid boolean scan error, got nil")
+	}
 
-    if !strings.Contains(err.Error(), "invalid") &&
-       !strings.Contains(err.Error(), "convert") {
-        t.Fatalf("expected boolean conversion error, got: %v", err)
-    }
+	if !strings.Contains(err.Error(), "invalid") &&
+		!strings.Contains(err.Error(), "convert") {
+		t.Fatalf("expected boolean conversion error, got: %v", err)
+	}
 }
 
 func TestBooleanInsertWithIntValues(t *testing.T) {
@@ -213,26 +213,26 @@ func TestBooleanDefaultValue(t *testing.T) {
 }
 
 func TestBooleanQueryMixedComparisons(t *testing.T) {
-    DB.Migrator().DropTable(&BooleanTest{})
-    DB.AutoMigrate(&BooleanTest{})
+	DB.Migrator().DropTable(&BooleanTest{})
+	DB.AutoMigrate(&BooleanTest{})
 
-    DB.Create(&BooleanTest{Flag: true})
-    DB.Create(&BooleanTest{Flag: false})
+	DB.Create(&BooleanTest{Flag: true})
+	DB.Create(&BooleanTest{Flag: false})
 
-    var gotNum []BooleanTest
+	var gotNum []BooleanTest
 
-    // FILTER USING NUMBER
-    if err := DB.Where("FLAG = 1").Find(&gotNum).Error; err != nil {
-        t.Fatal(err)
-    }
-    if len(gotNum) == 0 {
-        t.Errorf("expected at least 1 row for FLAG=1")
-    }
+	// FILTER USING NUMBER
+	if err := DB.Where("FLAG = 1").Find(&gotNum).Error; err != nil {
+		t.Fatal(err)
+	}
+	if len(gotNum) == 0 {
+		t.Errorf("expected at least 1 row for FLAG=1")
+	}
 
-    var gotStr []BooleanTest
-    if err := DB.Where("FLAG = 'true'").Find(&gotStr).Error; err == nil {
-        t.Errorf("expected ORA-01722 when comparing NUMBER to string literal")
-    }
+	var gotStr []BooleanTest
+	if err := DB.Where("FLAG = 'true'").Find(&gotStr).Error; err == nil {
+		t.Errorf("expected ORA-01722 when comparing NUMBER to string literal")
+	}
 }
 
 func TestBooleanStringCoercion(t *testing.T) {
@@ -277,5 +277,80 @@ func TestBooleanNullableColumn(t *testing.T) {
 
 	if got.Nullable != nil {
 		t.Errorf("expected NULL, got %v", *got.Nullable)
+	}
+}
+
+type Model struct {
+	ID       uint         `gorm:"primaryKey"`
+	Children []ChildModel `gorm:"foreignKey:ParentID"`
+}
+
+type ChildModel struct {
+	ParentID uint
+	ID       uint `gorm:"primaryKey"`
+	Data     bool `gorm:"type:boolean"`
+}
+
+func setupBooleanTestTables(t *testing.T) {
+	t.Log("Setting up boolean test tables")
+
+	DB.Migrator().DropTable(&Model{}, &ChildModel{})
+
+	err := DB.AutoMigrate(&Model{}, &ChildModel{})
+	if err != nil {
+		t.Fatalf("Failed to migrate boolean test tables: %v", err)
+	}
+
+	t.Log("boolean test tables created successfully")
+}
+
+func TestBooleanOnConflict(t *testing.T) {
+	type test struct {
+		model any
+		fn    func(model any) error
+	}
+	tests := map[string]test{
+		"OneToManySingle": {
+			model: &Model{
+				ID: 1,
+				Children: []ChildModel{
+					{
+						ID:   1,
+						Data: true,
+					},
+				},
+			},
+			fn: func(model any) error {
+				return DB.Create(model).Error
+			},
+		},
+		"OneToManyBatch": {
+			model: &Model{
+				ID: 1,
+				Children: []ChildModel{
+					{
+						ID:   1,
+						Data: true,
+					},
+					{
+						ID:   2,
+						Data: false,
+					},
+				},
+			},
+			fn: func(model any) error {
+				return DB.Create(model).Error
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			setupBooleanTestTables(t)
+			err := tc.fn(tc.model)
+			if err != nil {
+				t.Fatalf("Failed to create boolean record with ON CONFLICT: %v", err)
+			}
+		})
 	}
 }

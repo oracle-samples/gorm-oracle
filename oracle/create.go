@@ -39,16 +39,26 @@
 package oracle
 
 import (
+	"bytes"
 	"database/sql"
 	"fmt"
 	"reflect"
 	"strings"
 
+	"github.com/godror/godror"
 	"gorm.io/gorm"
 	"gorm.io/gorm/callbacks"
 	"gorm.io/gorm/clause"
 	"gorm.io/gorm/schema"
 )
+
+// plsqlBindVariableMap is a helper struct to manage PL/SQL bind variables.
+// It maps column names to their corresponding slice of real values, as well
+// as recording columns that are LOBs.
+type plsqlBindVariableMap struct {
+	lobColumns  map[string]bool
+	variableMap map[string][]any
+}
 
 // Create overrides GORM's create callback for Oracle.
 //
@@ -131,9 +141,14 @@ func Create(db *gorm.DB) {
 		hasReturningInDryRun := db.DryRun && hasReturningClause
 		needsReturning := stmtSchema != nil && len(stmtSchema.FieldsWithDefaultDBValue) > 0 && (!db.DryRun || hasReturningInDryRun)
 
-		if needsReturning && len(createValues.Values) > 1 {
+		// Pre-emptively map PL/SQL bind variables to check for LOBs
+		// If we have LOBs, we need to use PL/SQL for bulk inserts to ensure
+		// all values for a particular column are identically typed.
+		plsqlBindMap := mapPLSQLBindValues(createValues)
+
+		if (needsReturning || len(plsqlBindMap.lobColumns) > 0) && len(createValues.Values) > 1 {
 			// Multiple rows with RETURNING - use PL/SQL
-			buildBulkInsertPLSQL(db, createValues)
+			buildBulkInsertPLSQL(db, createValues, plsqlBindMap)
 		} else if needsReturning {
 			// Single row with RETURNING - use regular SQL with RETURNING
 			buildSingleInsertSQL(db, createValues)
@@ -142,6 +157,60 @@ func Create(db *gorm.DB) {
 			buildStandardInsertSQL(db, createValues)
 		}
 	}
+}
+
+// mapPLSQLBindValues maps the bind variables for PL/SQL batch inserts.
+// It frontloads the conversion of values to their real types, while also
+// ensuring that columns that are LOBs are identified and typed consistently.
+// Without this, subsets of batch inserts targeting string or []byte fields
+// may overrun the maximum size for VARCHAR2 and cause inconsistent types during UNIONs.
+func mapPLSQLBindValues(createValues clause.Values) plsqlBindVariableMap {
+	lobColumns := make(map[string]bool)
+	mappedVars := make(map[string][]any)
+	for i, column := range createValues.Columns {
+		for _, values := range createValues.Values {
+			value := convertValue(values[i])
+			if _, ok := lobColumns[column.Name]; ok {
+				value = convertToLOB(value)
+			} else {
+				lob, isLob := value.(godror.Lob)
+				if isLob {
+					lobColumns[column.Name] = true
+					lobs := convertToLOBs(mappedVars[column.Name])
+					mappedVars[column.Name] = lobs
+					value = lob
+				}
+			}
+			mappedVars[column.Name] = append(mappedVars[column.Name], value)
+		}
+	}
+	return plsqlBindVariableMap{
+		variableMap: mappedVars,
+		lobColumns:  lobColumns,
+	}
+}
+
+// convertToLOBs converts an array of values to their respective LOB types (if needed).
+func convertToLOBs(values []any) []any {
+	newVals := make([]any, len(values))
+	for i, val := range values {
+		newVals[i] = convertToLOB(val)
+	}
+	return newVals
+}
+
+// convertToLOB converts a value to its respective LOB type (if any).
+func convertToLOB(val any) any {
+	if val == nil {
+		return val
+	}
+	switch v := val.(type) {
+	case string:
+		return godror.Lob{IsClob: true, Reader: strings.NewReader(v)}
+	case []byte:
+		return godror.Lob{IsClob: false, Reader: bytes.NewReader(v)}
+	}
+	return val
 }
 
 // validateCreateData checks for invalid data in the destination before processing
@@ -175,7 +244,7 @@ func validateCreateData(stmt *gorm.Statement) error {
 }
 
 // Build PL/SQL block for bulk INSERT/MERGE with RETURNING
-func buildBulkInsertPLSQL(db *gorm.DB, createValues clause.Values) {
+func buildBulkInsertPLSQL(db *gorm.DB, createValues clause.Values, bindMap plsqlBindVariableMap) {
 	sanitizeCreateValuesForBulkArrays(db.Statement, &createValues)
 
 	stmt := db.Statement
@@ -229,16 +298,16 @@ func buildBulkInsertPLSQL(db *gorm.DB, createValues clause.Values) {
 		shouldUseMerge := ShouldUseRealConflict(createValues, onConflict, conflictColumns)
 
 		if shouldUseMerge {
-			buildBulkMergePLSQL(db, createValues, onConflictClause)
+			buildBulkMergePLSQL(db, createValues, onConflictClause, bindMap)
 			return
 		}
 	}
 	// Original INSERT logic for when there's no conflict handling needed
-	buildBulkInsertOnlyPLSQL(db, createValues)
+	buildBulkInsertOnlyPLSQL(db, createValues, bindMap)
 }
 
 // Build PL/SQL block for bulk MERGE with RETURNING (OnConflict case)
-func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClause clause.Clause) {
+func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClause clause.Clause, bindMap plsqlBindVariableMap) {
 	sanitizeCreateValuesForBulkArrays(db.Statement, &createValues)
 
 	stmt := db.Statement
@@ -267,18 +336,18 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 		valuesColumnMap[strings.ToUpper(column.Name)] = true
 	}
 
-	// Filter conflict columns to remove non unique columns
+	// Filter conflict columns to remove non unique columns and columns not a part of the INSERT
 	var filteredConflictColumns []clause.Column
 	for _, conflictCol := range conflictColumns {
 		field := stmt.Schema.LookUpField(conflictCol.Name)
-		if valuesColumnMap[strings.ToUpper(conflictCol.Name)] && (field.Unique || field.AutoIncrement) {
+		if valuesColumnMap[strings.ToUpper(conflictCol.Name)] && fieldCanConflict(field, schema) {
 			filteredConflictColumns = append(filteredConflictColumns, conflictCol)
 		}
 	}
 
 	// Check if we have any usable conflict columns
 	if len(filteredConflictColumns) == 0 {
-		buildBulkInsertOnlyPLSQL(db, createValues)
+		buildBulkInsertOnlyPLSQL(db, createValues, bindMap)
 		return
 	}
 
@@ -294,13 +363,7 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 
 	// Create array types and variables for each column
 	for i, column := range createValues.Columns {
-		var arrayType string
-		if field := findFieldByDBName(schema, column.Name); field != nil {
-			arrayType = getOracleArrayType(field, pluck(createValues.Values, i))
-		} else {
-			arrayType = "TABLE OF VARCHAR2(4000)"
-		}
-
+		arrayType := getOracleArrayType(bindMap.variableMap[column.Name])
 		plsqlBuilder.WriteString(fmt.Sprintf("  TYPE t_col_%d_array IS %s;\n", i, arrayType))
 		plsqlBuilder.WriteString(fmt.Sprintf("  l_col_%d_array t_col_%d_array;\n", i, i))
 	}
@@ -308,14 +371,14 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 	plsqlBuilder.WriteString("BEGIN\n")
 
 	// Initialize arrays with values
-	for i := range createValues.Columns {
+	for i, column := range createValues.Columns {
 		plsqlBuilder.WriteString(fmt.Sprintf("  l_col_%d_array := t_col_%d_array(", i, i))
-		for j, values := range createValues.Values {
+		for j, value := range bindMap.variableMap[column.Name] {
 			if j > 0 {
 				plsqlBuilder.WriteString(", ")
 			}
 			plsqlBuilder.WriteString(fmt.Sprintf(":%d", len(stmt.Vars)+1))
-			stmt.Vars = append(stmt.Vars, convertValue(values[i]))
+			stmt.Vars = append(stmt.Vars, value)
 		}
 		plsqlBuilder.WriteString(");\n")
 	}
@@ -517,7 +580,7 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 				if isJSONField(field) {
 					if isRawMessageField(field) {
 						// Column is a BLOB, return raw bytes; no JSON_SERIALIZE
-						stmt.Vars = append(stmt.Vars, sql.Out{Dest: new([]byte)})
+						stmt.Vars = append(stmt.Vars, sql.Out{Dest: &godror.Lob{IsClob: false}})
 						plsqlBuilder.WriteString(fmt.Sprintf(
 							"  IF l_affected_records.COUNT > %d THEN :%d := l_affected_records(%d).",
 							rowIdx, outParamIndex+1, rowIdx+1,
@@ -526,7 +589,7 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 						plsqlBuilder.WriteString("; END IF;\n")
 					} else {
 						// datatypes.JSON (text-based) -> serialize to CLOB
-						stmt.Vars = append(stmt.Vars, sql.Out{Dest: new(string)})
+						stmt.Vars = append(stmt.Vars, sql.Out{Dest: &godror.Lob{IsClob: true}})
 						plsqlBuilder.WriteString(fmt.Sprintf(
 							"  IF l_affected_records.COUNT > %d THEN :%d := JSON_SERIALIZE(l_affected_records(%d).",
 							rowIdx, outParamIndex+1, rowIdx+1,
@@ -535,7 +598,16 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 						plsqlBuilder.WriteString(" RETURNING CLOB); END IF;\n")
 					}
 				} else {
-					stmt.Vars = append(stmt.Vars, sql.Out{Dest: createTypedDestination(field)})
+					fieldType := createTypedDestination(field)
+					if bindMap.lobColumns[column] {
+						switch fieldType.(type) {
+						case *[]uint8:
+							fieldType = &godror.Lob{IsClob: false}
+						case *string:
+							fieldType = &godror.Lob{IsClob: true}
+						}
+					}
+					stmt.Vars = append(stmt.Vars, sql.Out{Dest: fieldType})
 					plsqlBuilder.WriteString(fmt.Sprintf("  IF l_affected_records.COUNT > %d THEN :%d := l_affected_records(%d).", rowIdx, outParamIndex+1, rowIdx+1))
 					db.QuoteTo(&plsqlBuilder, column)
 					plsqlBuilder.WriteString("; END IF;\n")
@@ -564,7 +636,7 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 }
 
 // Build PL/SQL block for bulk INSERT only (no conflict handling)
-func buildBulkInsertOnlyPLSQL(db *gorm.DB, createValues clause.Values) {
+func buildBulkInsertOnlyPLSQL(db *gorm.DB, createValues clause.Values, bindMap plsqlBindVariableMap) {
 	stmt := db.Statement
 	schema := stmt.Schema
 
@@ -577,13 +649,7 @@ func buildBulkInsertOnlyPLSQL(db *gorm.DB, createValues clause.Values) {
 
 	// Create array types and variables for each column
 	for i, column := range createValues.Columns {
-		var arrayType string
-		if field := findFieldByDBName(schema, column.Name); field != nil {
-			arrayType = getOracleArrayType(field, pluck(createValues.Values, i))
-		} else {
-			arrayType = "TABLE OF VARCHAR2(4000)"
-		}
-
+		arrayType := getOracleArrayType(bindMap.variableMap[column.Name])
 		plsqlBuilder.WriteString(fmt.Sprintf("  TYPE t_col_%d_array IS %s;\n", i, arrayType))
 		plsqlBuilder.WriteString(fmt.Sprintf("  l_col_%d_array t_col_%d_array;\n", i, i))
 	}
@@ -591,14 +657,14 @@ func buildBulkInsertOnlyPLSQL(db *gorm.DB, createValues clause.Values) {
 	plsqlBuilder.WriteString("BEGIN\n")
 
 	// Initialize arrays with values
-	for i := range createValues.Columns {
+	for i, column := range createValues.Columns {
 		plsqlBuilder.WriteString(fmt.Sprintf("  l_col_%d_array := t_col_%d_array(", i, i))
-		for j, values := range createValues.Values {
+		for j, value := range bindMap.variableMap[column.Name] {
 			if j > 0 {
 				plsqlBuilder.WriteString(", ")
 			}
 			plsqlBuilder.WriteString(fmt.Sprintf(":%d", len(stmt.Vars)+1))
-			stmt.Vars = append(stmt.Vars, convertValue(values[i]))
+			stmt.Vars = append(stmt.Vars, value)
 		}
 		plsqlBuilder.WriteString(");\n")
 	}
@@ -649,21 +715,30 @@ func buildBulkInsertOnlyPLSQL(db *gorm.DB, createValues clause.Values) {
 				if isJSONField(field) {
 					if isRawMessageField(field) {
 						// Column is a BLOB, return raw bytes; no JSON_SERIALIZE
-						stmt.Vars = append(stmt.Vars, sql.Out{Dest: new([]byte)})
+						stmt.Vars = append(stmt.Vars, sql.Out{Dest: &godror.Lob{IsClob: false}})
 						plsqlBuilder.WriteString(fmt.Sprintf(
 							"  IF l_inserted_records.COUNT > %d THEN :%d := l_inserted_records(%d).%s; END IF;\n",
 							rowIdx, outParamIndex+1, rowIdx+1, quotedColumn,
 						))
 					} else {
 						// datatypes.JSON (text-based) -> serialize to CLOB
-						stmt.Vars = append(stmt.Vars, sql.Out{Dest: new(string)})
+						stmt.Vars = append(stmt.Vars, sql.Out{Dest: &godror.Lob{IsClob: true}})
 						plsqlBuilder.WriteString(fmt.Sprintf(
 							"  IF l_inserted_records.COUNT > %d THEN :%d := JSON_SERIALIZE(l_inserted_records(%d).%s RETURNING CLOB); END IF;\n",
 							rowIdx, outParamIndex+1, rowIdx+1, quotedColumn,
 						))
 					}
 				} else {
-					stmt.Vars = append(stmt.Vars, sql.Out{Dest: createTypedDestination(field)})
+					fieldType := createTypedDestination(field)
+					if bindMap.lobColumns[column] {
+						switch fieldType.(type) {
+						case *[]uint8:
+							fieldType = &godror.Lob{IsClob: false}
+						case *string:
+							fieldType = &godror.Lob{IsClob: true}
+						}
+					}
+					stmt.Vars = append(stmt.Vars, sql.Out{Dest: fieldType})
 					plsqlBuilder.WriteString(fmt.Sprintf(
 						"  IF l_inserted_records.COUNT > %d THEN :%d := l_inserted_records(%d).%s; END IF;\n",
 						rowIdx, outParamIndex+1, rowIdx+1, quotedColumn,
@@ -1015,4 +1090,32 @@ func pluck[T any, N int](data [][]T, col int) []T {
 		out[i] = data[i][col]
 	}
 	return out
+}
+
+// fieldCanConflict checks if a field can be used as a conflict target in PL/SQL MERGE statements.
+// A field can be used as a conflict target if it is contains unique values. This includes primary key fields
+// and unique fields. However, in cases of composite primary keys where the identity column is auto-incremented,
+// even a primary key field cannot be used as a conflict target, as the auto-incremented primary key will ensure
+// a unique row.
+func fieldCanConflict(field *schema.Field, schema *schema.Schema) bool {
+	if field.PrimaryKey {
+		if schema != nil && schema.PrioritizedPrimaryField != nil && schema.PrioritizedPrimaryField.AutoIncrement {
+			// If the auto-incremented primary key is among the createValues, then it *can* be a conflict target
+			if schema.PrioritizedPrimaryField.Name == field.Name {
+				return true
+			}
+			return false
+		}
+		for _, primaryField := range schema.PrimaryFields {
+			if primaryField.AutoIncrement {
+				// If the auto-incremented primary key is among the createValues, then it *can* be a conflict target
+				if primaryField.Name == field.Name {
+					return true
+				}
+				return false
+			}
+		}
+		return true
+	}
+	return field.Unique
 }
