@@ -42,6 +42,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -193,8 +194,17 @@ func (m Migrator) CreateTable(values ...interface{}) error {
 			}
 
 			for _, chk := range stmt.Schema.ParseCheckConstraints() {
+				constraintSQL := chk.Constraint
+
+				// Quote column names that appear in the constraint
+				for _, f := range stmt.Schema.Fields {
+					if strings.Contains(constraintSQL, f.DBName) {
+						re := regexp.MustCompile(`\b` + regexp.QuoteMeta(f.DBName) + `\b`)
+						constraintSQL = re.ReplaceAllString(constraintSQL, QuoteIdentifier(f.DBName))
+					}
+				}
 				createTableSQL += "CONSTRAINT ? CHECK (?),"
-				values = append(values, clause.Column{Name: chk.Name}, clause.Expr{SQL: chk.Constraint})
+				values = append(values, clause.Column{Name: chk.Name}, clause.Expr{SQL: constraintSQL})
 			}
 
 			createTableSQL = strings.TrimSuffix(createTableSQL, ",")

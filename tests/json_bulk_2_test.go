@@ -405,7 +405,6 @@ func TestUnicodeJSON(t *testing.T) {
 }
 
 func TestJSONStrict(t *testing.T) {
-	t.Skip("Skipping due to issue #100")
 	type StrictJSONRecord struct {
 		ID      uint           `gorm:"primaryKey;autoIncrement;column:record_id"`
 		DocJson datatypes.JSON `gorm:"type:CLOB;column:doc;check:doc_is_json_strict,doc IS JSON (STRICT)"`
@@ -422,7 +421,6 @@ func TestJSONStrict(t *testing.T) {
 }
 
 func TestJSONLAX(t *testing.T) {
-	t.Skip("Skipping due to issue #100")
 	type LaxJSONRecord struct {
 		ID  uint           `gorm:"primaryKey;autoIncrement;column:record_id"`
 		Doc datatypes.JSON `gorm:"type:CLOB;column:doc;check:doc_is_json_lax,doc IS JSON(LAX)"`
