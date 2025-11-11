@@ -48,6 +48,8 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+
+	"github.com/oracle-samples/gorm-oracle/oracle"
 )
 
 func TestWithSingleConnection(t *testing.T) {
@@ -272,4 +274,15 @@ func TestConnectionPing(t *testing.T) {
 	if err != nil {
 		t.Errorf("Database ping with context failed: %v", err)
 	}
+}
+
+func TestServerVersion(t *testing.T) {
+	version, err := oracle.GetServerVersion(DB)
+	if err != nil {
+		t.Errorf("Failed to get server version: %v", err)
+	}
+	if version <= 0 {
+		t.Errorf("Invalid server version: %d", version)
+	}
+	t.Logf("Database server version: %d", version)
 }

@@ -67,6 +67,7 @@ type Config struct {
 	Conn                 *sql.DB
 	DefaultStringSize    uint
 	SkipQuoteIdentifiers bool
+	ServerVersion        int
 }
 
 type Dialector struct {
@@ -133,6 +134,12 @@ func (d Dialector) Initialize(db *gorm.DB) (err error) {
 		return err
 	}
 
+	version, err := GetServerVersion(db)
+	if err != nil {
+		return err
+	}
+	d.Config.ServerVersion = version
+
 	return nil
 }
 
@@ -188,7 +195,9 @@ func (d Dialector) getStringType(field *schema.Field) string {
 }
 
 func (d Dialector) getBooleanType() string {
-	// Oracle doesn't support BOOLEAN in CREATE TABLE, use NUMBER(1) instead
+	if d.Config.ServerVersion >= 23 {
+		return "BOOLEAN"
+	}
 	return "NUMBER(1)"
 }
 
@@ -293,4 +302,41 @@ func (d Dialector) SavePoint(tx *gorm.DB, name string) error {
 func (d Dialector) RollbackTo(tx *gorm.DB, name string) error {
 	tx.Exec("ROLLBACK TO SAVEPOINT " + name)
 	return tx.Error
+}
+
+// GetServerVersion retrieves the Oracle server version as an integer.
+func GetServerVersion(db *gorm.DB) (int, error) {
+	sqlDB, err := db.DB()
+	if err != nil {
+		return 0, err
+	}
+	rows, err := sqlDB.Query("SELECT banner FROM v$version")
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var banner string
+		err = rows.Scan(&banner)
+		if err != nil {
+			return 0, err
+		}
+		// Parse banner
+		if strings.Contains(banner, "Oracle") && strings.Contains(banner, "Release") {
+			parts := strings.Split(banner, " ")
+			for i, p := range parts {
+				if p == "Release" && i+1 < len(parts) {
+					rel := parts[i+1]
+					dotPos := strings.Index(rel, ".")
+					if dotPos != -1 {
+						version, perr := strconv.Atoi(rel[:dotPos])
+						if perr == nil {
+							return version, nil
+						}
+					}
+				}
+			}
+		}
+	}
+	return 0, fmt.Errorf("could not find version in banners")
 }
