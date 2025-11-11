@@ -2,14 +2,13 @@ module github.com/oracle-samples/gorm-oracle/tests
 
 go 1.25.4
 
-require gorm.io/gorm v1.31.1
-
 require (
 	github.com/godror/godror v0.49.4
 	github.com/google/uuid v1.6.0
-	github.com/oracle-samples/gorm-oracle v1.0.0
+	github.com/oracle-samples/gorm-oracle v1.1.0
 	github.com/stretchr/testify v1.11.1
 	gorm.io/datatypes v1.2.7
+	gorm.io/gorm v1.31.1
 )
 
 require (
