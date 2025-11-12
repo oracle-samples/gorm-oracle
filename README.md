@@ -1,21 +1,31 @@
 # GORM Driver for Oracle
 
-The GORM Driver for Oracle provides support for Oracle databases, enabling full compatibility with GORM's ORM capabilities. It is built on top of the [Go DRiver for ORacle (Godror)](https://github.com/godror/godror) and supports key features such as auto migrations, associations, transactions, and advanced querying.
+The GORM Driver for Oracle provides support for Oracle Database, enabling full compatibility with GORM's ORM capabilities. It is built on top of the [Go Driver for Oracle (Godror)](https://github.com/godror/godror) and supports key features such as auto migrations, associations, transactions, and advanced querying.
 
-## Prerequisite
+### Prerequisite: Install Instant Client
 
-### Install Instant Client
+To use ODPI-C with Godror, you’ll need to install the Oracle Instant Client on your system. Follow the steps on [this page](https://odpi-c.readthedocs.io/en/latest/user_guide/installation.html) to complete the installation.
 
-To use ODPI-C with Godror, you’ll need to install the Oracle Instant Client on your system.
+After that, you can connect to the database using the `dataSourceName`, which specifies connection parameters (such as username and password) using a logfmt-encoded parameter list.
 
-Follow the steps on [this page](https://odpi-c.readthedocs.io/en/latest/user_guide/installation.html) complete the installation.
+The way you specify the Instant Client directory differs by platform:
 
-After that, use a logfmt-encoded parameter list to specify the instant client directory in the `dataSourceName` when you connect to the database. For example:
+- macOS and Windows: You can set the `libDir` parameter in the dataSourceName.
+- Linux: The libraries must be in the system library search path before your Go process starts, preferably configured with "ldconfig". The libDir parameter does not work on Linux.
 
-```go
-dsn := `user="scott" password="tiger" 
-        connectString="[host]:[port]/cdb1_pdb1.regress.rdbms.dev.us.oracle.com"
-        libDir="/Path/to/your/instantclient_23_8"`
+#### Example (macOS/Windows)
+
+``` go
+dataSourceName := `user="scott" password="tiger" 
+                   connectString="dbhost:1521/orclpdb1"
+                   libDir="/Path/to/your/instantclient_23_26"`
+```
+
+#### Example (Linux)
+
+``` go
+dataSourceName := `user="scott" password="tiger" 
+                   connectString="dbhost:1521/orclpdb1"`
 ```
 
 ## Getting Started
@@ -24,15 +34,14 @@ dsn := `user="scott" password="tiger"
 package main
 
 import (
-        "github.com/oracle-samples/gorm-oracle/oracle"
-        "gorm.io/gorm"
+  "github.com/oracle-samples/gorm-oracle/oracle"
+  "gorm.io/gorm"
 )
 
 func main() {
-        dsn := `user="scott" password="tiger"
-                connectString="[host]:[port]/cdb1_pdb1.regress.rdbms.dev.us.oracle.com"
-                libDir="/Path/to/your/instantclient_23_8"`
-        db, err := gorm.Open(oracle.Open(dsn), &gorm.Config{})
+  dataSourceName := `user="scott" password="tiger"
+                     connectString="dbhost:1521/orclpdb1"`
+  db, err := gorm.Open(oracle.Open(dataSourceName), &gorm.Config{})
 }
 ```
 
