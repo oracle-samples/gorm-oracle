@@ -41,9 +41,8 @@ package oracle
 import (
 	"bytes"
 	"database/sql"
+	"database/sql/driver"
 	"encoding/json"
-	"fmt"
-	"math"
 	"reflect"
 	"strings"
 	"time"
@@ -52,50 +51,50 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"gorm.io/gorm/schema"
 )
 
 // Extra data types for the data type that are not declared in the
 // default DataType list
 const (
-	JSON                  schema.DataType = "json"
 	Timestamp             schema.DataType = "timestamp"
 	TimestampWithTimeZone schema.DataType = "timestamp with time zone"
 )
 
 // Helper function to get Oracle array type for a field
-func getOracleArrayType(field *schema.Field, values []any) string {
-	switch field.DataType {
-	case schema.Bool:
-		return "TABLE OF NUMBER(1)"
-	case schema.Int, schema.Uint:
-		return "TABLE OF NUMBER"
-	case schema.Float:
-		return "TABLE OF NUMBER"
-	case JSON:
-		// PL/SQL does not yet allow declaring collections of JSON (TABLE OF JSON) directly.
-		// Workaround for JSON type
-		fallthrough
-	case schema.String:
-		if field.Size > 0 && field.Size <= 4000 {
-			return fmt.Sprintf("TABLE OF VARCHAR2(%d)", field.Size)
-		} else {
-			for _, value := range values {
-				if strValue, ok := value.(string); ok {
-					if len(strValue) > 4000 {
-						return "TABLE OF CLOB"
-					}
-				}
+func getOracleArrayType(values []any) string {
+	arrayType := "TABLE OF VARCHAR2(4000)"
+	for _, val := range values {
+		if val == nil {
+			continue
+		}
+		switch v := val.(type) {
+		case bool:
+			arrayType = "TABLE OF NUMBER(1)"
+		case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64:
+			arrayType = "TABLE OF NUMBER"
+		case time.Time:
+			arrayType = "TABLE OF TIMESTAMP WITH TIME ZONE"
+		case godror.Lob:
+			if v.IsClob {
+				return "TABLE OF CLOB"
+			} else {
+				return "TABLE OF BLOB"
+			}
+		case []byte:
+			// Store byte slices longer than 4000 bytes as BLOB
+			if len(v) > 4000 {
+				return "TABLE OF BLOB"
+			}
+		case string:
+			// Store strings longer than 4000 characters as CLOB
+			if len(v) > 4000 {
+				return "TABLE OF CLOB"
 			}
 		}
-		return "TABLE OF VARCHAR2(4000)"
-	case schema.Time:
-		return "TABLE OF TIMESTAMP WITH TIME ZONE"
-	case schema.Bytes:
-		return "TABLE OF BLOB"
-	default:
-		return "TABLE OF " + strings.ToUpper(string(field.DataType))
 	}
+	return arrayType
 }
 
 // Helper function to get all column names for a table
@@ -129,6 +128,12 @@ func findFieldByDBName(schema *schema.Schema, dbName string) *schema.Field {
 func createTypedDestination(f *schema.Field) interface{} {
 	if f == nil {
 		return new(string)
+	}
+
+	// To differentiate between bool fields stored as NUMBER(1) and bool fields stored as actual BOOLEAN type,
+	// check the struct's "type" tag.
+	if f.DataType == "boolean" {
+		return new(bool)
 	}
 
 	// If the field has a serializer, the field type may not be directly related to the column type in the database.
@@ -204,13 +209,17 @@ func createTypedDestination(f *schema.Field) interface{} {
 
 	case reflect.Float32, reflect.Float64:
 		return new(float64)
+
+	case reflect.Slice:
+		if ft.Elem().Kind() == reflect.Uint8 { // []byte
+			return new([]byte)
+		}
 	}
 
 	// Fallback
 	return new(string)
 }
 
-// Convert values for Oracle-specific types
 func convertValue(val interface{}) interface{} {
 	if val == nil {
 		return nil
@@ -225,6 +234,10 @@ func convertValue(val interface{}) interface{} {
 	for rv.Kind() == reflect.Ptr && !rv.IsNil() {
 		rv = rv.Elem()
 		val = rv.Interface()
+	}
+	isNil := false
+	if rv.Kind() == reflect.Ptr && rv.IsNil() {
+		isNil = true
 	}
 
 	switch v := val.(type) {
@@ -242,7 +255,7 @@ func convertValue(val interface{}) interface{} {
 	case *uuid.UUID, *datatypes.UUID:
 		// Convert nil pointer to a UUID to empty string so that it is stored in the database as NULL
 		// rather than "00000000-0000-0000-0000-000000000000"
-		if rv.IsNil() {
+		if isNil {
 			return ""
 		}
 		return val
@@ -253,15 +266,31 @@ func convertValue(val interface{}) interface{} {
 			return 0
 		}
 	case string:
-		if len(v) > math.MaxInt16 {
+		// Store strings longer than 4000 characters as CLOB
+		if len(v) > 4000 {
 			return godror.Lob{IsClob: true, Reader: strings.NewReader(v)}
 		}
 		return v
 	case []byte:
-		if len(v) > math.MaxInt16 {
+		// Store byte slices longer than 4000 bytes as BLOB
+		if len(v) > 4000 {
 			return godror.Lob{IsClob: false, Reader: bytes.NewReader(v)}
 		}
 		return v
+	case driver.Valuer:
+		// Unwrap driver.Valuer to its underlying type by recursing into
+		// convertValue until we get a non-Valuer type
+		if v == nil || isNil {
+			return val
+		}
+		unwrappedValue, err := v.Value()
+		if err != nil {
+			return val
+		}
+		return convertValue(unwrappedValue)
+	case clause.Expr:
+		// If we get a clause.Expr, convert it to nil; it should be handled elsewhere
+		return nil
 	default:
 		return val
 	}
@@ -287,6 +316,13 @@ func convertFromOracleToField(value interface{}, field *schema.Field) interface{
 	isPtr := field.FieldType.Kind() == reflect.Ptr
 	if isPtr {
 		targetType = field.FieldType.Elem()
+	}
+
+	// When PL/SQL LOBs are returned, skip conversion.
+	// LOB addresses are freed by the driver after the query, so we cannot read their content
+	// from the return value. If you need to read stored LOB content, do it in a separate query.
+	if _, ok := value.(godror.Lob); ok {
+		return nil
 	}
 
 	switch targetType {
@@ -322,6 +358,16 @@ func convertFromOracleToField(value interface{}, field *schema.Field) interface{
 		default:
 			converted = value
 		}
+	case reflect.TypeOf(uuid.UUID{}), reflect.TypeOf(datatypes.UUID{}):
+		uuidStr, ok := value.(string)
+		if !ok {
+			return nil
+		}
+		parsed, err := uuid.Parse(uuidStr)
+		if err != nil {
+			return nil
+		}
+		converted = parsed
 
 	case reflect.TypeOf(time.Time{}):
 		switch vv := value.(type) {
@@ -392,6 +438,12 @@ func convertFromOracleToField(value interface{}, field *schema.Field) interface{
 }
 
 func isJSONField(f *schema.Field) bool {
+	// Support detecting JSON fields through the struct's "type" tag.
+	// Also support jsonb for compatibility with other databases.
+	if f.DataType == "json" || f.DataType == "jsonb" {
+		return true
+	}
+
 	_rawMsgT := reflect.TypeOf(json.RawMessage{})
 	_gormJSON := reflect.TypeOf(datatypes.JSON{})
 	if f == nil {

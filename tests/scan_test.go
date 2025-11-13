@@ -205,34 +205,6 @@ func TestScanRows(t *testing.T) {
 }
 
 func TestScanRowsNullValuesScanToFieldDefault(t *testing.T) {
-	DB.Save(&User{})
-
-	rows, err := DB.Table("users").
-		Select(`
-			NULL AS bool_field,
-			NULL AS int_field,
-			NULL AS int8_field,
-			NULL AS int16_field,
-			NULL AS int32_field,
-			NULL AS int64_field,
-			NULL AS uint_field,
-			NULL AS uint8_field,
-			NULL AS uint16_field,
-			NULL AS uint32_field,
-			NULL AS uint64_field,
-			NULL AS float32_field,
-			NULL AS float64_field,
-			NULL AS string_field,
-			NULL AS time_field,
-			NULL AS time_ptr_field,
-			NULL AS embedded_int_field,
-			NULL AS nested_embedded_int_field,
-			NULL AS embedded_ptr_int_field
-        `).Rows()
-	if err != nil {
-		t.Errorf("No error should happen, got %v", err)
-	}
-
 	type NestedEmbeddedStruct struct {
 		NestedEmbeddedIntField            int
 		NestedEmbeddedIntFieldWithDefault int `gorm:"default:2"`
@@ -267,6 +239,18 @@ func TestScanRowsNullValuesScanToFieldDefault(t *testing.T) {
 		TimePtrField       *time.Time
 		EmbeddedStruct     `gorm:"embedded"`
 		*EmbeddedPtrStruct `gorm:"embedded"`
+	}
+
+	DB.Migrator().DropTable(&Result{})
+	DB.Migrator().CreateTable(&Result{})
+
+	DB.Exec("INSERT INTO \"results\"" +
+		" (\"bool_field\",\"int_field\",\"int8_field\",\"int16_field\",\"int32_field\",\"int64_field\",\"uint_field\",\"uint8_field\",\"uint16_field\",\"uint32_field\",\"uint64_field\",\"float32_field\",\"float64_field\",\"string_field\",\"time_field\",\"time_ptr_field\",\"embedded_int_field\",\"nested_embedded_int_field\",\"nested_embedded_int_field_with_default\",\"embedded_ptr_int_field\")" +
+		" VALUES (NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL)")
+
+	rows, err := DB.Model(&Result{}).Select("*").Rows()
+	if err != nil {
+		t.Errorf("No error should happen, got %v", err)
 	}
 
 	currTime := time.Now()

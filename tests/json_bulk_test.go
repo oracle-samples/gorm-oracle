@@ -39,6 +39,7 @@
 package tests
 
 import (
+	"database/sql/driver"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -961,4 +962,105 @@ func TestJSONRootArray(t *testing.T) {
 	if len(arr) != 2 || arr[0] != 1 || arr[1] != 2 {
 		t.Fatalf("unexpected array content after appends: %#v", arr)
 	}
+}
+
+func TestCustomJSON(t *testing.T) {
+	type CustomJSONModel struct {
+		Blah string       `gorm:"primaryKey"`
+		Data AttributeMap `gorm:"type:json"`
+	}
+
+	type test struct {
+		model any
+		fn    func(model any) error
+	}
+	tests := map[string]test{
+		"Single": {
+			model: []CustomJSONModel{
+				{
+					Blah: "1",
+					Data: AttributeMap{"Data": strings.Repeat("X", 32768)},
+				},
+			},
+			fn: func(model any) error {
+				return DB.Clauses(clause.OnConflict{
+					UpdateAll: true,
+				}).CreateInBatches(model, 1000).Error
+			},
+		},
+		"SingleBatch": {
+			model: []CustomJSONModel{
+				{
+					Blah: "1",
+					Data: AttributeMap{"Data": strings.Repeat("X", 32768)},
+				},
+				{
+					Blah: "2",
+					Data: AttributeMap{"Data": strings.Repeat("Y", 3)},
+				},
+			},
+			fn: func(model any) error {
+				return DB.Clauses(clause.OnConflict{
+					UpdateAll: true,
+				}).CreateInBatches(model, 1000).Error
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			DB.Migrator().DropTable(&CustomJSONModel{})
+			if err := DB.Set("gorm:table_options", "TABLESPACE SYSAUX").AutoMigrate(&CustomJSONModel{}); err != nil {
+				t.Fatalf("migrate failed: %v", err)
+			}
+			err := tc.fn(tc.model)
+			if err != nil {
+				t.Fatalf("Failed to create CLOB record with ON CONFLICT: %v", err)
+			}
+		})
+	}
+}
+
+func scanBytes(src interface{}) ([]byte, bool) {
+	if stringer, ok := src.(fmt.Stringer); ok {
+		return []byte(stringer.String()), true
+	}
+	bytes, ok := src.([]byte)
+	if !ok {
+		return nil, false
+	}
+	return bytes, true
+}
+
+type AttributeMap map[string]interface{}
+
+func (a AttributeMap) Value() (driver.Value, error) {
+	attrs := a
+	if attrs == nil {
+		attrs = AttributeMap{}
+	}
+	value, err := json.Marshal(attrs)
+	return value, err
+}
+
+func (a *AttributeMap) Scan(src interface{}) error {
+	bytes, ok := scanBytes(src)
+	if !ok {
+		return fmt.Errorf("failed to scan attribute map")
+	}
+	var raw interface{}
+	err := json.Unmarshal(bytes, &raw)
+	if err != nil {
+		return err
+	}
+
+	if raw == nil {
+		*a = map[string]interface{}{}
+		return nil
+	}
+	*a, ok = raw.(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("failed to convert attribute map from json")
+	}
+	return nil
 }
