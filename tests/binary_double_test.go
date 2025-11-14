@@ -44,6 +44,13 @@ import (
 	"testing"
 )
 
+const (
+	// doubleComparisonEpsilon is used for direct value comparison
+	doubleComparisonEpsilon = 1e-15
+	// doubleAggregateEpsilon is used for aggregate operations (SUM, AVG, etc.)
+	doubleAggregateEpsilon = 1e-10
+)
+
 type BinaryDoubleTest struct {
 	ID             uint         `gorm:"column:ID;primaryKey"`
 	DoubleValue    float64      `gorm:"column:DOUBLE_VALUE;type:BINARY_DOUBLE"`
@@ -74,7 +81,7 @@ func TestBinaryDoubleBasicCRUD(t *testing.T) {
 		t.Fatalf("fetch failed: %v", err)
 	}
 	
-	if math.Abs(got.DoubleValue - testValue) > 1e-15 {
+	if math.Abs(got.DoubleValue - testValue) > doubleComparisonEpsilon {
 		t.Errorf("expected %v, got %v", testValue, got.DoubleValue)
 	}
 
@@ -89,7 +96,7 @@ func TestBinaryDoubleBasicCRUD(t *testing.T) {
 	if err := DB.First(&updated, bd1.ID).Error; err != nil {
 		t.Fatalf("fetch after update failed: %v", err)
 	}
-	if math.Abs(updated.DoubleValue - newValue) > 1e-15 {
+	if math.Abs(updated.DoubleValue - newValue) > doubleComparisonEpsilon {
 		t.Errorf("expected %v after update, got %v", newValue, updated.DoubleValue)
 	}
 
@@ -153,7 +160,7 @@ func TestBinaryDoubleSpecialValues(t *testing.T) {
 					t.Errorf("expected 0, got %v", got.DoubleValue)
 				}
 			} else {
-				if math.Abs(got.DoubleValue - tc.value) > 1e-15 {
+				if math.Abs(got.DoubleValue - tc.value) > doubleComparisonEpsilon {
 					t.Errorf("expected %v, got %v", tc.value, got.DoubleValue)
 				}
 			}
@@ -198,7 +205,7 @@ func TestBinaryDoubleNullableColumn(t *testing.T) {
 	}
 	if got2.NullableDouble == nil {
 		t.Error("expected non-NULL value")
-	} else if math.Abs(*got2.NullableDouble - val) > 1e-15 {
+	} else if math.Abs(*got2.NullableDouble - val) > doubleComparisonEpsilon {
 		t.Errorf("expected %v, got %v", val, *got2.NullableDouble)
 	}
 
@@ -236,7 +243,7 @@ func TestBinaryDoubleSQLNullFloat(t *testing.T) {
 	if !got1.SQLNullFloat.Valid {
 		t.Error("expected Valid to be true")
 	}
-	if math.Abs(got1.SQLNullFloat.Float64 - 123.456) > 1e-15 {
+	if math.Abs(got1.SQLNullFloat.Float64 - 123.456) > doubleComparisonEpsilon {
 		t.Errorf("expected 123.456, got %v", got1.SQLNullFloat.Float64)
 	}
 
@@ -277,7 +284,7 @@ func TestBinaryDoubleArithmeticOperations(t *testing.T) {
 		t.Fatalf("failed to calculate SUM: %v", err)
 	}
 	expectedSum := 10.5 + 20.3 + 30.7 + 40.1 + 50.9
-	if math.Abs(sum - expectedSum) > 1e-10 {
+	if math.Abs(sum - expectedSum) > doubleAggregateEpsilon {
 		t.Errorf("expected sum %v, got %v", expectedSum, sum)
 	}
 
@@ -287,7 +294,7 @@ func TestBinaryDoubleArithmeticOperations(t *testing.T) {
 		t.Fatalf("failed to calculate AVG: %v", err)
 	}
 	expectedAvg := expectedSum / 5
-	if math.Abs(avg - expectedAvg) > 1e-10 {
+	if math.Abs(avg - expectedAvg) > doubleAggregateEpsilon {
 		t.Errorf("expected avg %v, got %v", expectedAvg, avg)
 	}
 
@@ -299,10 +306,10 @@ func TestBinaryDoubleArithmeticOperations(t *testing.T) {
 	if err := DB.Model(&BinaryDoubleTest{}).Select("MAX(DOUBLE_VALUE)").Scan(&max).Error; err != nil {
 		t.Fatalf("failed to calculate MAX: %v", err)
 	}
-	if math.Abs(min - 10.5) > 1e-10 {
+	if math.Abs(min - 10.5) > doubleAggregateEpsilon {
 		t.Errorf("expected min 10.5, got %v", min)
 	}
-	if math.Abs(max - 50.9) > 1e-10 {
+	if math.Abs(max - 50.9) > doubleAggregateEpsilon {
 		t.Errorf("expected max 50.9, got %v", max)
 	}
 }
