@@ -642,6 +642,7 @@ func (m Migrator) FullDataTypeOf(field *schema.Field) (expr clause.Expr) {
 // Builds Oracle-compatible default values from string
 func (m Migrator) buildOracleDefault(defaultValue string) string {
 	defaultValue = strings.TrimSpace(defaultValue)
+	dialector := m.Dialector.(Dialector)
 
 	if defaultValue == "" {
 		return ""
@@ -656,8 +657,14 @@ func (m Migrator) buildOracleDefault(defaultValue string) string {
 	case "SYSDATE":
 		return "DEFAULT SYSDATE"
 	case "TRUE":
+		if dialector.Config.ServerVersion >= 23 {
+			return "DEFAULT TRUE"
+		}
 		return "DEFAULT 1"
 	case "FALSE":
+		if dialector.Config.ServerVersion >= 23 {
+			return "DEFAULT FALSE"
+		}
 		return "DEFAULT 0"
 	}
 
@@ -689,8 +696,15 @@ func (m Migrator) buildOracleDefault(defaultValue string) string {
 
 // Build Oracle-compatible default values from Go interface
 func (m Migrator) buildOracleDefaultFromInterface(value interface{}) string {
+	dialector := m.Dialector.(Dialector)
 	switch v := value.(type) {
 	case bool:
+		if dialector.Config.ServerVersion >= 23 {
+			if v {
+				return "DEFAULT TRUE"
+			}
+			return "DEFAULT FALSE"
+		}
 		if v {
 			return "DEFAULT 1"
 		}

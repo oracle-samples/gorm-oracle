@@ -71,7 +71,7 @@ func getOracleArrayType(values []any) string {
 		}
 		switch v := val.(type) {
 		case bool:
-			arrayType = "TABLE OF NUMBER(1)"
+			arrayType = "TABLE OF BOOLEAN"
 		case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64:
 			arrayType = "TABLE OF NUMBER"
 		case time.Time:
@@ -132,7 +132,7 @@ func createTypedDestination(f *schema.Field) interface{} {
 
 	// To differentiate between bool fields stored as NUMBER(1) and bool fields stored as actual BOOLEAN type,
 	// check the struct's "type" tag.
-	if f.DataType == "boolean" {
+	if string(f.DataType) == "bool" || string(f.DataType) == "boolean" {
 		return new(bool)
 	}
 
@@ -199,7 +199,7 @@ func createTypedDestination(f *schema.Field) interface{} {
 		return new(string)
 
 	case reflect.Bool:
-		return new(int64)
+		return new(bool)
 
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		return new(int64)
@@ -470,6 +470,9 @@ func isRawMessageField(f *schema.Field) bool {
 func convertPrimitiveType(value interface{}, targetType reflect.Type) interface{} {
 	switch targetType.Kind() {
 	case reflect.Bool:
+		if v, ok := value.(bool); ok {
+			return v
+		}
 		if v, ok := value.(int64); ok {
 			return v != 0
 		}

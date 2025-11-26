@@ -142,15 +142,30 @@ func TestBooleanNegativeInvalidDBValue(t *testing.T) {
 		t.Fatalf("failed to insert invalid bool: %v", err)
 	}
 
+	// Check if using native BOOLEAN or NUMBER(1)
+	var columnType string
+	DB.Raw(`SELECT DATA_TYPE FROM USER_TAB_COLUMNS 
+            WHERE TABLE_NAME = 'BOOLEAN_TESTS' AND COLUMN_NAME = 'FLAG'`).Scan(&columnType)
 	var got BooleanTest
 	err := DB.First(&got, 2001).Error
-	if err == nil {
-		t.Fatal("expected invalid boolean scan error, got nil")
-	}
-
-	if !strings.Contains(err.Error(), "invalid") &&
-		!strings.Contains(err.Error(), "convert") {
-		t.Fatalf("expected boolean conversion error, got: %v", err)
+	if columnType == "BOOLEAN" {
+		// Oracle database version above 23 native BOOLEAN accepts any number
+		if err != nil {
+			t.Fatalf("Oracle database version above 23 BOOLEAN should accept numeric value 2, got error: %v", err)
+		}
+		// Verify that 2 was treated as TRUE
+		if !got.Flag {
+			t.Errorf("expected FLAG=true for value 2 in BOOLEAN column, got false")
+		}
+	} else {
+		// Oracle database version below 23 uses NUMBER(1), should reject value 2
+		if err == nil {
+			t.Fatal("expected invalid boolean scan error, got nil")
+		}
+		if !strings.Contains(err.Error(), "invalid") &&
+			!strings.Contains(err.Error(), "convert") {
+			t.Fatalf("expected boolean conversion error, got: %v", err)
+		}
 	}
 }
 
@@ -229,9 +244,24 @@ func TestBooleanQueryMixedComparisons(t *testing.T) {
 		t.Errorf("expected at least 1 row for FLAG=1")
 	}
 
+	// Check if using native BOOLEAN or NUMBER(1)
+	var columnType string
+	DB.Raw(`SELECT DATA_TYPE FROM USER_TAB_COLUMNS 
+            WHERE TABLE_NAME = 'BOOLEAN_TESTS' AND COLUMN_NAME = 'FLAG'`).Scan(&columnType)
+
 	var gotStr []BooleanTest
-	if err := DB.Where("FLAG = 'true'").Find(&gotStr).Error; err == nil {
-		t.Errorf("expected ORA-01722 when comparing NUMBER to string literal")
+	err := DB.Where("FLAG = 'true'").Find(&gotStr).Error
+
+	if columnType == "NUMBER" {
+		// For NUMBER(1), expect error
+		if err == nil {
+			t.Errorf("expected ORA-01722 when comparing NUMBER to string literal")
+		}
+	} else {
+		// For BOOLEAN, it's valid
+		if err != nil {
+			t.Errorf("unexpected error for BOOLEAN type: %v", err)
+		}
 	}
 }
 
