@@ -360,10 +360,11 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 	plsqlBuilder.WriteString("DECLARE\n")
 	writeTableRecordCollectionDecl(db, &plsqlBuilder, stmt.Schema.DBNames, stmt.Table)
 	plsqlBuilder.WriteString("  l_affected_records t_records;\n")
+	dialector := stmt.DB.Dialector.(*Dialector) // Get dialector for version check
 
 	// Create array types and variables for each column
 	for i, column := range createValues.Columns {
-		arrayType := getOracleArrayType(bindMap.variableMap[column.Name])
+		arrayType := getOracleArrayType(bindMap.variableMap[column.Name], dialector.Config.ServerVersion)
 		plsqlBuilder.WriteString(fmt.Sprintf("  TYPE t_col_%d_array IS %s;\n", i, arrayType))
 		plsqlBuilder.WriteString(fmt.Sprintf("  l_col_%d_array t_col_%d_array;\n", i, i))
 	}
@@ -598,7 +599,7 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 						plsqlBuilder.WriteString(" RETURNING CLOB); END IF;\n")
 					}
 				} else {
-					fieldType := createTypedDestination(field)
+					fieldType := createTypedDestination(field, dialector.Config.ServerVersion)
 					if bindMap.lobColumns[column] {
 						switch fieldType.(type) {
 						case *[]uint8:
@@ -646,10 +647,11 @@ func buildBulkInsertOnlyPLSQL(db *gorm.DB, createValues clause.Values, bindMap p
 	plsqlBuilder.WriteString("DECLARE\n")
 	writeTableRecordCollectionDecl(db, &plsqlBuilder, stmt.Schema.DBNames, stmt.Table)
 	plsqlBuilder.WriteString("  l_inserted_records t_records;\n")
+	dialector := stmt.DB.Dialector.(*Dialector) // Get dialector for version check
 
 	// Create array types and variables for each column
 	for i, column := range createValues.Columns {
-		arrayType := getOracleArrayType(bindMap.variableMap[column.Name])
+		arrayType := getOracleArrayType(bindMap.variableMap[column.Name], dialector.Config.ServerVersion)
 		plsqlBuilder.WriteString(fmt.Sprintf("  TYPE t_col_%d_array IS %s;\n", i, arrayType))
 		plsqlBuilder.WriteString(fmt.Sprintf("  l_col_%d_array t_col_%d_array;\n", i, i))
 	}
@@ -729,7 +731,7 @@ func buildBulkInsertOnlyPLSQL(db *gorm.DB, createValues clause.Values, bindMap p
 						))
 					}
 				} else {
-					fieldType := createTypedDestination(field)
+					fieldType := createTypedDestination(field, dialector.Config.ServerVersion)
 					if bindMap.lobColumns[column] {
 						switch fieldType.(type) {
 						case *[]uint8:

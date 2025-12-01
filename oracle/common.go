@@ -63,7 +63,7 @@ const (
 )
 
 // Helper function to get Oracle array type for a field
-func getOracleArrayType(values []any) string {
+func getOracleArrayType(values []any, serverVersion int) string {
 	arrayType := "TABLE OF VARCHAR2(4000)"
 	for _, val := range values {
 		if val == nil {
@@ -71,7 +71,11 @@ func getOracleArrayType(values []any) string {
 		}
 		switch v := val.(type) {
 		case bool:
-			arrayType = "TABLE OF BOOLEAN"
+			if serverVersion < 23 {
+				arrayType = "TABLE OF NUMBER"
+			} else {
+				arrayType = "TABLE OF BOOLEAN"
+			}
 		case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64:
 			arrayType = "TABLE OF NUMBER"
 		case time.Time:
@@ -125,7 +129,7 @@ func findFieldByDBName(schema *schema.Schema, dbName string) *schema.Field {
 }
 
 // Create typed destination for OUT parameters
-func createTypedDestination(f *schema.Field) interface{} {
+func createTypedDestination(f *schema.Field, serverVersion int) interface{} {
 	if f == nil {
 		return new(string)
 	}
@@ -133,6 +137,10 @@ func createTypedDestination(f *schema.Field) interface{} {
 	// To differentiate between bool fields stored as NUMBER(1) and bool fields stored as actual BOOLEAN type,
 	// check the struct's "type" tag.
 	if string(f.DataType) == "bool" || string(f.DataType) == "boolean" {
+		if serverVersion < 23 {
+			return new(int64)
+		}
+		// For Oracle 23ai+,we use actual boolean type
 		return new(bool)
 	}
 
@@ -143,6 +151,9 @@ func createTypedDestination(f *schema.Field) interface{} {
 		dt := strings.ToLower(string(f.DataType))
 		switch schema.DataType(dt) {
 		case schema.Bool:
+			if serverVersion < 23 {
+				return new(int64)
+			}
 			return new(bool)
 		case schema.Uint:
 			return new(uint64)

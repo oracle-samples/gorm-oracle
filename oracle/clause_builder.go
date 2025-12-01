@@ -155,6 +155,8 @@ func ReturningClauseBuilder(c clause.Clause, builder clause.Builder) {
 			if stmt, ok := builder.(*gorm.Statement); ok {
 				builder.WriteString(" INTO ")
 
+				dialector := stmt.DB.Dialector.(*Dialector) // Get dialector for version check
+
 				// Add sql.Out parameters for each returning column
 				for idx, column := range returning.Columns {
 					if idx > 0 {
@@ -165,7 +167,7 @@ func ReturningClauseBuilder(c clause.Clause, builder clause.Builder) {
 					var dest interface{}
 					if stmt.Schema != nil {
 						if field := findFieldByDBName(stmt.Schema, column.Name); field != nil {
-							dest = createTypedDestination(field)
+							dest = createTypedDestination(field, dialector.Config.ServerVersion)
 						} else {
 							dest = new(string) // Default to string for unknown fields
 						}

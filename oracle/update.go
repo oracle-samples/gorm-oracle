@@ -457,6 +457,7 @@ func buildUpdatePLSQL(db *gorm.DB) {
 		db.AddError(fmt.Errorf("schema required for update with returning"))
 		return
 	}
+	dialector := stmt.DB.Dialector.(*Dialector)
 
 	// Get SET and WHERE clauses
 	setClause, hasSet := stmt.Clauses["SET"]
@@ -553,7 +554,7 @@ func buildUpdatePLSQL(db *gorm.DB) {
 						dest = new(string)
 					}
 				} else {
-					dest = createTypedDestination(field)
+					dest = createTypedDestination(field, dialector.Config.ServerVersion)
 				}
 				stmt.Vars = append(stmt.Vars, sql.Out{Dest: dest})
 			}

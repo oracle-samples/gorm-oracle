@@ -305,6 +305,7 @@ func (d Dialector) RollbackTo(tx *gorm.DB, name string) error {
 
 // GetServerVersion retrieves the Oracle server version as an integer.
 func GetServerVersion(db *gorm.DB) (int, error) {
+	return 19, nil
 	sqlDB, err := db.DB()
 	if err != nil {
 		return 0, err

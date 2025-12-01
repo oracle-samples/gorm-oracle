@@ -242,6 +242,7 @@ func buildBulkDeletePLSQL(db *gorm.DB) {
 		db.AddError(fmt.Errorf("schema required for bulk delete with returning"))
 		return
 	}
+	dialector := stmt.DB.Dialector.(*Dialector)
 
 	// Check if this is a soft delete model and we're not using Unscoped
 	if deletedAtField := schema.LookUpField("deleted_at"); deletedAtField != nil && !stmt.Unscoped {
@@ -312,7 +313,7 @@ func buildBulkDeletePLSQL(db *gorm.DB) {
 					}
 				} else {
 					// non-JSON as before
-					dest := createTypedDestination(field)
+					dest := createTypedDestination(field, dialector.Config.ServerVersion)
 					stmt.Vars = append(stmt.Vars, sql.Out{Dest: dest})
 					plsqlBuilder.WriteString(fmt.Sprintf("  IF l_deleted_records.COUNT > %d THEN\n", rowIdx))
 					plsqlBuilder.WriteString(fmt.Sprintf("    :%d := l_deleted_records(%d).", outParamIndex+1, rowIdx+1))
