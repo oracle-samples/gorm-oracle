@@ -335,7 +335,6 @@ func setupBooleanTestTables(t *testing.T) {
 }
 
 func TestBooleanOnConflict(t *testing.T) {
-	t.Skip("skip the test for now")
 	type test struct {
 		model any
 		fn    func(model any) error

@@ -172,6 +172,9 @@ func (d Dialector) DataTypeOf(field *schema.Field) string {
 		return d.getBLOBType()
 	default:
 		dataType := strings.ToUpper(string(field.DataType))
+		if dataType == "BOOL" || dataType == "BOOLEAN" {
+			return d.getBooleanType()
+		}
 		if dataType == "" {
 			panic("sql type cannot be empty")
 		}
