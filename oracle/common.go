@@ -44,6 +44,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"reflect"
+	"slices"
 	"strings"
 	"time"
 
@@ -707,8 +708,10 @@ func isZeroFor(t reflect.Type, v interface{}) bool {
 func filterFields(s *schema.Schema, predicate func(f *schema.Field) bool) []string {
 	var fields []string
 	for _, f := range s.Fields {
-		if predicate(f) {
-			fields = append(fields, f.DBName)
+		if slices.Contains(s.DBNames, f.DBName) {
+			if predicate(f) {
+				fields = append(fields, f.DBName)
+			}
 		}
 	}
 	return fields
