@@ -50,6 +50,7 @@ import (
 
 	"time"
 
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"gorm.io/gorm/utils/tests"
@@ -1001,4 +1002,45 @@ func TestCreateChildrenWithMixedPointers(t *testing.T) {
 		t.Fatalf("expected second child's has to be true, got %v", resultParents[0].Children[1].BoolPtr)
 	}
 
+}
+
+func TestCreateReadOnlyJson(t *testing.T) {
+	type record struct {
+		ID            string         `gorm:"column:child_id;primaryKey;type:varchar(36)"`
+		ReadOnlyField string         `gorm:"->;-:migration;column:read_only_field;type:varchar(100)"`
+		JsonTypeField datatypes.JSON `gorm:"column:json_type_field;type:json"`
+	}
+
+	json := datatypes.JSON(fmt.Sprintf(`{"key":"%s"}`, strings.Repeat("x", 4000)))
+	records := []record{
+		{
+			ID:            "1",
+			JsonTypeField: json,
+		},
+		{
+			ID: "2",
+		},
+	}
+
+	DB.Migrator().DropTable(&record{})
+	err := DB.AutoMigrate(&record{})
+	if err != nil {
+		t.Fatalf("errors happened with migrate: %v", err)
+	}
+
+	err = DB.Model(&records).Create(&records).Error
+	if err != nil {
+		t.Fatalf("errors happened when create: %v", err)
+	}
+
+	// verify records are created
+	var results []record
+	err = DB.Find(&results).Error
+	if err != nil {
+		t.Fatalf("errors happened when querying after create: %v", err)
+	}
+
+	if len(results) != 2 {
+		t.Fatalf("expected 1 parent, got %d", len(results))
+	}
 }

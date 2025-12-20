@@ -97,17 +97,6 @@ func getOracleArrayType(values []any) string {
 	return arrayType
 }
 
-// Helper function to get all column names for a table
-func getAllTableColumns(schema *schema.Schema) []string {
-	var columns []string
-	for _, field := range schema.Fields {
-		if field.DBName != "" {
-			columns = append(columns, field.DBName)
-		}
-	}
-	return columns
-}
-
 // Helper to check if a variable is an OUT parameter
 func isOutParam(v interface{}) bool {
 	_, ok := v.(sql.Out)
@@ -712,4 +701,33 @@ func isZeroFor(t reflect.Type, v interface{}) bool {
 		return !nt.Valid
 	}
 	return false
+}
+
+// generic helper that filters fields based on a predicate
+func filterFields(s *schema.Schema, predicate func(f *schema.Field) bool) []string {
+	var fields []string
+	for _, f := range s.Fields {
+		if predicate(f) {
+			fields = append(fields, f.DBName)
+		}
+	}
+	return fields
+}
+
+func getCreatableFields(s *schema.Schema) []string {
+	return filterFields(s, func(f *schema.Field) bool {
+		return f.Creatable
+	})
+}
+
+func getUpdatableFields(s *schema.Schema) []string {
+	return filterFields(s, func(f *schema.Field) bool {
+		return f.Updatable
+	})
+}
+
+func getMergableFields(s *schema.Schema) []string {
+	return filterFields(s, func(f *schema.Field) bool {
+		return f.Creatable && f.Updatable
+	})
 }

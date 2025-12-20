@@ -451,9 +451,9 @@ func addPrimaryKeyWhereClauseForUpdate(stmt *gorm.Statement) {
 // Build PL/SQL block for UPDATE with RETURNING
 func buildUpdatePLSQL(db *gorm.DB) {
 	stmt := db.Statement
-	schema := stmt.Schema
+	sch := stmt.Schema
 
-	if schema == nil {
+	if sch == nil {
 		db.AddError(fmt.Errorf("schema required for update with returning"))
 		return
 	}
@@ -477,7 +477,7 @@ func buildUpdatePLSQL(db *gorm.DB) {
 
 	// Start PL/SQL block
 	plsqlBuilder.WriteString("DECLARE\n")
-	writeTableRecordCollectionDecl(db, &plsqlBuilder, stmt.Schema.DBNames, stmt.Table)
+	writeTableRecordCollectionDecl(db, &plsqlBuilder, getUpdatableFields(stmt.Schema), stmt.Table)
 	plsqlBuilder.WriteString("  l_updated_records t_records;\n")
 	plsqlBuilder.WriteString("BEGIN\n")
 
@@ -524,7 +524,7 @@ func buildUpdatePLSQL(db *gorm.DB) {
 
 	// Add RETURNING clause
 	plsqlBuilder.WriteString("\n  RETURNING ")
-	allColumns := getAllTableColumns(schema)
+	allColumns := getUpdatableFields(sch)
 	for i, column := range allColumns {
 		if i > 0 {
 			plsqlBuilder.WriteString(", ")
@@ -541,7 +541,7 @@ func buildUpdatePLSQL(db *gorm.DB) {
 	// First, create all OUT parameters
 	for rowIdx := 0; rowIdx < estimatedRows; rowIdx++ {
 		for _, column := range allColumns {
-			field := findFieldByDBName(schema, column)
+			field := findFieldByDBName(sch, column)
 			if field != nil {
 				var dest interface{}
 				if isJSONField(field) {
@@ -563,7 +563,7 @@ func buildUpdatePLSQL(db *gorm.DB) {
 	// Then, generate PL/SQL assignments with correct parameter indices
 	for rowIdx := 0; rowIdx < estimatedRows; rowIdx++ {
 		for colIdx, column := range allColumns {
-			field := findFieldByDBName(schema, column)
+			field := findFieldByDBName(sch, column)
 			if field != nil {
 				paramIndex := outParamStartIndex + (rowIdx * len(allColumns)) + colIdx + 1
 
@@ -671,7 +671,7 @@ func getUpdateReturningValues(db *gorm.DB) {
 		return
 	}
 
-	allColumns := getAllTableColumns(db.Statement.Schema)
+	allColumns := getUpdatableFields(db.Statement.Schema)
 
 	if len(allColumns) == 0 {
 		return
