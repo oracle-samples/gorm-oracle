@@ -960,7 +960,7 @@ func getBulkReturningValues(db *gorm.DB, rowCount int) {
 	}
 
 	// Get all table columns
-	allColumns := db.Statement.Schema.DBNames
+	allColumns := getCreatableFields(db.Statement.Schema)
 
 	// Find the actual starting index of OUT parameters
 	actualStartIndex := -1

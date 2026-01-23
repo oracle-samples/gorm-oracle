@@ -1004,18 +1004,22 @@ func TestCreateChildrenWithMixedPointers(t *testing.T) {
 
 }
 
+// Fixes Issue #116
 func TestCreateReadOnlyJson(t *testing.T) {
 	type record struct {
-		ID            string         `gorm:"column:child_id;primaryKey;type:varchar(36)"`
-		ReadOnlyField string         `gorm:"->;-:migration;column:read_only_field;type:varchar(100)"`
-		JsonTypeField datatypes.JSON `gorm:"column:json_type_field;type:json"`
+		ID             string         `gorm:"column:child_id;primaryKey;type:varchar(36)"`
+		ReadOnlyField  string         `gorm:"->;-:migration;column:read_only_field;type:varchar(100)"`
+		JsonTypeField  datatypes.JSON `gorm:"column:json_type_field;type:json"`
+		JsonTypeField2 AttributeMap   `gorm:"column:json_type_field2;type:json"`
 	}
 
 	json := datatypes.JSON(fmt.Sprintf(`{"key":"%s"}`, strings.Repeat("x", 4000)))
+	attributeMapJSON := AttributeMap{"key": strings.Repeat("x", 4000)}
 	records := []record{
 		{
-			ID:            "1",
-			JsonTypeField: json,
+			ID:             "1",
+			JsonTypeField:  json,
+			JsonTypeField2: attributeMapJSON,
 		},
 		{
 			ID: "2",
