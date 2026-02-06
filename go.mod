@@ -1,6 +1,6 @@
 module github.com/oracle-samples/gorm-oracle
 
-go 1.25.4
+go 1.25.7
 
 require (
 	github.com/godror/godror v0.50.0
@@ -18,7 +18,6 @@ require (
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
 	golang.org/x/exp v0.0.0-20260112195511-716be5621a96 // indirect
-	golang.org/x/sys v0.40.0 // indirect
 	golang.org/x/term v0.39.0 // indirect
 	golang.org/x/text v0.33.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
