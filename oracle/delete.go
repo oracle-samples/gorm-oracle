@@ -236,15 +236,15 @@ func buildStandardDeleteSQL(db *gorm.DB) {
 // Build PL/SQL block for bulk DELETE with RETURNING
 func buildBulkDeletePLSQL(db *gorm.DB) {
 	stmt := db.Statement
-	schema := stmt.Schema
+	sch := stmt.Schema
 
-	if schema == nil {
+	if sch == nil {
 		db.AddError(fmt.Errorf("schema required for bulk delete with returning"))
 		return
 	}
 
 	// Check if this is a soft delete model and we're not using Unscoped
-	if deletedAtField := schema.LookUpField("deleted_at"); deletedAtField != nil && !stmt.Unscoped {
+	if deletedAtField := sch.LookUpField("deleted_at"); deletedAtField != nil && !stmt.Unscoped {
 		// For soft delete with RETURNING, let GORM handle it normally
 		stmt.Build(stmt.BuildClauses...)
 		return
@@ -273,7 +273,7 @@ func buildBulkDeletePLSQL(db *gorm.DB) {
 
 	// Add RETURNING clause
 	plsqlBuilder.WriteString("\n  RETURNING ")
-	allColumns := getAllTableColumns(schema)
+	allColumns := sch.DBNames
 	for i, column := range allColumns {
 		if i > 0 {
 			plsqlBuilder.WriteString(", ")
@@ -290,7 +290,7 @@ func buildBulkDeletePLSQL(db *gorm.DB) {
 
 	for rowIdx := 0; rowIdx < estimatedRows; rowIdx++ {
 		for _, column := range allColumns {
-			if field := findFieldByDBName(schema, column); field != nil {
+			if field := findFieldByDBName(sch, column); field != nil {
 				if isJSONField(field) {
 					if isRawMessageField(field) {
 						// Column is a BLOB, return raw bytes; no JSON_SERIALIZE
@@ -527,7 +527,7 @@ func getDeleteBulkReturningValues(db *gorm.DB) {
 		return
 	}
 
-	allColumns := getAllTableColumns(db.Statement.Schema)
+	allColumns := db.Statement.Schema.DBNames
 
 	// Count OUT parameters and calculate max rows
 	outParamCount := 0

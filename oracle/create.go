@@ -311,7 +311,7 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 	sanitizeCreateValuesForBulkArrays(db.Statement, &createValues)
 
 	stmt := db.Statement
-	schema := stmt.Schema
+	sch := stmt.Schema
 
 	onConflict, ok := onConflictClause.Expression.(clause.OnConflict)
 	if !ok {
@@ -322,10 +322,10 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 	// Determine conflict columns (use primary key if not specified)
 	conflictColumns := onConflict.Columns
 	if len(conflictColumns) == 0 {
-		if schema == nil || len(schema.PrimaryFields) == 0 {
+		if sch == nil || len(sch.PrimaryFields) == 0 {
 			return
 		}
-		for _, primaryField := range schema.PrimaryFields {
+		for _, primaryField := range sch.PrimaryFields {
 			conflictColumns = append(conflictColumns, clause.Column{Name: primaryField.DBName})
 		}
 	}
@@ -340,7 +340,7 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 	var filteredConflictColumns []clause.Column
 	for _, conflictCol := range conflictColumns {
 		field := stmt.Schema.LookUpField(conflictCol.Name)
-		if valuesColumnMap[strings.ToUpper(conflictCol.Name)] && fieldCanConflict(field, schema) {
+		if valuesColumnMap[strings.ToUpper(conflictCol.Name)] && fieldCanConflict(field, sch) {
 			filteredConflictColumns = append(filteredConflictColumns, conflictCol)
 		}
 	}
@@ -358,7 +358,7 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 
 	// Start PL/SQL block
 	plsqlBuilder.WriteString("DECLARE\n")
-	writeTableRecordCollectionDecl(db, &plsqlBuilder, stmt.Schema.DBNames, stmt.Table)
+	writeTableRecordCollectionDecl(db, &plsqlBuilder, getCreatableFields(stmt.Schema), stmt.Table)
 	plsqlBuilder.WriteString("  l_affected_records t_records;\n")
 
 	// Create array types and variables for each column
@@ -457,9 +457,9 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 			}
 
 			isAutoIncrement := false
-			if schema.PrioritizedPrimaryField != nil &&
-				schema.PrioritizedPrimaryField.AutoIncrement &&
-				strings.EqualFold(schema.PrioritizedPrimaryField.DBName, column.Name) {
+			if sch.PrioritizedPrimaryField != nil &&
+				sch.PrioritizedPrimaryField.AutoIncrement &&
+				strings.EqualFold(sch.PrioritizedPrimaryField.DBName, column.Name) {
 				isAutoIncrement = true
 			} else if stmt.Schema.LookUpField(column.Name).AutoIncrement {
 				isAutoIncrement = true
@@ -563,7 +563,8 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 
 	// Add RETURNING clause with BULK COLLECT INTO
 	plsqlBuilder.WriteString("    RETURNING ")
-	allColumns := getAllTableColumns(schema)
+	allColumns := getMergableFields(sch)
+
 	for i, column := range allColumns {
 		if i > 0 {
 			plsqlBuilder.WriteString(", ")
@@ -576,7 +577,7 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 	outParamIndex := len(stmt.Vars)
 	for rowIdx := 0; rowIdx < len(createValues.Values); rowIdx++ {
 		for _, column := range allColumns {
-			if field := findFieldByDBName(schema, column); field != nil {
+			if field := findFieldByDBName(sch, column); field != nil {
 				if isJSONField(field) {
 					if isRawMessageField(field) {
 						// Column is a BLOB, return raw bytes; no JSON_SERIALIZE
@@ -638,13 +639,13 @@ func buildBulkMergePLSQL(db *gorm.DB, createValues clause.Values, onConflictClau
 // Build PL/SQL block for bulk INSERT only (no conflict handling)
 func buildBulkInsertOnlyPLSQL(db *gorm.DB, createValues clause.Values, bindMap plsqlBindVariableMap) {
 	stmt := db.Statement
-	schema := stmt.Schema
+	sch := stmt.Schema
 
 	var plsqlBuilder strings.Builder
 
 	// Start PL/SQL block
 	plsqlBuilder.WriteString("DECLARE\n")
-	writeTableRecordCollectionDecl(db, &plsqlBuilder, stmt.Schema.DBNames, stmt.Table)
+	writeTableRecordCollectionDecl(db, &plsqlBuilder, getCreatableFields(stmt.Schema), stmt.Table)
 	plsqlBuilder.WriteString("  l_inserted_records t_records;\n")
 
 	// Create array types and variables for each column
@@ -694,7 +695,7 @@ func buildBulkInsertOnlyPLSQL(db *gorm.DB, createValues clause.Values, bindMap p
 
 	// Add RETURNING clause with BULK COLLECT INTO
 	plsqlBuilder.WriteString("    RETURNING ")
-	allColumns := getAllTableColumns(schema)
+	allColumns := getCreatableFields(sch)
 	for i, column := range allColumns {
 		if i > 0 {
 			plsqlBuilder.WriteString(", ")
@@ -711,7 +712,7 @@ func buildBulkInsertOnlyPLSQL(db *gorm.DB, createValues clause.Values, bindMap p
 			db.QuoteTo(&columnBuilder, column)
 			quotedColumn := columnBuilder.String()
 
-			if field := findFieldByDBName(schema, column); field != nil {
+			if field := findFieldByDBName(sch, column); field != nil {
 				if isJSONField(field) {
 					if isRawMessageField(field) {
 						// Column is a BLOB, return raw bytes; no JSON_SERIALIZE
@@ -959,7 +960,7 @@ func getBulkReturningValues(db *gorm.DB, rowCount int) {
 	}
 
 	// Get all table columns
-	allColumns := getAllTableColumns(db.Statement.Schema)
+	allColumns := getCreatableFields(db.Statement.Schema)
 
 	// Find the actual starting index of OUT parameters
 	actualStartIndex := -1
