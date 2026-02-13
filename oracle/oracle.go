@@ -266,7 +266,7 @@ func (d Dialector) QuoteTo(writer clause.Writer, str string) {
 var numericPlaceholder = regexp.MustCompile(`:(\d+)`)
 
 // Explain Formats SQL statements with variables, string literals will be encoded
-// with in ”
+// with in "
 func (d Dialector) Explain(sqlStr string, vars ...interface{}) string {
 	clonedVars := make([]interface{}, len(vars))
 	copy(clonedVars, vars)
@@ -283,14 +283,23 @@ func (d Dialector) Explain(sqlStr string, vars ...interface{}) string {
 	return logger.ExplainSQL(sqlStr, numericPlaceholder, "'", clonedVars...)
 }
 
+var savepointNameRegex = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
+
 // SavePoint creates a save point with the given name
 func (d Dialector) SavePoint(tx *gorm.DB, name string) error {
+	if !savepointNameRegex.MatchString(name) {
+		return fmt.Errorf("invalid savepoint name: %s", name)
+	}
 	tx.Exec("SAVEPOINT " + name)
 	return tx.Error
 }
 
 // RollbackTo Rolls back to the given save point
 func (d Dialector) RollbackTo(tx *gorm.DB, name string) error {
+	if !savepointNameRegex.MatchString(name) {
+		return fmt.Errorf("invalid savepoint name: %s", name)
+	}
 	tx.Exec("ROLLBACK TO SAVEPOINT " + name)
 	return tx.Error
 }
+```
