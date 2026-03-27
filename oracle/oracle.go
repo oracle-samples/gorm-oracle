@@ -107,6 +107,7 @@ func (d Dialector) Initialize(db *gorm.DB) (err error) {
 	callback.Create().Replace("gorm:create", Create)
 	callback.Delete().Replace("gorm:delete", Delete)
 	callback.Update().Replace("gorm:update", Update)
+	callback.Query().After("gorm:query").Register("oracle:after_query", AfterQuery)
 	callback.Query().Before("gorm:query").Register("oracle:before_query", BeforeQuery)
 
 	if d.SkipQuoteIdentifiers {

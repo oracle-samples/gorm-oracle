@@ -39,6 +39,7 @@
 package oracle
 
 import (
+	"reflect"
 	"regexp"
 	"strings"
 
@@ -58,6 +59,22 @@ func BeforeQuery(db *gorm.DB) {
 	if strings.Contains(name, " ") || strings.Contains(name, "`") {
 		if results := tableRegexp.FindStringSubmatch(name); len(results) == 3 {
 			db.Statement.Table = results[2]
+		}
+	}
+}
+
+func AfterQuery(db *gorm.DB) {
+	if db == nil || db.Statement == nil || db.Statement.Schema == nil {
+		return
+	}
+	destinationStruct := reflect.ValueOf(db.Statement.Dest)
+	for _, field := range db.Statement.Schema.Fields {
+		if field.DataType == "uuid" {
+			uuidDestField := reflect.Indirect(destinationStruct).FieldByName(field.Name)
+			if uuidDestField.Kind() == reflect.Ptr && !uuidDestField.IsNil() && uuidDestField.Elem().IsZero() {
+				// NULL UUIDs should be returned as nil if the field is a pointer type (as opposed to all-zero value)
+				field.Set(db.Statement.Context, destinationStruct, nil)
+			}
 		}
 	}
 }
