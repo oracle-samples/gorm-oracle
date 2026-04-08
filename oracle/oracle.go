@@ -49,7 +49,7 @@ import (
 
 	"maps"
 
-	_ "github.com/godror/godror"
+	_ "github.com/oracle/pure-go-driver/oracle"
 	"gorm.io/gorm"
 	"gorm.io/gorm/callbacks"
 	"gorm.io/gorm/clause"
@@ -59,7 +59,7 @@ import (
 	"gorm.io/gorm/utils"
 )
 
-const DefaultDriverName string = "godror"
+const DefaultDriverName string = "oraclego"
 
 type Config struct {
 	DriverName           string
