@@ -51,8 +51,8 @@ import (
  * Test 1: Simple Join with SkipQuoteIdentifiers
  **/
 
-// book domain struct - represents a book in a library
-type book struct {
+// Book domain struct - represents a Book in a library
+type Book struct {
 	ID          string    `gorm:"column:book_id;primaryKey;size:36"`
 	Title       string    `gorm:"column:title;size:256"`
 	AuthorID    string    `gorm:"column:author_id;size:36;not null"`
@@ -60,36 +60,36 @@ type book struct {
 	PublishedAt time.Time `gorm:"column:published_at"`
 }
 
-func (book) TableName() string {
+func (Book) TableName() string {
 	return "books"
 }
 
-// bookModel with Author relationship - used for queries with joined data
-type bookModel struct {
-	book
-	Author *authorModel `gorm:"foreignKey:AuthorID;references:ID"` // This is the field that fails to populate on Oracle
+// BookModel with Author relationship - used for queries with joined data
+type BookModel struct {
+	Book
+	Author *AuthorModel `gorm:"foreignKey:AuthorID;references:ID"` // This is the field that fails to populate on Oracle
 }
 
-func (bookModel) TableName() string {
+func (BookModel) TableName() string {
 	return "books"
 }
 
-// author domain struct - represents an author
-type author struct {
+// Author domain struct - represents an Author
+type Author struct {
 	ID   string `gorm:"column:id;primaryKey"`
 	Name string `gorm:"column:authorname"`
 }
 
-func (author) TableName() string {
+func (Author) TableName() string {
 	return "authors"
 }
 
-// authorModel wrapper - used for relationships
-type authorModel struct {
-	author
+// AuthorModel wrapper - used for relationships
+type AuthorModel struct {
+	Author
 }
 
-func (authorModel) TableName() string {
+func (AuthorModel) TableName() string {
 	return "authors"
 }
 
@@ -112,8 +112,8 @@ func TestJoinsWithSkipQuoteIdentifiers(t *testing.T) {
 	}
 
 	// Test the Join with GORM's ORM mapping
-	var dbBooks []bookModel
-	result := db.Model(&bookModel{}).
+	var dbBooks []BookModel
+	result := db.Model(&BookModel{}).
 		Joins("Author").
 		Find(&dbBooks)
 
@@ -171,7 +171,7 @@ func setupTest1Tables(db *gorm.DB) error {
 
 func insertTest1Data(db *gorm.DB) error {
 	// Insert test author
-	author := author{
+	author := Author{
 		ID:   "JKR",
 		Name: "J.K. Rowling",
 	}
@@ -180,7 +180,7 @@ func insertTest1Data(db *gorm.DB) error {
 	}
 
 	// Insert test book
-	book := book{
+	book := Book{
 		ID:          "HPATPS",
 		Title:       "Harry Potter and the Philosopher's Stone",
 		AuthorID:    "JKR",
