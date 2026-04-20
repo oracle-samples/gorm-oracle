@@ -2,6 +2,9 @@ name: Run Tests
 
 on: push
 
+permissions:
+  contents: read
+
 jobs:
   run-tests:
     runs-on: ubuntu-latest
@@ -63,8 +66,19 @@ jobs:
 
         $GORM_ORACLEDB_LIBDIR/sqlplus -s "sys/${GORM_SYS_PASSOWRD}@${GORM_ORACLEDB_CONNECTSTRING} AS SYSDBA" @alter_user.sql
 
-    - name: Checkout
-      uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+    # Check the GitHub Actions workflows in the repository for vulnerabilities.
+    # Note: adjust the policy_purl to refer to your repository URL.
+    - name: Run Macaron action
+      id: run_macaron
+      uses: oracle/macaron@b31acfe389133a5587d9639063ec70cb84e7bc47 # v0.23.0
+      with:
+        repo_path: ./
+        policy_file: check-github-actions
+        policy_purl: pkg:github.com/oracle/macaron@.*
+        reports_retention_days: 90
 
     - name: Run all tests under tests directory
       run: |
