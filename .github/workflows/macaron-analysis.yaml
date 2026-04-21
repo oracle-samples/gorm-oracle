@@ -6,9 +6,11 @@ on:
     # - main
     paths:
     - .github/workflows/**
+    - ".github/actions/**"
   pull_request:
     paths:
     - .github/workflows/**
+    - ".github/actions/**"
   workflow_dispatch:
   schedule:
     - cron: "20 15 * * 3"
