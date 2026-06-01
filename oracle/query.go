@@ -55,14 +55,19 @@ import (
 var tableRegexp = regexp.MustCompile(`^"(\w+)"\s+"?(\w+)"?$`)
 
 func BeforeQuery(db *gorm.DB) {
-	if db == nil || db.Statement == nil || db.Statement.TableExpr == nil {
+	if db == nil || db.Statement == nil {
 		return
 	}
-	name := db.Statement.TableExpr.SQL
-	if strings.Contains(name, " ") || strings.Contains(name, "`") {
-		if results := tableRegexp.FindStringSubmatch(name); len(results) == 3 {
-			db.Statement.Table = results[2]
+	if db.Statement.TableExpr != nil {
+		name := db.Statement.TableExpr.SQL
+		if strings.Contains(name, " ") || strings.Contains(name, "`") {
+			if results := tableRegexp.FindStringSubmatch(name); len(results) == 3 {
+				db.Statement.Table = results[2]
+			}
 		}
+	}
+	for i, val := range db.Statement.Vars {
+		db.Statement.Vars[i] = convertValue(val)
 	}
 }
 
