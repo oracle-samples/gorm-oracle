@@ -72,19 +72,10 @@ func BeforeQuery(db *gorm.DB) {
 }
 
 func AfterQuery(db *gorm.DB) {
-	if db == nil || db.Statement == nil || db.Statement.Schema == nil {
+	if db == nil || db.Statement == nil {
 		return
 	}
-	destinationStruct := reflect.ValueOf(db.Statement.Dest)
-	for _, field := range db.Statement.Schema.Fields {
-		if field.DataType == "uuid" {
-			uuidDestField := reflect.Indirect(destinationStruct).FieldByName(field.Name)
-			if uuidDestField.Kind() == reflect.Ptr && !uuidDestField.IsNil() && uuidDestField.Elem().IsZero() {
-				// NULL UUIDs should be returned as nil if the field is a pointer type (as opposed to all-zero value)
-				field.Set(db.Statement.Context, destinationStruct, nil)
-			}
-		}
-	}
+	fixStructsWithZeroUUIDPtrs(db.Statement)
 }
 
 // MismatchedCaseHandler handles Oracle case insensitivity for unquoted identifiers.
@@ -169,4 +160,41 @@ func addNestedFieldMappings(columnMapping map[string]string, aliasName string, j
 		nestedName := utils.NestedRelationName(aliasName, dbName)
 		columnMapping[strings.ToUpper(nestedName)] = nestedName
 	}
+}
+
+// fixStructsWithZeroUUIDPtrs replaces any pointers to zero-value UUIDs in the current statement's destination struct(s) with nil.
+func fixStructsWithZeroUUIDPtrs(stmt *gorm.Statement) {
+	if stmt == nil || stmt.Schema == nil {
+		return
+	}
+	var processValue func(value reflect.Value)
+	processValue = func(value reflect.Value) {
+		// If it's a pointer, dereference it to get to the actual value for the kind checking.
+		// We will set the field on the pointer if it's addressable, or create a new pointer if not.
+		value = reflect.Indirect(value)
+
+		// We may get a struct, slice, or array depending on the destination's type.
+		switch value.Kind() {
+		case reflect.Slice, reflect.Array:
+			for i := 0; i < value.Len(); i++ {
+				processValue(value.Index(i))
+			}
+		case reflect.Struct:
+			var valuePtr reflect.Value
+			if !value.CanAddr() {
+				return
+			}
+			valuePtr = value.Addr()
+
+			for _, field := range stmt.Schema.Fields {
+				if field.DataType == "uuid" {
+					fieldValue := value.FieldByName(field.Name)
+					if fieldValue.Kind() == reflect.Ptr && !fieldValue.IsNil() && fieldValue.Elem().IsZero() {
+						field.Set(stmt.Context, valuePtr, nil)
+					}
+				}
+			}
+		}
+	}
+	processValue(reflect.ValueOf(stmt.Dest))
 }

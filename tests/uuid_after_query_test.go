@@ -40,6 +40,7 @@ package tests
 
 import (
 	"context"
+	"reflect"
 	"sync"
 	"testing"
 
@@ -70,7 +71,12 @@ type afterQueryNonUUIDModel struct {
 // construct minimal *gorm.DB with dest struct bound on statement
 func buildDBForAfterQuery(t *testing.T, dest interface{}) *gorm.DB {
 	t.Helper()
-	s, err := schema.Parse(dest, &sync.Map{}, schema.NamingStrategy{})
+	destForSchema := dest
+	kind := reflect.Indirect(reflect.ValueOf(dest)).Kind()
+	if kind == reflect.Slice || kind == reflect.Array {
+		destForSchema = reflect.Indirect(reflect.ValueOf(dest)).Index(0).Interface()
+	}
+	s, err := schema.Parse(destForSchema, &sync.Map{}, schema.NamingStrategy{})
 	if err != nil {
 		t.Fatalf("schema.Parse failed: %v", err)
 	}
@@ -101,6 +107,27 @@ func TestAfterQuery_UUIDPtr_ZeroUUID_SetToNil(t *testing.T) {
 
 	if dest.UUID != nil {
 		t.Errorf("expected UUID to be nil for a zero UUID value, got %v", dest.UUID)
+	}
+}
+
+func TestAfterQuery_UUIDPtr_ZeroUUID_SetToNil_Slice(t *testing.T) {
+	zeroUUID := uuid.UUID{} // 00000000-0000-0000-0000-000000000000 is what gorm reflection gives back when Oracle holds NULL
+	dest := []*afterQueryUUIDPtrModel{{UUID: &zeroUUID}, {UUID: &zeroUUID}}
+	oracle.AfterQuery(buildDBForAfterQuery(t, dest))
+
+	if (dest)[0].UUID != nil || (dest)[1].UUID != nil {
+		t.Errorf("expected UUID to be nil for a zero UUID value, got %v and %v", (dest)[0].UUID, (dest)[1].UUID)
+	}
+}
+
+// Ensure it works when the dest is an array of structs as well
+func TestAfterQuery_UUIDPtr_ZeroUUID_SetToNil_Array(t *testing.T) {
+	zeroUUID := uuid.UUID{} // 00000000-0000-0000-0000-000000000000 is what gorm reflection gives back when Oracle holds NULL
+	dest := [2]*afterQueryUUIDPtrModel{{UUID: &zeroUUID}, {UUID: &zeroUUID}}
+	oracle.AfterQuery(buildDBForAfterQuery(t, dest))
+
+	if dest[0].UUID != nil || dest[1].UUID != nil {
+		t.Errorf("expected UUID to be nil for a zero UUID value, got %v and %v", dest[0].UUID, dest[1].UUID)
 	}
 }
 
