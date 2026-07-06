@@ -297,15 +297,15 @@ func TestSmartMigrateColumn(t *testing.T) {
 		switch columnType.Name() {
 		case "name":
 			if length, _ := columnType.Length(); (fullSupported || length != 0) && length != 256 {
-				t.Fatalf("name's length should be 128, but got %v", length)
+				t.Fatalf("name's length should be 256, but got %v", length)
 			}
 		case "salary":
 			if precision, _, _ := columnType.DecimalSize(); (fullSupported || precision != 0) && precision != 3 {
-				t.Fatalf("salary's precision should be 2, but got %v", precision)
+				t.Fatalf("salary's precision should be 3, but got %v", precision)
 			}
 		case "birthday":
 			if precision, _, _ := columnType.DecimalSize(); (fullSupported || precision != 0) && precision != 3 {
-				t.Fatalf("birthday's precision should be 2, but got %v", precision)
+				t.Fatalf("birthday's precision should be 3, but got %v", precision)
 			}
 		case "name_ignore_migration":
 			if length, _ := columnType.Length(); (fullSupported || length != 0) && length != 100 {
