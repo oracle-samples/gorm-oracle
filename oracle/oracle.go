@@ -162,7 +162,7 @@ func (d Dialector) DataTypeOf(field *schema.Field) string {
 	case schema.String:
 		return d.getStringType(field)
 	case schema.Time:
-		return d.getDataTimeType()
+		return d.getDataTimeType(field)
 	case schema.Bytes:
 		return d.getBLOBType()
 	default:
@@ -193,9 +193,12 @@ func (d Dialector) getBooleanType() string {
 	return "NUMBER(1)"
 }
 
-func (d Dialector) getDataTimeType() string {
-	sqlType := "TIMESTAMP WITH TIME ZONE"
-	return sqlType
+func (d Dialector) getDataTimeType(field *schema.Field) string {
+	if field.Precision > 0 {
+		return fmt.Sprintf("TIMESTAMP(%d) WITH TIME ZONE", field.Precision)
+	}
+
+	return "TIMESTAMP WITH TIME ZONE"
 }
 
 func (d Dialector) getBLOBType() string {
