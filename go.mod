@@ -1,12 +1,12 @@
 module github.com/oracle-samples/gorm-oracle
 
-go 1.25.9
+go 1.25.11
 
 require (
-	github.com/godror/godror v0.50.0
+	github.com/godror/godror v0.51.0
 	github.com/google/uuid v1.6.0
 	gorm.io/datatypes v1.2.7
-	gorm.io/gorm v1.31.1
+	gorm.io/gorm v1.31.2
 )
 
 require (
