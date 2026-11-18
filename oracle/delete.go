@@ -40,6 +40,7 @@ package oracle
 
 import (
 	"database/sql"
+	"database/sql/driver"
 	"fmt"
 	"reflect"
 	"strings"
@@ -399,19 +400,8 @@ func buildExpressionClause(db *gorm.DB, plsqlBuilder *strings.Builder, e clause.
 		if varIndex < len(e.Vars) {
 			// Check if this is an IN expression with a slice
 			if strings.Contains(exprSQL, "IN ?") && varIndex < len(e.Vars) {
-				// Handle different slice types
-				var values []interface{}
-
-				switch v := e.Vars[varIndex].(type) {
-				case []interface{}:
-					values = v
-				case []string:
-					// Convert []string to []interface{}
-					values = make([]interface{}, len(v))
-					for i, s := range v {
-						values[i] = s
-					}
-				default:
+				values, ok := inClauseValues(e.Vars[varIndex])
+				if !ok {
 					// Fall back to regular parameter replacement
 					exprSQL = strings.Replace(exprSQL, "?", fmt.Sprintf(":%d", len(stmt.Vars)+1), 1)
 					stmt.Vars = append(stmt.Vars, convertValue(e.Vars[varIndex]))
@@ -419,7 +409,11 @@ func buildExpressionClause(db *gorm.DB, plsqlBuilder *strings.Builder, e clause.
 					continue
 				}
 
-				if len(values) > 0 {
+				if len(values) == 0 {
+					// Same as GORM for an empty slice
+					exprSQL = strings.Replace(exprSQL, "?", "(NULL)", 1)
+					varIndex++
+				} else {
 					// Handle IN clause with multiple values
 					inClause := "("
 					for j, val := range values {
@@ -445,6 +439,27 @@ func buildExpressionClause(db *gorm.DB, plsqlBuilder *strings.Builder, e clause.
 	}
 
 	plsqlBuilder.WriteString(exprSQL)
+}
+
+// inClauseValues returns the elements of v if GORM would expand it for "IN ?":
+// any slice or array, except []byte and driver.Valuer values.
+func inClauseValues(v interface{}) ([]interface{}, bool) {
+	switch v := v.(type) {
+	case driver.Valuer, []byte:
+		return nil, false
+	case []interface{}:
+		return v, true
+	}
+
+	rv := reflect.ValueOf(v)
+	if (rv.Kind() != reflect.Slice && rv.Kind() != reflect.Array) || rv.Type().Elem() == reflect.TypeOf(uint8(0)) {
+		return nil, false
+	}
+	values := make([]interface{}, rv.Len())
+	for i := range values {
+		values[i] = rv.Index(i).Interface()
+	}
+	return values, true
 }
 
 // Execute the delete statement
